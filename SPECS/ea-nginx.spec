@@ -1,7 +1,7 @@
 #
 %define nginx_home %{_localstatedir}/cache/nginx
-%define nginx_user nginx
-%define nginx_group nginx
+%define nginx_user nobody
+%define nginx_group nobody
 %define nginx_loggroup adm
 
 # distribution specific definitions
@@ -48,7 +48,6 @@ BuildRequires: systemd
 # end of distribution specific definitions
 
 %define main_version 1.15.9
-%define main_release 1%{?dist}.ngx
 
 %define bdir %{_builddir}/%{name}-%{main_version}
 
@@ -58,14 +57,16 @@ BuildRequires: systemd
 %define BASE_CONFIGURE_ARGS $(echo "--prefix=%{_sysconfdir}/nginx --sbin-path=%{_sbindir}/nginx --modules-path=%{_libdir}/nginx/modules --conf-path=%{_sysconfdir}/nginx/nginx.conf --error-log-path=%{_localstatedir}/log/nginx/error.log --http-log-path=%{_localstatedir}/log/nginx/access.log --pid-path=%{_localstatedir}/run/nginx.pid --lock-path=%{_localstatedir}/run/nginx.lock --http-client-body-temp-path=%{_localstatedir}/cache/nginx/client_temp --http-proxy-temp-path=%{_localstatedir}/cache/nginx/proxy_temp --http-fastcgi-temp-path=%{_localstatedir}/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=%{_localstatedir}/cache/nginx/uwsgi_temp --http-scgi-temp-path=%{_localstatedir}/cache/nginx/scgi_temp --user=%{nginx_user} --group=%{nginx_group} --with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module")
 
 Summary: High performance web server
-Name: nginx
+Name: ea-nginx
 Version: %{main_version}
-Release: %{main_release}
-Vendor: Nginx, Inc.
+# Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
+%define release_prefix 1
+Release: %{release_prefix}%{?dist}.cpanel
+Vendor: cPanel, L.L.C
 URL: http://nginx.org/
 Group: %{_group}
 
-Source0: http://nginx.org/download/%{name}-%{version}.tar.gz
+Source0: http://nginx.org/download/nginx-%{version}.tar.gz
 Source1: logrotate
 Source2: nginx.init.in
 Source3: nginx.sysconf
@@ -81,7 +82,7 @@ Source13: nginx.check-reload.sh
 
 License: 2-clause BSD-like license
 
-BuildRoot: %{_tmppath}/%{name}-%{main_version}-%{main_release}-root
+BuildRoot: %{_tmppath}/%{name}-%{main_version}-%{release}-root
 BuildRequires: zlib-devel
 BuildRequires: pcre-devel
 
@@ -96,7 +97,7 @@ a mail proxy server.
 %endif
 
 %prep
-%setup -q
+%setup -q -n nginx-%{version}
 cp %{SOURCE2} .
 sed -e 's|%%DEFAULTSTART%%|2 3 4 5|g' -e 's|%%DEFAULTSTOP%%|0 1 6|g' \
     -e 's|%%PROVIDES%%|nginx|g' < %{SOURCE2} > nginx.init
@@ -312,6 +313,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
+- cPanelize nginx SPEC file
+
 * Tue Feb 26 2019 Konstantin Pavlov <thresh@nginx.com>
 - 1.15.9
 
