@@ -1,4 +1,5 @@
 #
+%define upstream_name nginx
 %define nginx_home %{_localstatedir}/cache/nginx
 %define nginx_user nobody
 %define nginx_group nobody
@@ -49,7 +50,7 @@ BuildRequires: systemd
 
 %define main_version 1.15.9
 
-%define bdir %{_builddir}/%{name}-%{main_version}
+%define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
 %define WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC
 %define WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie
@@ -82,7 +83,7 @@ Source13: nginx.check-reload.sh
 
 License: 2-clause BSD-like license
 
-BuildRoot: %{_tmppath}/%{name}-%{main_version}-%{release}-root
+BuildRoot: %{_tmppath}/%{upstream_name}-%{main_version}-%{release}-root
 BuildRequires: zlib-devel
 BuildRequires: pcre-devel
 
@@ -135,9 +136,9 @@ make %{?_smp_mflags}
 cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
     %{__ln_s} ../..%{_libdir}/nginx/modules modules && cd -
 
-%{__mkdir} -p $RPM_BUILD_ROOT%{_datadir}/doc/%{name}-%{main_version}
+%{__mkdir} -p $RPM_BUILD_ROOT%{_datadir}/doc/%{upstream_name}-%{main_version}
 %{__install} -m 644 -p %{SOURCE12} \
-    $RPM_BUILD_ROOT%{_datadir}/doc/%{name}-%{main_version}/
+    $RPM_BUILD_ROOT%{_datadir}/doc/%{upstream_name}-%{main_version}/
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
 %{__rm} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
@@ -232,8 +233,8 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 %attr(0755,root,root) %dir %{_localstatedir}/cache/nginx
 %attr(0755,root,root) %dir %{_localstatedir}/log/nginx
 
-%dir %{_datadir}/doc/%{name}-%{main_version}
-%doc %{_datadir}/doc/%{name}-%{main_version}/COPYRIGHT
+%dir %{_datadir}/doc/%{upstream_name}-%{main_version}
+%doc %{_datadir}/doc/%{upstream_name}-%{main_version}/COPYRIGHT
 %{_mandir}/man8/nginx.8*
 
 %pre
