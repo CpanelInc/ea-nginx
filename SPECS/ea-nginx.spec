@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -80,6 +80,12 @@ Source10: nginx.suse.logrotate
 Source11: nginx-debug.service
 Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
+Source14: cpanel/conf.d/includes-optional/cpanel-fastcgi.conf
+Source15: cpanel/conf.d/cpanel-proxy-non-ssl.conf
+Source16: cpanel/conf.d/server-includes/cpanel-static-locations.conf
+Source17: cpanel/conf.d/server-includes/cpanel-redirect-locations.conf
+Source18: cpanel/conf.d/server-includes/cpanel-mailman-locations.conf
+Source19: cpanel/conf.d/users.conf
 
 License: 2-clause BSD-like license
 
@@ -146,6 +152,23 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
 %{__install} -m 644 -p %{SOURCE5} \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/default.conf
+
+%{__install} -m 644 -p %{SOURCE19} \
+    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/users.conf
+%{__install} -m 644 -p %{SOURCE15} \
+    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
+
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/includes-optional/
+%{__install} -m 644 -p %{SOURCE14} \
+    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
+
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/
+%{__install} -m 644 -p %{SOURCE16} \
+    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
+%{__install} -m 644 -p %{SOURCE17} \
+    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
+%{__install} -m 644 -p %{SOURCE18} \
+    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 %{__install} -m 644 -p %{SOURCE3} \
@@ -314,6 +337,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Mar 14 2019 Dan Muey <dan@cpanel.net> - 1.15.9-2
+- ZC-4868: Add cPanel specific configurations
+
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file
 
