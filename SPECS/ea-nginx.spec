@@ -80,12 +80,7 @@ Source10: nginx.suse.logrotate
 Source11: nginx-debug.service
 Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
-Source14: cpanel/conf.d/includes-optional/cpanel-fastcgi.conf
-Source15: cpanel/conf.d/cpanel-proxy-non-ssl.conf
-Source16: cpanel/conf.d/server-includes/cpanel-static-locations.conf
-Source17: cpanel/conf.d/server-includes/cpanel-redirect-locations.conf
-Source18: cpanel/conf.d/server-includes/cpanel-mailman-locations.conf
-Source19: cpanel/conf.d/users.conf
+Source14: cpanel.tar.gz
 
 License: 2-clause BSD-like license
 
@@ -153,22 +148,10 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 %{__install} -m 644 -p %{SOURCE5} \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/default.conf
 
-%{__install} -m 644 -p %{SOURCE19} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/users.conf
-%{__install} -m 644 -p %{SOURCE15} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
-
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/includes-optional/
-%{__install} -m 644 -p %{SOURCE14} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
-
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/
-%{__install} -m 644 -p %{SOURCE16} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
-%{__install} -m 644 -p %{SOURCE17} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
-%{__install} -m 644 -p %{SOURCE18} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
+mkdir cpanel && cd cpanel && tar xzf %{SOURCE14}  && cd ..
+cp -r cpanel/conf.d/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 %{__install} -m 644 -p %{SOURCE3} \
@@ -222,6 +205,13 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/
 
 %dir %{_sysconfdir}/nginx
 %dir %{_sysconfdir}/nginx/conf.d
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
+
 %{_sysconfdir}/nginx/modules
 
 %config(noreplace) %{_sysconfdir}/nginx/nginx.conf
