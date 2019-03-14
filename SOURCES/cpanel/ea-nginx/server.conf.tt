@@ -1,0 +1,60 @@
+server {
+    server_name[% FOREACH domain IN domains %] [% domain %] www.[% domain %][% END %];
+
+    [%- IF ssl_certificate && ssl_certificate_key %]
+    listen 443 ssl;
+    ssl_certificate [% ssl_certificate %];
+    ssl_certificate_key [% ssl_certificate_key %];
+    [% END -%]
+
+    root [% docroot %];
+    index index.php index.html;
+
+    include conf.d/server-includes/*.conf;
+    include conf.d/users/[% user %]/*.conf;
+    include conf.d/users/[% user %]/[% domains.0 %]/*.conf;
+}
+
+[%- IF ssl_certificate && ssl_certificate_key %]
+#### SSL Proxies ##
+    [%- FOREACH domain IN domains %]
+#### SSL Proxies for [% domain %] ##
+# TODO ZC-4869: .cpanel/dcv bit 
+    [%- SET subdom_map = {
+            cpanel  = 2082, webmail    = 2095, whm        = 2087,
+            webdisk = 2077, cpcontacts = 2079, cpcalndars = 2079,
+        }
+    -%]
+        [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
+server {
+    listen 443 ssl;
+    ssl_certificate [% ssl_certificate %];
+    ssl_certificate_key [% ssl_certificate_key %];
+
+    server_name [% FOREACH domain IN domains %] [% proxy_subdomain %].[% domain %][% END %];
+
+    location / {
+        [%- IF proxy_subdomain.match('^(?:cpanel|webmail|whm)$') %]
+        # since proxy_set_header can not be done inside an if block we jump though hoops
+        # default value is empty because the header will be only sent if $value is not empty
+        set $upgrade_value "";
+        set $connection_value "";
+
+        if ($http_upgrade ~* ^websocket$) {
+            set $upgrade_value $http_upgrade;
+            set $connection_value "upgrade";
+        }
+
+        # In nginx you still need to use `http` for protocol in your url and not `ws`.
+        # The `ws` and `wss` protocol are required for browser, in the nginx side we add
+        #   the headers below to handle the websockets over `http`.
+        proxy_set_header Upgrade $upgrade_value; # the header will be only sent if $upgrade_value is not empty
+        proxy_set_header Connection $connection_value; # the header will be only sent if $connection_value is not empty
+        [%- END %]
+        proxy_pass http://127.0.0.1:[% subdom_map.$proxy_subdomain %];
+    }
+}
+
+        [%- END -%]
+    [%- END -%]
+[%- END -%]
