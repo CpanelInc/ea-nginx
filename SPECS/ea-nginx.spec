@@ -145,6 +145,8 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 %{__rm} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
 %{__install} -m 644 -p %{SOURCE4} \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
+perl -pi -e 's/^user\s+nginx;/user nobody;/g' $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
+
 %{__install} -m 644 -p %{SOURCE5} \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/default.conf
 
