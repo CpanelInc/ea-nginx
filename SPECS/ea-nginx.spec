@@ -67,6 +67,9 @@ Vendor: cPanel, L.L.C
 URL: http://nginx.org/
 Group: %{_group}
 
+Provides: nginx
+Conflicts: nginx
+
 Source0: http://nginx.org/download/nginx-%{version}.tar.gz
 Source1: logrotate
 Source2: nginx.init.in
@@ -295,16 +298,22 @@ BANNER
         if [ ! -e %{_localstatedir}/log/nginx/access.log ]; then
             touch %{_localstatedir}/log/nginx/access.log
             %{__chmod} 640 %{_localstatedir}/log/nginx/access.log
-            %{__chown} nginx:%{nginx_loggroup} %{_localstatedir}/log/nginx/access.log
+            %{__chown} %{nginx_user}:%{nginx_loggroup} %{_localstatedir}/log/nginx/access.log
         fi
 
         if [ ! -e %{_localstatedir}/log/nginx/error.log ]; then
             touch %{_localstatedir}/log/nginx/error.log
             %{__chmod} 640 %{_localstatedir}/log/nginx/error.log
-            %{__chown} nginx:%{nginx_loggroup} %{_localstatedir}/log/nginx/error.log
+            %{__chown} %{nginx_user}:%{nginx_loggroup} %{_localstatedir}/log/nginx/error.log
         fi
     fi
 fi
+
+%if %{use_systemd}
+    /usr/bin/systemctl start nginx.service >/dev/null 2>&1 ||:
+%else
+    /sbin/service nginx start  >/dev/null 2>&1 ||:
+%endif
 
 %preun
 if [ $1 -eq 0 ]; then
@@ -331,6 +340,9 @@ fi
 %changelog
 * Thu Mar 14 2019 Dan Muey <dan@cpanel.net> - 1.15.9-2
 - ZC-4868: Add cPanel specific configurations
+- ZC-4867: start nginx (specfile already stops it if needed)
+-          fix hard coded `nginx` user in log ownership
+-          Add `Provides` and `Conflicts` for upstream
 
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file
