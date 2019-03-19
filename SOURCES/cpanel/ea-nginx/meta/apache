@@ -50,6 +50,16 @@ sub move_apache_to_alt_ports {
             _set_settings($cur_settings);
         }
     }
+
+    if ( !-s "/etc/nginx/conf.d/ea-nginx.conf" ) {
+
+        # not complicated enough to justify pulling in Template::Toolkit
+        my $cur_settings = _get_settings();
+        my $cont         = path("/etc/nginx/ea-nginx/ea-nginx.conf.tt")->slurp;
+        $cont =~ s/\[% settings\.apache_port_ip %\]/$cur_settings->{apache_port_ip}/g;
+        $cont =~ s/\[% settings\.apache_port %\]/$cur_settings->{apache_port}/g;
+        path("/etc/nginx/conf.d/ea-nginx.conf")->spew($cont);
+    }
 }
 
 sub move_apache_back_to_orig_ports {
