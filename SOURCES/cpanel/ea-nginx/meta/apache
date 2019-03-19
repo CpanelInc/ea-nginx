@@ -1,0 +1,150 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+
+# cpanel - SOURCES/ea-nginx-rpmtool                Copyright 2019 cPanel, L.L.C.
+#                                                           All rights reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+use strict;
+use warnings;
+use Path::Tiny;
+use JSON::Syck              ();
+use Cpanel::SafeRun::Object ();
+
+my $meta_dir = "/etc/nginx/ea-nginx/meta";
+my $settings = "/etc/nginx/ea-nginx/settings.json";
+my %default  = ( apache_port => 80, apache_ssl_port => 443 );
+
+my $task = $ARGV[0];
+if ( !defined $task || ( $task ne "move_apache_to_alt_ports" && $task ne "move_apache_back_to_orig_ports" ) ) {
+    die "Invalid task\n";    # no help because this should never be run outside of the RPM
+}
+else {
+    print "Running $task() …\n";
+    no strict "refs";
+    $task->();
+}
+
+#############
+#### tasks ##
+#############
+
+sub move_apache_to_alt_ports {
+    for my $key (qw(apache_port apache_ssl_port)) {
+        if ( !-s "$meta_dir/$key.initial" ) {
+            my $cur_ts_val = _get_ts($key) || "0.0.0.0:$default{$key}";
+            my ( $ip_part, $port_part ) = split( /:/, $cur_ts_val, 2 );
+            if ( !$port_part ) {
+                $port_part = $ip_part;
+                $ip_part   = "0.0.0.0";
+            }
+            path("$meta_dir/$key.initial")->spew($cur_ts_val);
+
+            my $new_port = _get_new_port($port_part);
+            _set_ts( $key, "$ip_part:$new_port" );
+
+            my $cur_settings = _get_settings();
+            $ip_part = "127.0.0.1" if !$ip_part || $ip_part eq '0.0.0.0';
+            $cur_settings->{$key} = $new_port;
+            $cur_settings->{ $key . "_ip" } = $ip_part;
+            _set_settings($cur_settings);
+        }
+    }
+}
+
+sub move_apache_back_to_orig_ports {
+    for my $key (qw(apache_port apache_ssl_port)) {
+        if ( -s "$meta_dir/$key.initial" ) {
+
+            # ¿TODO/YAGNI? - warn if _get_ts($key) ip/port does not
+            #   match what is in /etc/nginx/ea-nginx/settings.json
+
+            my $pre_nginx_val = path("/etc/nginx/ea-nginx/meta/$key.initial")->slurp;
+            _set_ts( $key, $pre_nginx_val );
+
+            path("$meta_dir/$key.initial")->spew("");
+
+            my $cur_settings = _get_settings();
+            $cur_settings->{$key} = undef;
+            $cur_settings->{ $key . "_ip" } = undef;
+            _set_settings($cur_settings);
+        }
+    }
+}
+
+###############
+#### helpers ##
+###############
+
+sub _get_ts {
+    my ($key) = @_;
+    return _get_apicall( 'get_tweaksetting', "key=$key" );
+}
+
+sub _set_ts {
+    my ( $key, $val ) = @_;
+    return _get_apicall( 'set_tweaksetting', "key=$key", "value=$val" );
+}
+
+sub _get_apicall {
+    my ( $function, @args ) = @_;
+
+    my $run = Cpanel::SafeRun::Object->new( program => '/usr/sbin/whmapi1', args => [ $function, '--output=json', @args ] );
+
+    if ( $run->CHILD_ERROR() ) {
+        warn $run->CHILD_ERROR() . "\n";
+        return;
+    }
+    else {
+        my $hr = eval { JSON::Syck::Load( $run->stdout() ) };
+        if ( !$hr || !$hr->{metadata}{result} ) {
+            warn "whmapi1 $args[0] failed: $hr->{metadata}{reason}\n";
+            return;
+        }
+
+        return $hr->{data}{tweaksetting}{value};
+    }
+}
+
+sub _get_settings {
+    my $hr = eval { JSON::Syck::LoadFile($settings) };
+
+    if ( $@ || !$hr ) {
+        warn "Could not load $settings: $@\n";
+        return;
+    }
+
+    return $hr;
+}
+
+sub _set_settings {
+    my ($hr) = @_;
+
+    eval { JSON::Syck::DumpFile( $settings, $hr ) };
+    if ($@) {
+        warn "Could not save $settings: $@\n";
+        return;
+    }
+
+    return 1;
+}
+
+sub _get_new_port {
+    my ($cur_port) = @_;
+    my $new_port;
+
+    for my $try_port ( $cur_port + 1 .. 1023 ) {
+        if ( !`netstat -tulpn | grep -e ':$try_port\b'` ) {
+            $new_port = $try_port;
+            last;
+        }
+    }
+
+    if ( !$new_port ) {
+        $new_port = $cur_port + 10;
+        warn "Could not determine an empty port, falling back to $new_port\n";
+    }
+
+    return $new_port;
+}
+

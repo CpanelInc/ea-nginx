@@ -67,6 +67,10 @@ Vendor: cPanel, L.L.C
 URL: http://nginx.org/
 Group: %{_group}
 
+Provides: nginx
+Conflicts: nginx
+AutoReq: no
+
 Source0: http://nginx.org/download/nginx-%{version}.tar.gz
 Source1: logrotate
 Source2: nginx.init.in
@@ -155,6 +159,9 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/
 mkdir cpanel && cd cpanel && tar xzf %{SOURCE14}  && cd ..
 cp -r cpanel/conf.d/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
 
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
+cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
+
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 %{__install} -m 644 -p %{SOURCE3} \
     $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/nginx
@@ -213,6 +220,13 @@ cp -r cpanel/conf.d/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
+
+%dir %{_sysconfdir}/nginx/ea-nginx
+%attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/meta/apache
+%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
+%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
+%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
+%{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 
 %{_sysconfdir}/nginx/modules
 
@@ -295,16 +309,25 @@ BANNER
         if [ ! -e %{_localstatedir}/log/nginx/access.log ]; then
             touch %{_localstatedir}/log/nginx/access.log
             %{__chmod} 640 %{_localstatedir}/log/nginx/access.log
-            %{__chown} nginx:%{nginx_loggroup} %{_localstatedir}/log/nginx/access.log
+            %{__chown} %{nginx_user}:%{nginx_loggroup} %{_localstatedir}/log/nginx/access.log
         fi
 
         if [ ! -e %{_localstatedir}/log/nginx/error.log ]; then
             touch %{_localstatedir}/log/nginx/error.log
             %{__chmod} 640 %{_localstatedir}/log/nginx/error.log
-            %{__chown} nginx:%{nginx_loggroup} %{_localstatedir}/log/nginx/error.log
+            %{__chown} %{nginx_user}:%{nginx_loggroup} %{_localstatedir}/log/nginx/error.log
         fi
     fi
+
+%{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_to_alt_ports
+
 fi
+
+%if %{use_systemd}
+    /usr/bin/systemctl start nginx.service >/dev/null 2>&1 ||:
+%else
+    /sbin/service nginx start  >/dev/null 2>&1 ||:
+%endif
 
 %preun
 if [ $1 -eq 0 ]; then
@@ -316,6 +339,9 @@ if [ $1 -eq 0 ]; then
     /sbin/chkconfig --del nginx
     /sbin/chkconfig --del nginx-debug
 %endif
+
+%{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
+
 fi
 
 %postun
@@ -331,6 +357,10 @@ fi
 %changelog
 * Thu Mar 14 2019 Dan Muey <dan@cpanel.net> - 1.15.9-2
 - ZC-4868: Add cPanel specific configurations
+- ZC-4867: start nginx (specfile already stops it if needed)
+-          fix hard coded `nginx` user in log ownership
+-          Add `Provides` and `Conflicts` for upstream
+- ZC-4867: Move Apache to alternate port and back again
 
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file
