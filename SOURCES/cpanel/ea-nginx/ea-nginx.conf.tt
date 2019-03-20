@@ -1,0 +1,7 @@
+map $host $CPANEL_APACHE_PROXY_IP {
+    default [% settings.apache_port_ip %];
+}
+
+map $host $CPANEL_APACHE_PROXY_PORT {
+    default [% settings.apache_port %];
+}

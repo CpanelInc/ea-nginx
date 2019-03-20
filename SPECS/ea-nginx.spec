@@ -216,9 +216,11 @@ cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
 %dir %{_sysconfdir}/nginx/conf.d
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
+%config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
 
 %dir %{_sysconfdir}/nginx/ea-nginx
@@ -226,6 +228,7 @@ cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
+%{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 
 %{_sysconfdir}/nginx/modules
@@ -361,6 +364,8 @@ fi
 -          fix hard coded `nginx` user in log ownership
 -          Add `Provides` and `Conflicts` for upstream
 - ZC-4867: Move Apache to alternate port and back again
+- ZC-4869: Add support for proxying to apache,
+-          add mailman and DCV (.well-known) proxies
 
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file
