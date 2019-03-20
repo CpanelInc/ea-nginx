@@ -378,6 +378,7 @@ fi
 - ZC-4869: Add support for proxying to apache,
 -          add mailman and DCV (.well-known) proxies
 - ZC-4870/ZC-4871: tie into chkservd and restartsrv system
+- ZC-4897: Account for current apache port settings that are above the root-only range
 
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file

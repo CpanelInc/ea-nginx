@@ -143,6 +143,7 @@ sub _get_new_port {
     my ($cur_port) = @_;
     my $new_port;
 
+    $cur_port = 80 if $cur_port > 1022;
     for my $try_port ( $cur_port + 1 .. 1023 ) {
         if ( !`netstat -tulpn | grep -e ':$try_port\b'` ) {
             $new_port = $try_port;
