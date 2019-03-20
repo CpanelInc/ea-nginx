@@ -85,6 +85,7 @@ Source11: nginx-debug.service
 Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
 Source14: cpanel.tar.gz
+Source15: cpanel-chksrvd
 
 License: 2-clause BSD-like license
 
@@ -162,6 +163,11 @@ cp -r cpanel/conf.d/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
 cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
 
+mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
+%{__install} -m 644 -p %{SOURCE15} $RPM_BUILD_ROOT/etc/chkserv.d/nginx
+mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
+ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
+
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 %{__install} -m 644 -p %{SOURCE3} \
     $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/nginx
@@ -230,6 +236,9 @@ cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
+
+/usr/local/cpanel/scripts/restartsrv_nginx
+/etc/chkserv.d/nginx
 
 %{_sysconfdir}/nginx/modules
 
@@ -323,6 +332,7 @@ BANNER
     fi
 
 %{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_to_alt_ports
+echo "nginx:1" >> /etc/chkserv.d/chkservd.conf
 
 fi
 
@@ -343,6 +353,7 @@ if [ $1 -eq 0 ]; then
     /sbin/chkconfig --del nginx-debug
 %endif
 
+sed -i '/nginx:1/d' /etc/chkserv.d/chkservd.conf
 %{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
 
 fi
@@ -366,6 +377,7 @@ fi
 - ZC-4867: Move Apache to alternate port and back again
 - ZC-4869: Add support for proxying to apache,
 -          add mailman and DCV (.well-known) proxies
+- ZC-4870/ZC-4871: tie into chkservd and restartsrv system
 
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file
