@@ -40,8 +40,14 @@ sub move_apache_to_alt_ports {
             }
             path("$meta_dir/$key.initial")->spew($cur_ts_val);
 
-            my $new_port = _get_new_port($port_part);
-            _set_ts( $key, "$ip_part:$new_port" );
+            my $new_port;
+            if ( $default{$key} eq $port_part ) {
+                $new_port = _get_new_port($port_part);
+                _set_ts( $key, "$ip_part:$new_port" );
+            }
+            else {
+                $new_port = $port_part;
+            }
 
             my $cur_settings = _get_settings();
             $ip_part = "127.0.0.1" if !$ip_part || $ip_part eq '0.0.0.0';
@@ -69,6 +75,7 @@ sub move_apache_back_to_orig_ports {
             # ¿TODO/YAGNI? - warn if _get_ts($key) ip/port does not
             #   match what is in /etc/nginx/ea-nginx/settings.json
 
+            # noop if apache was already not on non-standard ports
             my $pre_nginx_val = path("/etc/nginx/ea-nginx/meta/$key.initial")->slurp;
             _set_ts( $key, $pre_nginx_val );
 
@@ -143,7 +150,7 @@ sub _get_new_port {
     my ($cur_port) = @_;
     my $new_port;
 
-    $cur_port = 80 if $cur_port > 1022;
+    $cur_port = 80 if $cur_port > 1022;    # should never happen but just in case ¯\_(ツ)_/¯
     for my $try_port ( $cur_port + 1 .. 1023 ) {
         if ( !`netstat -tulpn | grep -e ':$try_port\b'` ) {
             $new_port = $try_port;
