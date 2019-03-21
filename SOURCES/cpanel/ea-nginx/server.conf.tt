@@ -16,12 +16,11 @@ server {
 }
 
 [%- IF ssl_certificate && ssl_certificate_key %]
-#### SSL Proxies ##
     [%- FOREACH domain IN domains %]
 #### SSL Proxies for [% domain %] ##
     [%- SET subdom_map = {
             cpanel  = 2082, webmail    = 2095, whm        = 2087,
-            webdisk = 2077, cpcontacts = 2079, cpcalndars = 2079,
+            webdisk = 2077, cpcontacts = 2079, cpcalendars = 2079,
         }
     -%]
         [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]

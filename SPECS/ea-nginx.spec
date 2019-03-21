@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -86,6 +86,7 @@ Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
 Source14: cpanel.tar.gz
 Source15: cpanel-chksrvd
+Source16: cpanel-scripts-ea-nginx
 
 License: 2-clause BSD-like license
 
@@ -166,6 +167,7 @@ cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
 mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
 %{__install} -m 644 -p %{SOURCE15} $RPM_BUILD_ROOT/etc/chkserv.d/nginx
 mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
+%{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
 ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
@@ -237,6 +239,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 
+%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
 /usr/local/cpanel/scripts/restartsrv_nginx
 /etc/chkserv.d/nginx
 
@@ -369,6 +372,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Mar 21 2019 Dan Muey <dan@cpanel.net> - 1.15.9-3
+- ZC-4877: add initial user config script
+
 * Thu Mar 14 2019 Dan Muey <dan@cpanel.net> - 1.15.9-2
 - ZC-4868: Add cPanel specific configurations
 - ZC-4867: start nginx (specfile already stops it if needed)

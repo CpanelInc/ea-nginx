@@ -1,0 +1,255 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - ea-nginx                                Copyright 2019 cPanel, L.L.C.
+#                                                           All rights Reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+use strict;
+use warnings;
+
+package scripts::ea_nginx;
+
+use Cpanel::JSON                    ();
+use Cpanel::Config::userdata        ();
+use Cpanel::Config::LoadUserDomains ();
+use Cpanel::DomainLookup            ();
+use Cpanel::Validate::Username      ();
+use Cpanel::Apache::TLS             ();
+use Template                        ();
+use Path::Tiny;
+
+my $nginxroot = "/etc/nginx";
+
+my $cmds = {
+    config => {
+        code     => \&config,
+        clue     => "config [--all|<user>] [--no-reload]",
+        abstract => 'Build nginx configuration for users',
+        help     => "Build nginx configuration for one or all users",
+    },
+    reload => {
+        code     => \&reload,
+        clue     => "reload",
+        abstract => 'reload nginx configuration',
+        help     => "reload nginx configuration - a convenience for `nginx -s reload` (useful after multiple changes w/ --no-reload)",
+    },
+    remove => {
+        code     => \&remove,
+        clue     => "remove <user> [--no-reload]",
+        abstract => "remove a given user’s nginx configuration",
+        help     => "Remove the given user’s nginx configuration. Only does the generated conf.d/user/<user>.conf, does not touch the user customization directory conf.d/users/<user>/",
+    },
+};
+
+my $hint_blurb = "Usage: `$0 {command} …`.\n\tThis tool supports the following commands:";
+my $opts       = {
+    'help:pre_hint'  => $hint_blurb,
+    'help:pre_help'  => "Various ea-nginx related admin utilities\n\n$hint_blurb",
+    default_commands => "help",
+    alias            => { conf => "config" },
+};
+
+run(@ARGV) if !caller;
+
+sub run {
+    my (@argv) = @_;
+    die "This script should only be called as root\n" if $> != 0;
+
+    local $ENV{TERM} = $ENV{TERM} || "xterm-256color";    # non-CLI modulino avoid needless: Cannot find termcap: TERM not set at …/Term/ReadLine.pm line 373.
+    require App::CmdDispatch;
+    import App::CmdDispatch;
+
+    # need to have App::CmdDispatch do this automatically see CPANEL-22328
+    if ( @argv && grep { defined && m/\A\-\-help\z/ } @argv ) {
+        App::CmdDispatch->new( $cmds, $opts )->help();
+        exit(0);
+    }
+
+    my $orig_command_hint = \&App::CmdDispatch::command_hint;
+    no warnings "redefine";
+    local *App::CmdDispatch::command_hint = sub {
+        $orig_command_hint->(@_);
+        exit(1);
+    };
+    no warnings 'once';
+    require App::CmdDispatch::IO;
+    local *App::CmdDispatch::IO::print = sub {
+        shift;
+        if ( ref($@) && $@ =~ m/^App::CmdDispatch::Exception/ ) {
+            CORE::print STDERR @_;
+            return;
+        }
+        CORE::print(@_);
+        return;
+    };
+    use warnings 'once';
+
+    # ^^^ /need to have App::CmdDispatch do this automatically see CPANEL-22328
+
+    return App::CmdDispatch->new( $cmds, $opts )->run(@argv);
+}
+
+################
+#### commands ##
+################
+
+sub remove {
+    my ( $app, $user, @args ) = @_;
+
+    _validate_user_arg( $app, $user );
+
+    my $file = "$nginxroot/conf.d/users/$user.conf";
+    my $dir  = "$nginxroot/conf.d/users/$user";
+
+    if ( -f $file ) {
+        print "Removing $file …\n";
+        unlink $file;
+        if ( -f $file ) {
+            die "Unable to remove $file\n";
+        }
+        _reload() unless grep { $_ eq '--no-reload' } @args;
+
+    }
+    else {
+        print "$file is already removed or never existed.\n";
+    }
+
+    if ( -d $dir ) {
+        warn "Customization path $dir exists, you will need to manually move/remove/reconfigure that.\n";
+    }
+    else {
+        print "Customization path $dir does not exist. You are all set!\n";
+    }
+
+    return;
+}
+
+sub config {
+    my ( $app, $user, @args ) = @_;
+
+    if ( $user eq '--all' ) {
+        mkdir "/etc/nginx/conf.d/users/";
+        unlink("/etc/nginx/conf.d/users/*.conf");
+        for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
+            _write_user_conf($usr);
+        }
+
+    }
+    else {
+        _validate_user_arg( $app, $user );
+        mkdir "/etc/nginx/conf.d/users/";
+        _write_user_conf($user);
+    }
+
+    _reload("/etc/nginx/conf.d/users/$user.conf") unless grep { $_ eq '--no-reload' } @args;
+}
+
+sub reload { _reload() }
+
+###############
+#### helpers ##
+###############
+
+sub _reload {
+    my ($new_file) = @_;
+
+    if ( system("/usr/sbin/nginx -s reload") != 0 ) {
+        if ($new_file) {
+            warn "Could not reload generated nginx config, removing and attempting reload without it: $?\n";
+            unlink $new_file;
+            system("/usr/sbin/nginx -s reload");
+        }
+        exit 1;
+    }
+}
+
+sub _write_user_conf {
+    my ($user) = @_;
+
+    my $domains_data = Cpanel::Config::userdata::Load::load_userdata_main($user);
+    my $userconf     = "/etc/nginx/conf.d/users/$user.conf";
+
+    print "Setting up $userconf …\n";
+
+    path($userconf)->spew("#### main domain for $user ##\n");
+    _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
+
+    if ( @{ $domains_data->{sub_domains} } ) {
+        path($userconf)->append("\n#### sub domains for $user ##\n");
+        _render_and_append( $user => $domains_data->{sub_domains} );
+    }
+
+    if ( keys %{ $domains_data->{addon_domains} } ) {
+        path($userconf)->append("\n#### addon domains for $user ##\n");
+        for my $aod ( sort keys %{ $domains_data->{addon_domains} } ) {
+            my $sub = $domains_data->{addon_domains}{$aod};
+            _render_and_append( $user => [ $sub, $aod ] );
+        }
+    }
+
+    return 1;
+}
+
+my ( $tt, $server_tt );
+
+sub _render_and_append {
+    my ( $user, $domains ) = @_;
+
+    my $userconf = "/etc/nginx/conf.d/users/$user.conf";
+    $tt ||= Template->new;
+    $server_tt ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
+
+    my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
+    $tt->process(
+        \$server_tt,
+        {
+            docroot             => scalar( Cpanel::DomainLookup::getdocroot( $domains->[0] ) ),
+            ssl_certificate     => $combined_tls,
+            ssl_certificate_key => $combined_tls,
+            domains             => $domains,
+            user                => $user,
+        },
+        sub {
+            my ($out) = @_;
+            path($userconf)->append($out);
+            return 1;
+        }
+    );
+
+    if ( $tt->error() ) {
+        unlink $userconf;
+        die $tt->error();
+    }
+
+    return 1;
+}
+
+my $user_lookup;
+
+sub _validate_user_arg {
+    my ( $app, $user ) = @_;
+
+    _bail( $app, "The user argument is missing." ) if !$user;
+
+    $user_lookup //= Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 );
+    _bail( $app, "The given user is not a cPanel user.\n" ) if !$user_lookup->{$user};
+
+    return 1;
+}
+
+sub _get_cmd {
+    return $cmds;
+}
+
+sub _bail {
+    my ( $app, $msg ) = @_;
+    chomp($msg);
+
+    die "$msg\n" if $ENV{ __PACKAGE__ . "::bail_die" };    # for API calls, otherwise:
+
+    warn "$msg\n";
+    $app->help();
+    exit(1);                                               # there is no return()ing from this lol
+}
+
+1;
