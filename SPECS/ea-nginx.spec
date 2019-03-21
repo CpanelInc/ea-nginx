@@ -381,6 +381,7 @@ fi
 - ZC-4897: Account for current apache port settings that are above the root-only range
 - ZC-4898: Do not move apache if it is already configured for nonstandard ports
 - ZC-4869: do `proxy_set_header` for `Host` and `X-Real-IP` anywhere we `proxy_pass`
+- ZC-4869: alias img-sys for mailman images
 
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file
