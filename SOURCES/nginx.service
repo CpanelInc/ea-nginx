@@ -7,9 +7,9 @@ Wants=network-online.target
 [Service]
 Type=forking
 PIDFile=/var/run/nginx.pid
-ExecStart=/usr/sbin/nginx -c /etc/nginx/nginx.conf
-ExecReload=/bin/kill -s HUP $MAINPID
-ExecStop=/bin/kill -s TERM $MAINPID
+ExecStart=/usr/local/cpanel/scripts/restartsrv_nginx start
+ExecReload=/usr/local/cpanel/scripts/restartsrv_nginx
+ExecStop=/usr/local/cpanel/scripts/restartsrv_nginx stop
 
 [Install]
 WantedBy=multi-user.target
