@@ -12,7 +12,7 @@ package scripts::ea_nginx;
 use Cpanel::JSON                    ();
 use Cpanel::Config::userdata        ();
 use Cpanel::Config::LoadUserDomains ();
-use Cpanel::DomainLookup            ();
+use Cpanel::DomainLookup::DocRoot   ();
 use Cpanel::Validate::Username      ();
 use Cpanel::Apache::TLS             ();
 use Template                        ();
@@ -190,20 +190,21 @@ sub _write_user_conf {
     return 1;
 }
 
-my ( $tt, $server_tt );
+my ( $tt, $server_tt, $docroots );
 
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
-    $tt ||= Template->new;
-    $server_tt ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
+    $tt                ||= Template->new;
+    $server_tt         ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
+    $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
 
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     $tt->process(
         \$server_tt,
         {
-            docroot             => scalar( Cpanel::DomainLookup::getdocroot( $domains->[0] ) ),
+            docroot             => $docroots->{$user}{ $domains->[0] },
             ssl_certificate     => $combined_tls,
             ssl_certificate_key => $combined_tls,
             domains             => $domains,
