@@ -20,7 +20,7 @@ server {
     [%- FOREACH domain IN domains %]
 #### SSL Proxies for [% domain %] ##
     [%- SET subdom_map = {
-            cpanel  = 2082, webmail    = 2095, whm        = 2087,
+            cpanel  = 2082, webmail    = 2095, whm        = 2086,
             webdisk = 2077, cpcontacts = 2079, cpcalendars = 2079,
         }
     -%]
