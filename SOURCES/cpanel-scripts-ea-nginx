@@ -167,16 +167,20 @@ sub _write_user_conf {
     my ($user) = @_;
 
     my $domains_data = Cpanel::Config::userdata::Load::load_userdata_main($user);
-    my $userconf     = "/etc/nginx/conf.d/users/$user.conf";
+    my %addon_subdomains;
+    @addon_subdomains{ values %{ $domains_data->{addon_domains} } } = ();
+    my @actual_subdomains = grep { !exists $addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
+
+    my $userconf = "/etc/nginx/conf.d/users/$user.conf";
 
     print "Setting up $userconf …\n";
 
     path($userconf)->spew("#### main domain for $user ##\n");
     _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
 
-    if ( @{ $domains_data->{sub_domains} } ) {
+    if (@actual_subdomains) {
         path($userconf)->append("\n#### sub domains for $user ##\n");
-        _render_and_append( $user => $domains_data->{sub_domains} );
+        _render_and_append( $user => \@actual_subdomains );
     }
 
     if ( keys %{ $domains_data->{addon_domains} } ) {
