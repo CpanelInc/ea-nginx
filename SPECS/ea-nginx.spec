@@ -345,6 +345,9 @@ fi
     /sbin/service nginx start  >/dev/null 2>&1 ||:
 %endif
 
+# now that it is running:
+/usr/local/cpanel/scripts/ea-nginx config --all
+
 %preun
 if [ $1 -eq 0 ]; then
 %if %use_systemd
