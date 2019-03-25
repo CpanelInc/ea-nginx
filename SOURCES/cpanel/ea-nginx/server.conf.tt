@@ -9,7 +9,14 @@ server {
     [% END -%]
 
     root [% docroot %];
-    index index.php index.html;
+    index [% IF fpm_socket %]index.php [% END %]index.html;
+
+    [%- IF fpm_socket %]
+    location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _ "?" : "" %]$ {
+        include conf.d/includes-optional/cpanel-fastcgi.conf;
+        fastcgi_pass unix:[% fpm_socket %];
+    }
+    [%- END %]
 
     include conf.d/server-includes/*.conf;
     include conf.d/users/[% user %]/*.conf;

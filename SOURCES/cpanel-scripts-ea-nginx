@@ -13,6 +13,8 @@ use Cpanel::JSON                    ();
 use Cpanel::Config::userdata        ();
 use Cpanel::Config::LoadUserDomains ();
 use Cpanel::DomainLookup::DocRoot   ();
+use Cpanel::PHP::Config             ();
+use Cpanel::PHPFPM::Get             ();
 use Cpanel::Validate::Username      ();
 use Cpanel::Apache::TLS             ();
 use Template                        ();
@@ -204,15 +206,32 @@ sub _render_and_append {
     $server_tt         ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
 
+    my $fpm_socket;
+    my $fpm_socket_php_major_version;
+    for my $i ( 0, 1 ) {
+        my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $domains->[$i] );
+        if ($has_fpm) {
+            my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [ $domains->[$i] ] )->{ $domains->[$i] };
+            my ( $proxy, $socket ) = Cpanel::PHPFPM::Get::get_proxy_from_php_config_for_domain($php_config_ref);
+            $fpm_socket = $socket;
+            if ( $fpm_socket =~ m{/\w+-php(\d)\d/} ) {
+                $fpm_socket_php_major_version = $1;
+            }
+            last;
+        }
+    }
+
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     $tt->process(
         \$server_tt,
         {
-            docroot             => $docroots->{$user}{ $domains->[0] },
-            ssl_certificate     => $combined_tls,
-            ssl_certificate_key => $combined_tls,
-            domains             => $domains,
-            user                => $user,
+            docroot                      => $docroots->{$user}{ $domains->[0] },
+            ssl_certificate              => $combined_tls,
+            ssl_certificate_key          => $combined_tls,
+            domains                      => $domains,
+            user                         => $user,
+            fpm_socket                   => $fpm_socket,
+            fpm_socket_php_major_version => $fpm_socket_php_major_version,
         },
         sub {
             my ($out) = @_;
