@@ -24,14 +24,13 @@ server {
 }
 
 [%- IF ssl_certificate && ssl_certificate_key %]
-    [%- FOREACH domain IN domains %]
-#### SSL Proxies for [% domain %] ##
+#### SSL Proxies for [% domains.join(', ') %] ##
     [%- SET subdom_map = {
             cpanel  = 2082, webmail    = 2095, whm        = 2086,
             webdisk = 2077, cpcontacts = 2079, cpcalendars = 2079,
         }
     -%]
-        [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
+    [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
 server {
     listen 443 ssl;
     ssl_certificate [% ssl_certificate %];
@@ -63,6 +62,5 @@ server {
     }
 }
 
-        [%- END -%]
     [%- END -%]
 [%- END -%]
