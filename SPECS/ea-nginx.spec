@@ -345,6 +345,18 @@ fi
     /sbin/service nginx start  >/dev/null 2>&1 ||:
 %endif
 
+# record the current value of fileprotect
+if [ -e /var/cpanel/fileprotect ]
+then
+    touch /etc/nginx/ea-nginx/meta/fileprotect
+else
+    rm -f /etc/nginx/ea-nginx/meta/fileprotect
+fi
+
+# disable file protect
+
+/usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
+
 # now that it is running:
 /usr/local/cpanel/scripts/ea-nginx config --all
 
@@ -362,6 +374,10 @@ if [ $1 -eq 0 ]; then
 sed -i '/nginx:1/d' /etc/chkserv.d/chkservd.conf
 %{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
 
+if [ -e /etc/nginx/ea-nginx/meta/fileprotect ]; then
+    rm -f /etc/nginx/ea-nginx/meta/fileprotect
+    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
+fi
 fi
 
 %postun
