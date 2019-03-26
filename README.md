@@ -32,7 +32,7 @@ To keep things organized and revision controlled we use `SOURCES/cpanel`.
 
 Since `SOURCES/` must be flat it is cleaner to generate a tarball as a single source and untar it on installation.
 
-Just run: `cd SOURCES/cpanel && rm -f ../cpanel.tar.gz && tar czf ../cpanel.tar.gz conf.d ea-nginx && cd ../..`
+Just run: `cd SOURCES/cpanel && rm -f ../cpanel.tar.gz && tar czf ../cpanel.tar.gz conf.d ea-nginx && cd ../.. && git add SOURCES/cpanel.tar.gz`
 
 ## Make sure any `alias` directives do not introduce path traversal exploit
 
