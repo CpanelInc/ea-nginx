@@ -67,7 +67,7 @@ Vendor: cPanel, L.L.C
 URL: http://nginx.org/
 Group: %{_group}
 
-Provides: nginx
+Provides: ea-nginx = %{version}-%{release}
 Conflicts: nginx
 AutoReq: no
 
