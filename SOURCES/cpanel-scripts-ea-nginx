@@ -10,6 +10,7 @@ use warnings;
 package scripts::ea_nginx;
 
 use Cpanel::JSON                    ();
+use Cpanel::SafeRun::Object         ();
 use Cpanel::Config::userdata        ();
 use Cpanel::Config::LoadUserDomains ();
 use Cpanel::DomainLookup::DocRoot   ();
@@ -205,8 +206,8 @@ sub _render_and_append {
     my ( $user, $domains ) = @_;
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
-    $tt                ||= Template->new;
-    $server_tt         ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
+    $tt ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
+    $server_tt ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
 
     my $fpm_socket;
@@ -227,6 +228,7 @@ sub _render_and_append {
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     $combined_tls = "" if !-f $combined_tls;
 
+    my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
     $tt->process(
         \$server_tt,
         {
@@ -237,6 +239,10 @@ sub _render_and_append {
             user                         => $user,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
+            wordpress                    => {
+                docroot_install  => $wordpress_hr->{docroot_install},
+                non_docroot_uris => $wordpress_hr->{non_docroot_uris},
+            },
         },
         sub {
             my ($out) = @_;
@@ -251,6 +257,52 @@ sub _render_and_append {
     }
 
     return 1;
+}
+
+my $wordpress_lu;
+
+sub _get_wp_uapi {
+    my ($user) = @_;
+
+    my $uapi = Cpanel::SafeRun::Object->new(
+        program => "/usr/bin/uapi",
+        args    => [ "--output=json", "--user=$user", "WordPressInstanceManager", "get_instances" ],
+    );
+
+    warn "Could not determine managed wordpres instances for $user\n" if $uapi->CHILD_ERROR();
+
+    return eval { Cpanel::JSON::Load( $uapi->stdout() ) } || {};
+}
+
+sub _get_wordpress_info {
+    my ( $user, $docroot ) = @_;
+
+    my $res = {
+        docroot_install  => 0,
+        non_docroot_uris => [],
+    };
+
+    return $res if !-e "/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm";
+
+    $wordpress_lu->{$user} ||= _get_wp_uapi($user);
+
+    # paths passed in and from API call do not have trailing slash, if that changes we could normalize them
+    for my $wp_instance ( @{ $wordpress_lu->{$user}{result}{data}{instances} } ) {
+        if ( length $wp_instance->{rel_path} ) {
+            my $instance_docroot = $wp_instance->{full_path};
+            $instance_docroot =~ s{/\Q$wp_instance->{rel_path}\E$}{};
+            if ( $instance_docroot eq $docroot ) {
+                push @{ $res->{non_docroot_uris} }, $wp_instance->{rel_path};
+            }
+        }
+        else {
+            if ( $wp_instance->{full_path} eq $docroot ) {
+                $res->{docroot_install} = 1;
+            }
+        }
+    }
+
+    return $res;
 }
 
 my $user_lookup;
