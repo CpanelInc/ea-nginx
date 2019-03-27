@@ -346,7 +346,7 @@ fi
 %endif
 
 # record the current value of fileprotect
-if [ -e /var/cpanel/fileprotect ]
+if [ -e /var/cpanel/fileprotect ];
 then
     touch /etc/nginx/ea-nginx/meta/fileprotect
 else
