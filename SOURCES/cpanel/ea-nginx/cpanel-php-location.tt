@@ -1,0 +1,6 @@
+[%- IF fpm_socket %]
+location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _ "?" : "" %]$ {
+    include conf.d/includes-optional/cpanel-fastcgi.conf;
+    fastcgi_pass unix:[% fpm_socket %];
+}
+[%- END %]

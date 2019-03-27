@@ -11,16 +11,26 @@ server {
     root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;
 
-    [%- IF fpm_socket %]
-    location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _ "?" : "" %]$ {
-        include conf.d/includes-optional/cpanel-fastcgi.conf;
-        fastcgi_pass unix:[% fpm_socket %];
+    [%- IF wordpress.docroot_install %]
+    # $docroot wordpress install
+    location / {
+        [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
+        [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
     }
-    [%- END %]
+    [% END -%]
+    [%- FOREACH wordpress_uri IN wordpress.non_docroot_uris %]
+    # $docroot/[% wordpress_uri %] wordpress install
+    location /[% wordpress_uri %] {
+        [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
+        [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+    }
+    [% END -%]
 
     include conf.d/server-includes/*.conf;
     include conf.d/users/[% user %]/*.conf;
     include conf.d/users/[% user %]/[% domains.0 %]/*.conf;
+
+    [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
 }
 
 [%- IF ssl_certificate && ssl_certificate_key %]

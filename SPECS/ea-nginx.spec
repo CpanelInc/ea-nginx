@@ -237,6 +237,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
+%{_sysconfdir}/nginx/ea-nginx/cpanel-php-location.tt
+%{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 
