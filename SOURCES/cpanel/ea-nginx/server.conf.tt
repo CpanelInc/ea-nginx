@@ -56,8 +56,7 @@ server {
         proxy_set_header Upgrade $upgrade_value; # the header will be only sent if $upgrade_value is not empty
         proxy_set_header Connection $connection_value; # the header will be only sent if $connection_value is not empty
         [%- END %]
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        include conf.d/includes-optional/cpanel-proxy.conf;
         proxy_pass http://127.0.0.1:[% subdom_map.$proxy_subdomain %];
     }
 }
