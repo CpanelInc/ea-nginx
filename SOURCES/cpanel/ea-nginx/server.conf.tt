@@ -11,7 +11,7 @@ server {
     root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;
 
-    location = /503.html {
+    location = /FPM_50x.html {
         root   /etc/nginx/ea-nginx/html;
     }
 
