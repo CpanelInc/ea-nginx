@@ -87,6 +87,7 @@ Source13: nginx.check-reload.sh
 Source14: cpanel.tar.gz
 Source15: cpanel-chksrvd
 Source16: cpanel-scripts-ea-nginx
+Source17: FPM_50x.html
 
 License: 2-clause BSD-like license
 
@@ -178,6 +179,9 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__install} -p -D -m 0644 %{bdir}/objs/nginx.8 \
     $RPM_BUILD_ROOT%{_mandir}/man8/nginx.8
+
+%{__mkdir} -m 755 -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html
+%{__install} -m 644 -p %{SOURCE17} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
 
 %if %{use_systemd}
 # install systemd-specific files
@@ -283,6 +287,9 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %dir %{_datadir}/doc/%{upstream_name}-%{main_version}
 %doc %{_datadir}/doc/%{upstream_name}-%{main_version}/COPYRIGHT
 %{_mandir}/man8/nginx.8*
+
+%attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/html
+%attr(644, root, root) %{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
 
 %pre
 # Add the "nginx" user
