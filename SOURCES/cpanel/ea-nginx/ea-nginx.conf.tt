@@ -1,7 +1,9 @@
-map $host $CPANEL_APACHE_PROXY_IP {
-    default [% settings.apache_port_ip %];
-}
+resolver [% settings.resolver %]; # so that we can use $host in proxy_pass
 
 map $host $CPANEL_APACHE_PROXY_PORT {
     default [% settings.apache_port %];
 }
+
+server_names_hash_max_size [% settings.server_names_hash_max_size %];
+server_names_hash_bucket_size [% settings.server_names_hash_bucket_size %];
+
