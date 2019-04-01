@@ -19,6 +19,7 @@ use Cpanel::PHPFPM::Get             ();
 use Cpanel::Validate::Username      ();
 use Cpanel::Apache::TLS             ();
 use Template                        ();
+use File::Glob                      ();
 use Path::Tiny;
 
 my $nginxroot = "/etc/nginx";
@@ -103,7 +104,7 @@ sub remove {
     _validate_user_arg( $app, $user );
 
     my $file = "$nginxroot/conf.d/users/$user.conf";
-    my $dir  = "$nginxroot/conf.d/users/$user";
+    my $dir  = "$nginxroot/conf.d/users/$user/";
 
     if ( -f $file ) {
         print "Removing $file …\n";
@@ -133,19 +134,20 @@ sub config {
 
     if ( $user eq '--all' ) {
         mkdir "/etc/nginx/conf.d/users/";
-        unlink("/etc/nginx/conf.d/users/*.conf");
+        unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
         for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
             _write_user_conf($usr);
         }
-
+        _reload() unless grep { $_ eq '--no-reload' } @args;
     }
     else {
         _validate_user_arg( $app, $user );
         mkdir "/etc/nginx/conf.d/users/";
         _write_user_conf($user);
+        _reload("/etc/nginx/conf.d/users/$user.conf") unless grep { $_ eq '--no-reload' } @args;
     }
 
-    _reload("/etc/nginx/conf.d/users/$user.conf") unless grep { $_ eq '--no-reload' } @args;
+    return 1;
 }
 
 sub reload { _reload() }
@@ -161,10 +163,12 @@ sub _reload {
         if ($new_file) {
             warn "Could not reload generated nginx config, removing and attempting reload without it: $?\n";
             unlink $new_file;
-            system("/usr/sbin/nginx -s reload");
+            system("/usr/sbin/nginx -s reload") || return 1;
         }
         exit 1;
     }
+
+    return 1;
 }
 
 sub _write_user_conf {
