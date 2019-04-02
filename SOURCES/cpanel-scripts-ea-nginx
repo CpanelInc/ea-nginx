@@ -13,6 +13,7 @@ use Cpanel::JSON                    ();
 use Cpanel::SafeRun::Object         ();
 use Cpanel::Config::userdata        ();
 use Cpanel::Config::LoadUserDomains ();
+use Cpanel::DomainIp                ();
 use Cpanel::DomainLookup::DocRoot   ();
 use Cpanel::PHP::Config             ();
 use Cpanel::PHPFPM::Get             ();
@@ -232,6 +233,8 @@ sub _render_and_append {
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     $combined_tls = "" if !-f $combined_tls;
 
+    my $ip = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
+
     my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
     $tt->process(
         \$server_tt,
@@ -241,6 +244,7 @@ sub _render_and_append {
             ssl_certificate_key          => $combined_tls,
             domains                      => $domains,
             user                         => $user,
+            ip                           => $ip,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
             wordpress                    => {
