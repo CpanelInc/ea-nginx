@@ -10,7 +10,6 @@ use warnings;
 use Path::Tiny;
 use JSON::Syck              ();
 use Cpanel::SafeRun::Object ();
-use Cpanel::Resolvers       ();
 
 my $meta_dir = "/etc/nginx/ea-nginx/meta";
 my $settings = "/etc/nginx/ea-nginx/settings.json";
@@ -51,7 +50,6 @@ sub move_apache_to_alt_ports {
             }
 
             my $cur_settings = _get_settings();
-            $cur_settings->{resolver} = _get_resolver_value();
             $ip_part = "127.0.0.1" if !$ip_part || $ip_part eq '0.0.0.0';
             $cur_settings->{$key} = $new_port;
             $cur_settings->{ $key . "_ip" } = $ip_part;
@@ -64,7 +62,7 @@ sub move_apache_to_alt_ports {
         # not complicated enough to justify pulling in Template::Toolkit
         my $cur_settings = _get_settings();
         my $cont         = path("/etc/nginx/ea-nginx/ea-nginx.conf.tt")->slurp;
-        for my $key (qw(apache_port apache_port_ip server_names_hash_max_size server_names_hash_bucket_size resolver)) {
+        for my $key (qw(apache_port apache_port_ip server_names_hash_max_size server_names_hash_bucket_size)) {
             $cont =~ s/\[% settings\.$key %\]/$cur_settings->{$key}/g;
         }
         path("/etc/nginx/conf.d/ea-nginx.conf")->spew($cont);
@@ -95,12 +93,6 @@ sub move_apache_back_to_orig_ports {
 ###############
 #### helpers ##
 ###############
-
-sub _get_resolver_value {
-    my @resolvers = @{ Cpanel::Resolvers::fetchresolvers() };
-    return "127.0.0.1" if !@resolvers;
-    return join( " ", @resolvers );
-}
 
 sub _get_ts {
     my ($key) = @_;
