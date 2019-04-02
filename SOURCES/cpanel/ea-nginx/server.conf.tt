@@ -2,6 +2,8 @@ server {
     server_name[% FOREACH domain IN domains %] [% domain %] www.[% domain %][% END %];
     listen 80;
 
+    set $CPANEL_APACHE_PROXY_IP [% ip %];
+
     [%- IF ssl_certificate && ssl_certificate_key %]
     listen 443 ssl;
     ssl_certificate [% ssl_certificate %];
