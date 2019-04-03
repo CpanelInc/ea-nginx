@@ -1,0 +1,126 @@
+<html>
+    <head>
+        <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+        <meta http-equiv="Cache-control" content="no-cache">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Error 502/503</title>
+        <style type="text/css">
+            body {
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 14px;
+                line-height: 1.428571429;
+                background-color: #ffffff;
+                color: #2F3230;
+                padding: 0;
+                margin: 0;
+            }
+            section,footer {
+                display: block;
+                padding: 0;
+                margin: 0;
+            }
+            .container {
+                margin-left: auto;
+                margin-right: auto;
+                border: 1px solid #293a4a;
+                margin-top: 50px;
+                width: 70%;
+            }
+            .response-info {
+                color: #eeeeee;
+                padding: 20px;
+                background-color: #293a4a;
+            }
+            .status-code {
+                font-size: 500%;
+            }
+            .status-reason {
+                font-size: 250%;
+                display: block;
+            }
+            .response-message,
+            .reason-text {
+                color: #333333;
+            }
+            .response-message {
+                margin-bottom: 20px;
+                font-size: 16px;
+                padding: 20px;
+            }
+            .response-message a {
+                text-decoration: underline;
+                color: #428BCA;
+            }
+            .response-message a:hover,
+            .response-message a:focus,
+            .response-message a:active {
+                color: #2A6496;
+            }
+            footer {
+                text-align: center;
+                margin: 60px 0;
+            }
+            footer a {
+                text-decoration: none;
+            }
+            footer a img {
+                border: 0;
+            }
+            .copyright {
+                font-size: 10px;
+                color: #3F4143;
+            }
+            @media (max-width: 767px) {
+                .container {
+                    width: 100%;
+                    margin-top: 0;
+                }
+                .response-info {
+                    padding: 10px;
+                }
+                .response-message {
+                    padding: 10px;
+                }
+            }
+            @media (max-width: 1024px) and (min-width: 768px) {
+                .container {
+                    width: 90%;
+                    margin-top: 0;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <section class="response-info">
+                <div class="status-code">502/503</div>
+                <div class="status-reason">An error has occurred while processing your request.</div>
+            </section>
+            <section class="response-message">
+                <p>
+                    Thanks for trying out nginx on cPanel! We're sorry that you're seeing this message. Make sure that you have enabled PHP-FPM on this domain. This is the most common reason that you will see this page.
+                </p>
+                <p>
+                    If you're still having trouble, read our <a href="https://go.cpanel.net/PHP-FPMConfig" target="_blank">PHP-FPM Configuration</a> documentation.
+                </p>
+            </section>
+        </div>
+        <footer>
+            <div class="copyright">
+                Copyright© <span id="currentYear"></span> cPanel, L.L.C.
+                <a href="https://go.cpanel.net/privacy" target="_blank">Privacy Policy</a></p>
+            </div>
+        </footer>
+        <script type="text/javascript">
+            window.addEventListener("load", function(e){
+                var yearEl = document.querySelector("#currentYear");
+                if(yearEl !== null){
+                    var year = new Date();
+                    yearEl.innerHTML = year.getFullYear();
+                }
+            });
+        </script>
+    </body>
+</html>

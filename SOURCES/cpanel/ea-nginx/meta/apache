@@ -62,8 +62,9 @@ sub move_apache_to_alt_ports {
         # not complicated enough to justify pulling in Template::Toolkit
         my $cur_settings = _get_settings();
         my $cont         = path("/etc/nginx/ea-nginx/ea-nginx.conf.tt")->slurp;
-        $cont =~ s/\[% settings\.apache_port_ip %\]/$cur_settings->{apache_port_ip}/g;
-        $cont =~ s/\[% settings\.apache_port %\]/$cur_settings->{apache_port}/g;
+        for my $key (qw(apache_port apache_port_ip server_names_hash_max_size server_names_hash_bucket_size)) {
+            $cont =~ s/\[% settings\.$key %\]/$cur_settings->{$key}/g;
+        }
         path("/etc/nginx/conf.d/ea-nginx.conf")->spew($cont);
     }
 }
@@ -115,7 +116,7 @@ sub _get_apicall {
     else {
         my $hr = eval { JSON::Syck::Load( $run->stdout() ) };
         if ( !$hr || !$hr->{metadata}{result} ) {
-            warn "whmapi1 $args[0] failed: $hr->{metadata}{reason}\n";
+            warn "whmapi1 $function failed: $hr->{metadata}{reason}\n";
             return;
         }
 

@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -86,6 +86,8 @@ Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
 Source14: cpanel.tar.gz
 Source15: cpanel-chksrvd
+Source16: cpanel-scripts-ea-nginx
+Source17: FPM_50x.html
 
 License: 2-clause BSD-like license
 
@@ -166,6 +168,7 @@ cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
 mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
 %{__install} -m 644 -p %{SOURCE15} $RPM_BUILD_ROOT/etc/chkserv.d/nginx
 mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
+%{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
 ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
@@ -176,6 +179,9 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__install} -p -D -m 0644 %{bdir}/objs/nginx.8 \
     $RPM_BUILD_ROOT%{_mandir}/man8/nginx.8
+
+%{__mkdir} -m 755 -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html
+%{__install} -m 644 -p %{SOURCE17} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
 
 %if %{use_systemd}
 # install systemd-specific files
@@ -222,6 +228,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %dir %{_sysconfdir}/nginx/conf.d
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
@@ -234,9 +241,12 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
+%{_sysconfdir}/nginx/ea-nginx/cpanel-php-location.tt
+%{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 
+%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
 /usr/local/cpanel/scripts/restartsrv_nginx
 /etc/chkserv.d/nginx
 
@@ -277,6 +287,9 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %dir %{_datadir}/doc/%{upstream_name}-%{main_version}
 %doc %{_datadir}/doc/%{upstream_name}-%{main_version}/COPYRIGHT
 %{_mandir}/man8/nginx.8*
+
+%attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/html
+%attr(644, root, root) %{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
 
 %pre
 # Add the "nginx" user
@@ -342,6 +355,21 @@ fi
     /sbin/service nginx start  >/dev/null 2>&1 ||:
 %endif
 
+# record the current value of fileprotect
+if [ -e /var/cpanel/fileprotect ];
+then
+    touch /etc/nginx/ea-nginx/meta/fileprotect
+else
+    rm -f /etc/nginx/ea-nginx/meta/fileprotect
+fi
+
+# disable file protect
+
+/usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
+
+# now that it is running:
+/usr/local/cpanel/scripts/ea-nginx config --all
+
 %preun
 if [ $1 -eq 0 ]; then
 %if %use_systemd
@@ -356,6 +384,10 @@ if [ $1 -eq 0 ]; then
 sed -i '/nginx:1/d' /etc/chkserv.d/chkservd.conf
 %{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
 
+if [ -e /etc/nginx/ea-nginx/meta/fileprotect ]; then
+    rm -f /etc/nginx/ea-nginx/meta/fileprotect
+    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
+fi
 fi
 
 %postun
@@ -369,6 +401,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Mar 21 2019 Dan Muey <dan@cpanel.net> - 1.15.9-3
+- ZC-4877: add initial user config script
+
 * Thu Mar 14 2019 Dan Muey <dan@cpanel.net> - 1.15.9-2
 - ZC-4868: Add cPanel specific configurations
 - ZC-4867: start nginx (specfile already stops it if needed)

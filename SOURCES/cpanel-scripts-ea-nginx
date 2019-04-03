@@ -1,0 +1,344 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - ea-nginx                                Copyright 2019 cPanel, L.L.C.
+#                                                           All rights Reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+use strict;
+use warnings;
+
+package scripts::ea_nginx;
+
+use Cpanel::JSON                    ();
+use Cpanel::SafeRun::Object         ();
+use Cpanel::Config::userdata        ();
+use Cpanel::Config::LoadUserDomains ();
+use Cpanel::DomainIp                ();
+use Cpanel::DomainLookup::DocRoot   ();
+use Cpanel::PHP::Config             ();
+use Cpanel::PHPFPM::Get             ();
+use Cpanel::Validate::Username      ();
+use Cpanel::Apache::TLS             ();
+use Template                        ();
+use File::Glob                      ();
+use Path::Tiny;
+
+my $nginxroot = "/etc/nginx";
+
+my $cmds = {
+    config => {
+        code     => \&config,
+        clue     => "config [--all|<user>] [--no-reload]",
+        abstract => 'Build nginx configuration for users',
+        help     => "Build nginx configuration for one or all users",
+    },
+    reload => {
+        code     => \&reload,
+        clue     => "reload",
+        abstract => 'reload nginx configuration',
+        help     => "reload nginx configuration - a convenience for `nginx -s reload` (useful after multiple changes w/ --no-reload)",
+    },
+    remove => {
+        code     => \&remove,
+        clue     => "remove <user> [--no-reload]",
+        abstract => "remove a given user’s nginx configuration",
+        help     => "Remove the given user’s nginx configuration. Only does the generated conf.d/user/<user>.conf, does not touch the user customization directory conf.d/users/<user>/",
+    },
+};
+
+my $hint_blurb = "Usage: `$0 {command} …`.\n\tThis tool supports the following commands:";
+my $opts       = {
+    'help:pre_hint'  => $hint_blurb,
+    'help:pre_help'  => "Various ea-nginx related admin utilities\n\n$hint_blurb",
+    default_commands => "help",
+    alias            => { conf => "config" },
+    'help:post_help' => "More information on `en-nginx` (what works and what does not, how to customize configuration, etc)\n  can be found at https://go.cpanel.net/ea-nginx.",
+};
+
+run(@ARGV) if !caller;
+
+sub run {
+    my (@argv) = @_;
+    die "This script should only be called as root\n" if $> != 0;
+
+    local $ENV{TERM} = $ENV{TERM} || "xterm-256color";    # non-CLI modulino avoid needless: Cannot find termcap: TERM not set at …/Term/ReadLine.pm line 373.
+    require App::CmdDispatch;
+    import App::CmdDispatch;
+
+    # need to have App::CmdDispatch do this automatically see CPANEL-22328
+    if ( @argv && grep { defined && m/\A\-\-help\z/ } @argv ) {
+        App::CmdDispatch->new( $cmds, $opts )->help();
+        exit(0);
+    }
+
+    my $orig_command_hint = \&App::CmdDispatch::command_hint;
+    no warnings "redefine";
+    local *App::CmdDispatch::command_hint = sub {
+        $orig_command_hint->(@_);
+        exit(1);
+    };
+    no warnings 'once';
+    require App::CmdDispatch::IO;
+    local *App::CmdDispatch::IO::print = sub {
+        shift;
+        if ( ref($@) && $@ =~ m/^App::CmdDispatch::Exception/ ) {
+            CORE::print STDERR @_;
+            return;
+        }
+        CORE::print(@_);
+        return;
+    };
+    use warnings 'once';
+
+    # ^^^ /need to have App::CmdDispatch do this automatically see CPANEL-22328
+
+    return App::CmdDispatch->new( $cmds, $opts )->run(@argv);
+}
+
+################
+#### commands ##
+################
+
+sub remove {
+    my ( $app, $user, @args ) = @_;
+
+    _validate_user_arg( $app, $user );
+
+    my $file = "$nginxroot/conf.d/users/$user.conf";
+    my $dir  = "$nginxroot/conf.d/users/$user/";
+
+    if ( -f $file ) {
+        print "Removing $file …\n";
+        unlink $file;
+        if ( -f $file ) {
+            die "Unable to remove $file\n";
+        }
+        _reload() unless grep { $_ eq '--no-reload' } @args;
+
+    }
+    else {
+        print "$file is already removed or never existed.\n";
+    }
+
+    if ( -d $dir ) {
+        warn "Customization path $dir exists, you will need to manually move/remove/reconfigure that.\n";
+    }
+    else {
+        print "Customization path $dir does not exist. You are all set!\n";
+    }
+
+    return;
+}
+
+sub config {
+    my ( $app, $user, @args ) = @_;
+
+    if ( $user eq '--all' ) {
+        mkdir "/etc/nginx/conf.d/users/";
+        unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
+        for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
+            _write_user_conf($usr);
+        }
+        _reload() unless grep { $_ eq '--no-reload' } @args;
+    }
+    else {
+        _validate_user_arg( $app, $user );
+        mkdir "/etc/nginx/conf.d/users/";
+        _write_user_conf($user);
+        _reload("/etc/nginx/conf.d/users/$user.conf") unless grep { $_ eq '--no-reload' } @args;
+    }
+
+    return 1;
+}
+
+sub reload { _reload() }
+
+###############
+#### helpers ##
+###############
+
+sub _reload {
+    my ($new_file) = @_;
+
+    if ( system("/usr/sbin/nginx -s reload") != 0 ) {
+        if ($new_file) {
+            warn "Could not reload generated nginx config, removing and attempting reload without it: $?\n";
+            unlink $new_file;
+            system("/usr/sbin/nginx -s reload") || return 1;
+        }
+        exit 1;
+    }
+
+    return 1;
+}
+
+sub _write_user_conf {
+    my ($user) = @_;
+
+    my $domains_data = Cpanel::Config::userdata::Load::load_userdata_main($user);
+    my %addon_subdomains;
+    @addon_subdomains{ values %{ $domains_data->{addon_domains} } } = ();
+    my @actual_subdomains = grep { !exists $addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
+
+    my $userconf = "/etc/nginx/conf.d/users/$user.conf";
+
+    print "Setting up $userconf …\n";
+
+    path($userconf)->spew("#### main domain for $user ##\n");
+    _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
+
+    if (@actual_subdomains) {
+        path($userconf)->append("\n#### sub domains for $user ##\n");
+        for my $subdom (@actual_subdomains) {
+            _render_and_append( $user => [$subdom] );
+        }
+    }
+
+    if ( keys %{ $domains_data->{addon_domains} } ) {
+        path($userconf)->append("\n#### addon domains for $user ##\n");
+        for my $aod ( sort keys %{ $domains_data->{addon_domains} } ) {
+            my $sub = $domains_data->{addon_domains}{$aod};
+            _render_and_append( $user => [ $sub, $aod ] );
+        }
+    }
+
+    return 1;
+}
+
+my ( $tt, $server_tt, $docroots );
+
+sub _render_and_append {
+    my ( $user, $domains ) = @_;
+
+    my $userconf = "/etc/nginx/conf.d/users/$user.conf";
+    $tt ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
+    $server_tt ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
+    $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
+
+    my $fpm_socket;
+    my $fpm_socket_php_major_version;
+    for my $i ( 0, 1 ) {
+        my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $domains->[$i] );
+        if ($has_fpm) {
+            my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [ $domains->[$i] ] )->{ $domains->[$i] };
+            my ( $proxy, $socket ) = Cpanel::PHPFPM::Get::get_proxy_from_php_config_for_domain($php_config_ref);
+            $fpm_socket = $socket;
+            if ( $fpm_socket =~ m{/\w+-php(\d)\d/} ) {
+                $fpm_socket_php_major_version = $1;
+            }
+            last;
+        }
+    }
+
+    my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
+    $combined_tls = "" if !-f $combined_tls;
+
+    my $ip = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
+
+    my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
+    $tt->process(
+        \$server_tt,
+        {
+            docroot                      => $docroots->{$user}{ $domains->[0] },
+            ssl_certificate              => $combined_tls,
+            ssl_certificate_key          => $combined_tls,
+            domains                      => $domains,
+            user                         => $user,
+            ip                           => $ip,
+            fpm_socket                   => $fpm_socket,
+            fpm_socket_php_major_version => $fpm_socket_php_major_version,
+            wordpress                    => {
+                docroot_install  => $wordpress_hr->{docroot_install},
+                non_docroot_uris => $wordpress_hr->{non_docroot_uris},
+            },
+        },
+        sub {
+            my ($out) = @_;
+            path($userconf)->append($out);
+            return 1;
+        }
+    );
+
+    if ( $tt->error() ) {
+        unlink $userconf;
+        die $tt->error();
+    }
+
+    return 1;
+}
+
+my $wordpress_lu;
+
+sub _get_wp_uapi {
+    my ($user) = @_;
+
+    my $uapi = Cpanel::SafeRun::Object->new(
+        program => "/usr/bin/uapi",
+        args    => [ "--output=json", "--user=$user", "WordPressInstanceManager", "get_instances" ],
+    );
+
+    warn "Could not determine managed wordpres instances for $user\n" if $uapi->CHILD_ERROR();
+
+    return eval { Cpanel::JSON::Load( $uapi->stdout() ) } || {};
+}
+
+sub _get_wordpress_info {
+    my ( $user, $docroot ) = @_;
+
+    my $res = {
+        docroot_install  => 0,
+        non_docroot_uris => [],
+    };
+
+    return $res if !-e "/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm";
+
+    $wordpress_lu->{$user} ||= _get_wp_uapi($user);
+
+    # paths passed in and from API call do not have trailing slash, if that changes we could normalize them
+    for my $wp_instance ( @{ $wordpress_lu->{$user}{result}{data}{instances} } ) {
+        if ( length $wp_instance->{rel_path} ) {
+            my $instance_docroot = $wp_instance->{full_path};
+            $instance_docroot =~ s{/\Q$wp_instance->{rel_path}\E$}{};
+            if ( $instance_docroot eq $docroot ) {
+                push @{ $res->{non_docroot_uris} }, $wp_instance->{rel_path};
+            }
+        }
+        else {
+            if ( $wp_instance->{full_path} eq $docroot ) {
+                $res->{docroot_install} = 1;
+            }
+        }
+    }
+
+    return $res;
+}
+
+my $user_lookup;
+
+sub _validate_user_arg {
+    my ( $app, $user ) = @_;
+
+    _bail( $app, "The user argument is missing." ) if !$user;
+
+    $user_lookup //= Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 );
+    _bail( $app, "The given user is not a cPanel user.\n" ) if !$user_lookup->{$user};
+
+    return 1;
+}
+
+sub _get_cmd {
+    return $cmds;
+}
+
+sub _bail {
+    my ( $app, $msg ) = @_;
+    chomp($msg);
+
+    die "$msg\n" if $ENV{ __PACKAGE__ . "::bail_die" };    # for API calls, otherwise:
+
+    warn "$msg\n";
+    $app->help();
+    exit(1);                                               # there is no return()ing from this lol
+}
+
+1;

@@ -1,5 +1,8 @@
 server {
     server_name[% FOREACH domain IN domains %] [% domain %] www.[% domain %][% END %];
+    listen 80;
+
+    set $CPANEL_APACHE_PROXY_IP [% ip %];
 
     [%- IF ssl_certificate && ssl_certificate_key %]
     listen 443 ssl;
@@ -8,23 +11,42 @@ server {
     [% END -%]
 
     root [% docroot %];
-    index index.php index.html;
+    index [% IF fpm_socket %]index.php [% END %]index.html;
+
+    location = /FPM_50x.html {
+        root   /etc/nginx/ea-nginx/html;
+    }
+
+    [%- IF wordpress.docroot_install %]
+    # $docroot wordpress install
+    location / {
+        [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
+        [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+    }
+    [% END -%]
+    [%- FOREACH wordpress_uri IN wordpress.non_docroot_uris %]
+    # $docroot/[% wordpress_uri %] wordpress install
+    location /[% wordpress_uri %] {
+        [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
+        [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+    }
+    [% END -%]
 
     include conf.d/server-includes/*.conf;
     include conf.d/users/[% user %]/*.conf;
     include conf.d/users/[% user %]/[% domains.0 %]/*.conf;
+
+    [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
 }
 
 [%- IF ssl_certificate && ssl_certificate_key %]
-#### SSL Proxies ##
-    [%- FOREACH domain IN domains %]
-#### SSL Proxies for [% domain %] ##
+#### SSL Proxies for [% domains.join(', ') %] ##
     [%- SET subdom_map = {
-            cpanel  = 2082, webmail    = 2095, whm        = 2087,
-            webdisk = 2077, cpcontacts = 2079, cpcalndars = 2079,
+            cpanel  = 2082, webmail    = 2095, whm        = 2086,
+            webdisk = 2077, cpcontacts = 2079, cpcalendars = 2079,
         }
     -%]
-        [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
+    [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
 server {
     listen 443 ssl;
     ssl_certificate [% ssl_certificate %];
@@ -50,12 +72,10 @@ server {
         proxy_set_header Upgrade $upgrade_value; # the header will be only sent if $upgrade_value is not empty
         proxy_set_header Connection $connection_value; # the header will be only sent if $connection_value is not empty
         [%- END %]
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        include conf.d/includes-optional/cpanel-proxy.conf;
         proxy_pass http://127.0.0.1:[% subdom_map.$proxy_subdomain %];
     }
 }
 
-        [%- END -%]
     [%- END -%]
 [%- END -%]
