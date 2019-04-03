@@ -52,7 +52,7 @@ my $opts       = {
     'help:pre_help'  => "Various ea-nginx related admin utilities\n\n$hint_blurb",
     default_commands => "help",
     alias            => { conf => "config" },
-    'help:post_help' => "More information on `en-nginx` (what works and what does not, how to customize configuration, etc)\n  can be found at https://go.cpanel.net/ea-nginx.",
+    'help:post_help' => "More information on `ea-nginx` (what works and what does not, how to customize configuration, etc)\n  can be found at https://go.cpanel.net/ea-nginx.",
 };
 
 run(@ARGV) if !caller;

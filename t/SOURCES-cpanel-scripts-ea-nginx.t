@@ -74,7 +74,7 @@ shared_examples_for "any sub command that taks a cpanel user" => sub {
     };
 };
 
-describe "en-nginx script" => sub {
+describe "ea-nginx script" => sub {
     share my %mi;
     around {
         local $ENV{"scripts::ea_nginx::bail_die"} = 1;
