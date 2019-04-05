@@ -73,10 +73,27 @@ describe "Basics On C6" => sub {
         };
 
         it "on C6 restart calls saferun once, and it's init.d" => sub {
+            # its already running
+            local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
+                return 0;
+            };
+
             Cpanel::ServiceManager::Services::Nginx::restart ();
             is ($Cpanel::ServiceManager::Services::Nginx::_initted, 1, "restart: Initted");
             is (@{$shared{'saferun_results'}}, 1, "restart: Saferun called once");
-            is ($shared{'saferun_results'}->[0], '/etc/init.d/nginx,reload', "restart: Saferun is used to call init.d script");
+            is ($shared{'saferun_results'}->[0], '/etc/init.d/nginx,reload', "restart: Saferun is used to call init.d script reload");
+        };
+
+        it "on C6 restart calls saferun once, and it's init.d" => sub {
+            # its already running
+            local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
+                return 3;
+            };
+
+            Cpanel::ServiceManager::Services::Nginx::restart ();
+            is ($Cpanel::ServiceManager::Services::Nginx::_initted, 1, "restart: Initted");
+            is (@{$shared{'saferun_results'}}, 1, "restart: Saferun called once");
+            is ($shared{'saferun_results'}->[0], '/etc/init.d/nginx,start', "restart: Saferun is used to call init.d script start");
         };
 
         it "on C6 support_reload" => sub {
@@ -177,11 +194,28 @@ describe "Basics On C7" => sub {
             is ($shared{'saferun_results'}->[0], '/usr/bin/systemctl,start,nginx', "start: Saferun is used to call systemctl");
         };
 
-        it "on C7 restart calls saferun once, and it's init.d" => sub {
+        it "on C7 restart calls saferun once, and it's systemctl" => sub {
+            # its already running
+            local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
+                return 0;
+            };
+
             Cpanel::ServiceManager::Services::Nginx::restart ();
             is ($Cpanel::ServiceManager::Services::Nginx::_initted, 1, "restart: Initted");
             is (@{$shared{'saferun_results'}}, 1, "restart: Saferun called once");
-            is ($shared{'saferun_results'}->[0], '/usr/bin/systemctl,reload,nginx', "restart: Saferun is used to call systemctl");
+            is ($shared{'saferun_results'}->[0], '/usr/bin/systemctl,reload,nginx', "restart: Saferun is used to call systemctl reload");
+        };
+
+        it "on C7 restart calls saferun once, and it's systemctl" => sub {
+            # its already running
+            local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
+                return 3;
+            };
+
+            Cpanel::ServiceManager::Services::Nginx::restart ();
+            is ($Cpanel::ServiceManager::Services::Nginx::_initted, 1, "restart: Initted");
+            is (@{$shared{'saferun_results'}}, 1, "restart: Saferun called once");
+            is ($shared{'saferun_results'}->[0], '/usr/bin/systemctl,start,nginx', "restart: Saferun is used to call systemctl start");
         };
 
         it "on C7 support_reload" => sub {

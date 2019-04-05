@@ -108,6 +108,9 @@ sub restart {
     my ( $self, %opts ) = @_;
     _init();
 
+    # if it is not currently running, start it
+    return start () if (_status (0) != 0);
+
     if ($is_systemctl) {
         Cpanel::SafeRun::Simple::saferun( '/usr/bin/systemctl', 'reload', 'nginx' );
     }
@@ -126,17 +129,21 @@ Nginx supports the reload option.
 
 sub support_reload { return 1; }
 
-=head2 status
+=head2 _status
 
-Determine if nginx is running or not.
+Determine if nginx is running or not.  Accepts parameter of do_print, if you want it to print to the screen or not.
 
 =cut
 
-sub status {
+sub _status {
+    my ($do_print) = @_;
+
+    $do_print //= 1;
+
     _init();
 
     if ( !-e $pid_file ) {
-        print "nginx is not running\n";
+        print "nginx is not running\n" if $do_print;
         return 3;
     }
 
@@ -146,19 +153,30 @@ sub status {
     my $exe_path = "/proc/$pid/exe";
 
     if ( !-e $exe_path ) {
-        print "nginx is not running\n";
+        print "nginx is not running\n" if $do_print;
         return 3;
     }
 
     my $path = Cwd::abs_path($exe_path);
 
     if ( $path eq $nginx_file ) {
-        print "nginx (pid $pid) is running\n";
+        print "nginx (pid $pid) is running\n" if $do_print;
         return 0;
     }
 
-    print "nginx is not running\n";
+    print "nginx is not running\n" if $do_print;
     return 3;
+
+}
+
+=head2 status
+
+Determine if nginx is running or not.
+
+=cut
+
+sub status {
+    return _status (1);
 }
 
 no Cpanel::Class;    #issafe #nomunge
