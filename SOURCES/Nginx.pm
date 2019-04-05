@@ -23,6 +23,29 @@ our $initd_file   = '/etc/init.d/nginx';
 our $pid_file     = '/var/run/nginx.pid';
 our $nginx_file   = '/usr/sbin/nginx';
 
+=head1 NAME
+
+Cpanel::ServiceManager::Services::Nginx
+
+=head1 SYNOPSIS
+
+restartsrv driver for the 'apache_php_fpm' service.
+
+=head1 DESCRIPTION
+
+    exec('/usr/local/cpanel/scripts/restarsrv_apache_php_fpm');
+
+=head1 SUBROUTINES
+
+=head2 _init
+
+Handles initialization, which at the moment is just whether this
+system supports systemd or init.d.
+
+If Nginx is not installed this routine will die.
+
+=cut
+
 sub _init {
     return if $_initted;
     $_initted = 1;
@@ -33,6 +56,12 @@ sub _init {
         die "Nginx seems to have been uninstalled\n";
     }
 }
+
+=head2 stop
+
+Stops nginx. Returns 1 unless something throws an exception.
+
+=cut
 
 sub stop {
     my ( $self, %opts ) = @_;
@@ -48,6 +77,12 @@ sub stop {
     return 1;
 }
 
+=head2 start
+
+Starts nginx. Returns 1 unless something throws an exception.
+
+=cut
+
 sub start {
     my ( $self, %opts ) = @_;
     _init();
@@ -61,6 +96,13 @@ sub start {
 
     return 1;
 }
+
+=head2 restart
+
+Restarts nginx.  In the parlance of the nginx scripts, this is really a "reload"
+so call reload.
+
+=cut
 
 sub restart {
     my ( $self, %opts ) = @_;
@@ -76,7 +118,19 @@ sub restart {
     return 1;
 }
 
+=head2 support_reload
+
+Nginx supports the reload option.
+
+=cut
+
 sub support_reload { return 1; }
+
+=head2 status
+
+Determine if nginx is running or not.
+
+=cut
 
 sub status {
     _init();
@@ -105,15 +159,6 @@ sub status {
 
     print "nginx is not running\n";
     return 3;
-}
-
-sub check {
-    eval { status(); };
-    if ($@) {
-        die $@;
-    }
-
-    return 1;
 }
 
 no Cpanel::Class;    #issafe #nomunge
