@@ -22,8 +22,6 @@ require $conf{'require'};
 use Test::MockFile ();
 use Test::MockModule ();
 
-no warnings qw(redefine once);
-
 my @saferun_results;
 
 describe "Basics On C6" => sub {
@@ -74,6 +72,7 @@ describe "Basics On C6" => sub {
 
         it "on C6 restart calls saferun once, and it's init.d" => sub {
             # its already running
+            no warnings 'redefine';
             local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
                 return 0;
             };
@@ -86,6 +85,7 @@ describe "Basics On C6" => sub {
 
         it "on C6 restart calls saferun once, and it's init.d" => sub {
             # its already running
+            no warnings 'redefine';
             local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
                 return 3;
             };
@@ -196,6 +196,7 @@ describe "Basics On C7" => sub {
 
         it "on C7 restart calls saferun once, and it's systemctl" => sub {
             # its already running
+            no warnings 'redefine';
             local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
                 return 0;
             };
@@ -208,6 +209,7 @@ describe "Basics On C7" => sub {
 
         it "on C7 restart calls saferun once, and it's systemctl" => sub {
             # its already running
+            no warnings 'redefine';
             local *Cpanel::ServiceManager::Services::Nginx::_status = sub {
                 return 3;
             };
