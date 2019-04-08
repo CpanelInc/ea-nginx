@@ -9,6 +9,11 @@ package Cpanel::ServiceManager::Services::Nginx;
 use strict;
 use warnings;
 
+# Cpanel::Class, is a 3rdparty/perl class that is used by
+# Cpanel::ServiceManager::Base and the "extends" line below fails if
+# Cpanel::Class is not explicitly declared here.  Even if I use
+# Cpanel::ServiceManager::Base I still need.
+
 use Cpanel::Class;
 use Cpanel::SafeRun::Simple;
 use Cpanel::LoadFile;
