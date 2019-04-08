@@ -7,8 +7,9 @@
 package Cpanel::ServiceManager::Services::Nginx;
 
 use strict;
+use warnings;
 
-use Cpanel::Class;    #issafe #nomunge
+use Cpanel::Class;
 use Cpanel::SafeRun::Simple;
 use Cpanel::LoadFile;
 use Cwd;
@@ -29,11 +30,11 @@ Cpanel::ServiceManager::Services::Nginx
 
 =head1 SYNOPSIS
 
-restartsrv driver for the 'apache_php_fpm' service.
+restartsrv driver for the 'Nginx' service.
 
 =head1 DESCRIPTION
 
-    exec('/usr/local/cpanel/scripts/restarsrv_apache_php_fpm');
+    exec('/usr/local/cpanel/scripts/restarsrv_nginx');
 
 =head1 SUBROUTINES
 
@@ -109,7 +110,7 @@ sub restart {
     _init();
 
     # if it is not currently running, start it
-    return start () if (_status (0) != 0);
+    return start() if ( _status(0) != 0 );
 
     if ($is_systemctl) {
         Cpanel::SafeRun::Simple::saferun( '/usr/bin/systemctl', 'reload', 'nginx' );
@@ -176,9 +177,7 @@ Determine if nginx is running or not.
 =cut
 
 sub status {
-    return _status (1);
+    return _status(1);
 }
-
-no Cpanel::Class;    #issafe #nomunge
 
 1;
