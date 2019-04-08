@@ -88,6 +88,7 @@ Source14: cpanel.tar.gz
 Source15: cpanel-chksrvd
 Source16: cpanel-scripts-ea-nginx
 Source17: FPM_50x.html
+Source18: Nginx.pm
 
 License: 2-clause BSD-like license
 
@@ -215,6 +216,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{__install} -m755 %{bdir}/objs/nginx-debug \
     $RPM_BUILD_ROOT%{_sbindir}/nginx-debug
 
+%{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services
+%{__install} -m 600 -p %{SOURCE18} $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
 
@@ -290,6 +293,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/html
 %attr(644, root, root) %{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
+
+%attr(600, root, root) /var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
 
 %pre
 # Add the "nginx" user
