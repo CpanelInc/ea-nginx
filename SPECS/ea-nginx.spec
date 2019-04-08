@@ -305,6 +305,8 @@ if [ $1 -eq 1 ]; then
 %if %{use_systemd}
     /usr/bin/systemctl preset nginx.service >/dev/null 2>&1 ||:
     /usr/bin/systemctl preset nginx-debug.service >/dev/null 2>&1 ||:
+    /usr/bin/systemctl enable nginx.service >/dev/null 2>&1 ||:
+    /usr/bin/systemctl enable nginx-debug.service >/dev/null 2>&1 ||:
 %else
     /sbin/chkconfig --add nginx
     /sbin/chkconfig --add nginx-debug
