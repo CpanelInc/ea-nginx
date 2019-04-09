@@ -36,7 +36,7 @@ my $cmds = {
         code     => \&reload,
         clue     => "reload",
         abstract => 'reload nginx configuration',
-        help     => "reload nginx configuration - a convenience for `nginx -s reload` (useful after multiple changes w/ --no-reload)",
+        help     => "reload nginx configuration - a convenience for `restartsrv_nginx reload` (useful after multiple changes w/ --no-reload)",
     },
     remove => {
         code     => \&remove,
@@ -160,11 +160,11 @@ sub reload { _reload() }
 sub _reload {
     my ($new_file) = @_;
 
-    if ( system("/usr/sbin/nginx -s reload") != 0 ) {
+    if ( system("/usr/local/cpanel/scripts/restartsrv_nginx reload") != 0 ) {
         if ($new_file) {
             warn "Could not reload generated nginx config, removing and attempting reload without it: $?\n";
             unlink $new_file;
-            system("/usr/sbin/nginx -s reload") || return 1;
+            system("/usr/local/cpanel/scripts/restartsrv_nginx reload") || return 1;
         }
         exit 1;
     }

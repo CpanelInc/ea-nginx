@@ -223,7 +223,7 @@ describe "ea-nginx script" => sub {
 
             it "should reload nginx" => sub {
                 modulino_run_trap("reload");
-                is_deeply $system_calls, [ ['/usr/sbin/nginx -s reload'] ];
+                is_deeply $system_calls, [ ['/usr/local/cpanel/scripts/restartsrv_nginx reload'] ];
             };
 
             describe "\b, if reload fails, " => sub {
@@ -256,7 +256,7 @@ describe "ea-nginx script" => sub {
                     it "should restart again (exit unclean on success)" => sub {
                         my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/derp$$.conf", "oh hai" );
                         trap { scripts::ea_nginx::_reload( $mock->filename ) };
-                        is_deeply $system_calls, [ ['/usr/sbin/nginx -s reload'], ['/usr/sbin/nginx -s reload'] ];
+                        is_deeply $system_calls, [ ['/usr/local/cpanel/scripts/restartsrv_nginx reload'], ['/usr/local/cpanel/scripts/restartsrv_nginx reload'] ];
                         is $trap->exit, 1;
                     };
 
@@ -265,7 +265,7 @@ describe "ea-nginx script" => sub {
                         local $current_system = sub { push @{$system_calls}, [@_]; $rv-- };
                         my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/derp$$.conf", "oh hai" );
                         trap { scripts::ea_nginx::_reload( $mock->filename ) };
-                        is_deeply $system_calls, [ ['/usr/sbin/nginx -s reload'], ['/usr/sbin/nginx -s reload'] ];
+                        is_deeply $system_calls, [ ['/usr/local/cpanel/scripts/restartsrv_nginx reload'], ['/usr/local/cpanel/scripts/restartsrv_nginx reload'] ];
                         is $trap->exit, undef;
                     };
                 };
