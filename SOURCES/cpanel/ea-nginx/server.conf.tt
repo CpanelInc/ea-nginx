@@ -1,0 +1,81 @@
+server {
+    server_name[% FOREACH domain IN domains %] [% domain %] www.[% domain %][% END %];
+    listen 80;
+
+    set $CPANEL_APACHE_PROXY_IP [% ip %];
+
+    [%- IF ssl_certificate && ssl_certificate_key %]
+    listen 443 ssl;
+    ssl_certificate [% ssl_certificate %];
+    ssl_certificate_key [% ssl_certificate_key %];
+    [% END -%]
+
+    root [% docroot %];
+    index [% IF fpm_socket %]index.php [% END %]index.html;
+
+    location = /FPM_50x.html {
+        root   /etc/nginx/ea-nginx/html;
+    }
+
+    [%- IF wordpress.docroot_install %]
+    # $docroot wordpress install
+    location / {
+        [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
+        [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+    }
+    [% END -%]
+    [%- FOREACH wordpress_uri IN wordpress.non_docroot_uris %]
+    # $docroot/[% wordpress_uri %] wordpress install
+    location /[% wordpress_uri %] {
+        [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
+        [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+    }
+    [% END -%]
+
+    include conf.d/server-includes/*.conf;
+    include conf.d/users/[% user %]/*.conf;
+    include conf.d/users/[% user %]/[% domains.0 %]/*.conf;
+
+    [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
+}
+
+[%- IF ssl_certificate && ssl_certificate_key %]
+#### SSL Proxies for [% domains.join(', ') %] ##
+    [%- SET subdom_map = {
+            cpanel  = 2082, webmail    = 2095, whm        = 2086,
+            webdisk = 2077, cpcontacts = 2079, cpcalendars = 2079,
+        }
+    -%]
+    [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
+server {
+    listen 443 ssl;
+    ssl_certificate [% ssl_certificate %];
+    ssl_certificate_key [% ssl_certificate_key %];
+
+    server_name [% FOREACH domain IN domains %] [% proxy_subdomain %].[% domain %][% END %];
+
+    location / {
+        [%- IF proxy_subdomain.match('^(?:cpanel|webmail|whm)$') %]
+        # since proxy_set_header can not be done inside an if block we jump though hoops
+        # default value is empty because the header will be only sent if $value is not empty
+        set $upgrade_value "";
+        set $connection_value "";
+
+        if ($http_upgrade ~* ^websocket$) {
+            set $upgrade_value $http_upgrade;
+            set $connection_value "upgrade";
+        }
+
+        # In nginx you still need to use `http` for protocol in your url and not `ws`.
+        # The `ws` and `wss` protocol are required for browser, in the nginx side we add
+        #   the headers below to handle the websockets over `http`.
+        proxy_set_header Upgrade $upgrade_value; # the header will be only sent if $upgrade_value is not empty
+        proxy_set_header Connection $connection_value; # the header will be only sent if $connection_value is not empty
+        [%- END %]
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass http://127.0.0.1:[% subdom_map.$proxy_subdomain %];
+    }
+}
+
+    [%- END -%]
+[%- END -%]

@@ -61,11 +61,15 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
 Group: %{_group}
+
+Provides: ea-nginx = %{version}-%{release}
+Conflicts: nginx
+AutoReq: no
 
 Source0: http://nginx.org/download/nginx-%{version}.tar.gz
 Source1: logrotate
@@ -80,6 +84,11 @@ Source10: nginx.suse.logrotate
 Source11: nginx-debug.service
 Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
+Source14: cpanel.tar.gz
+Source15: cpanel-chksrvd
+Source16: cpanel-scripts-ea-nginx
+Source17: FPM_50x.html
+Source18: Nginx.pm
 
 License: 2-clause BSD-like license
 
@@ -144,8 +153,24 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 %{__rm} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
 %{__install} -m 644 -p %{SOURCE4} \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
+perl -pi -e 's/^user\s+nginx;/user nobody;/g' $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
+
 %{__install} -m 644 -p %{SOURCE5} \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/default.conf
+
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/includes-optional/
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/
+mkdir cpanel && cd cpanel && tar xzf %{SOURCE14}  && cd ..
+cp -r cpanel/conf.d/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
+
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
+cp -r cpanel/ea-nginx/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx
+
+mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
+%{__install} -m 644 -p %{SOURCE15} $RPM_BUILD_ROOT/etc/chkserv.d/nginx
+mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
+%{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
+ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 %{__install} -m 644 -p %{SOURCE3} \
@@ -155,6 +180,9 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 
 %{__install} -p -D -m 0644 %{bdir}/objs/nginx.8 \
     $RPM_BUILD_ROOT%{_mandir}/man8/nginx.8
+
+%{__mkdir} -m 755 -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html
+%{__install} -m 644 -p %{SOURCE17} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
 
 %if %{use_systemd}
 # install systemd-specific files
@@ -188,6 +216,8 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 %{__install} -m755 %{bdir}/objs/nginx-debug \
     $RPM_BUILD_ROOT%{_sbindir}/nginx-debug
 
+%{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services
+%{__install} -m 600 -p %{SOURCE18} $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
 
@@ -199,6 +229,30 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 
 %dir %{_sysconfdir}/nginx
 %dir %{_sysconfdir}/nginx/conf.d
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
+%config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
+
+%dir %{_sysconfdir}/nginx/ea-nginx
+%attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/meta/apache
+%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
+%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
+%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
+%{_sysconfdir}/nginx/ea-nginx/cpanel-php-location.tt
+%{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
+%{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
+%{_sysconfdir}/nginx/ea-nginx/server.conf.tt
+
+%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
+/usr/local/cpanel/scripts/restartsrv_nginx
+/etc/chkserv.d/nginx
+
 %{_sysconfdir}/nginx/modules
 
 %config(noreplace) %{_sysconfdir}/nginx/nginx.conf
@@ -237,6 +291,11 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 %doc %{_datadir}/doc/%{upstream_name}-%{main_version}/COPYRIGHT
 %{_mandir}/man8/nginx.8*
 
+%attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/html
+%attr(644, root, root) %{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
+
+%attr(600, root, root) /var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
+
 %pre
 # Add the "nginx" user
 getent group %{nginx_group} >/dev/null || groupadd -r %{nginx_group}
@@ -251,6 +310,7 @@ if [ $1 -eq 1 ]; then
 %if %{use_systemd}
     /usr/bin/systemctl preset nginx.service >/dev/null 2>&1 ||:
     /usr/bin/systemctl preset nginx-debug.service >/dev/null 2>&1 ||:
+    /usr/bin/systemctl enable nginx.service >/dev/null 2>&1 ||:
 %else
     /sbin/chkconfig --add nginx
     /sbin/chkconfig --add nginx-debug
@@ -280,16 +340,41 @@ BANNER
         if [ ! -e %{_localstatedir}/log/nginx/access.log ]; then
             touch %{_localstatedir}/log/nginx/access.log
             %{__chmod} 640 %{_localstatedir}/log/nginx/access.log
-            %{__chown} nginx:%{nginx_loggroup} %{_localstatedir}/log/nginx/access.log
+            %{__chown} %{nginx_user}:%{nginx_loggroup} %{_localstatedir}/log/nginx/access.log
         fi
 
         if [ ! -e %{_localstatedir}/log/nginx/error.log ]; then
             touch %{_localstatedir}/log/nginx/error.log
             %{__chmod} 640 %{_localstatedir}/log/nginx/error.log
-            %{__chown} nginx:%{nginx_loggroup} %{_localstatedir}/log/nginx/error.log
+            %{__chown} %{nginx_user}:%{nginx_loggroup} %{_localstatedir}/log/nginx/error.log
         fi
     fi
+
+%{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_to_alt_ports
+echo "nginx:1" >> /etc/chkserv.d/chkservd.conf
+
 fi
+
+%if %{use_systemd}
+    /usr/bin/systemctl start nginx.service >/dev/null 2>&1 ||:
+%else
+    /sbin/service nginx start  >/dev/null 2>&1 ||:
+%endif
+
+# record the current value of fileprotect
+if [ -e /var/cpanel/fileprotect ];
+then
+    touch /etc/nginx/ea-nginx/meta/fileprotect
+else
+    rm -f /etc/nginx/ea-nginx/meta/fileprotect
+fi
+
+# disable file protect
+
+/usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
+
+# now that it is running:
+/usr/local/cpanel/scripts/ea-nginx config --all
 
 %preun
 if [ $1 -eq 0 ]; then
@@ -301,6 +386,14 @@ if [ $1 -eq 0 ]; then
     /sbin/chkconfig --del nginx
     /sbin/chkconfig --del nginx-debug
 %endif
+
+sed -i '/nginx:1/d' /etc/chkserv.d/chkservd.conf
+%{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
+
+if [ -e /etc/nginx/ea-nginx/meta/fileprotect ]; then
+    rm -f /etc/nginx/ea-nginx/meta/fileprotect
+    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
+fi
 fi
 
 %postun
@@ -314,6 +407,26 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Apr 10 2019 Julian Brown <julian.brown@cpanel.net> - 1.15.9-4
+- ZC-4975: Update custom 503 html file.
+
+* Thu Mar 21 2019 Dan Muey <dan@cpanel.net> - 1.15.9-3
+- ZC-4877: add initial user config script
+
+* Thu Mar 14 2019 Dan Muey <dan@cpanel.net> - 1.15.9-2
+- ZC-4868: Add cPanel specific configurations
+- ZC-4867: start nginx (specfile already stops it if needed)
+-          fix hard coded `nginx` user in log ownership
+-          Add `Provides` and `Conflicts` for upstream
+- ZC-4867: Move Apache to alternate port and back again
+- ZC-4869: Add support for proxying to apache,
+-          add mailman and DCV (.well-known) proxies
+- ZC-4870/ZC-4871: tie into chkservd and restartsrv system
+- ZC-4897: Account for current apache port settings that are above the root-only range
+- ZC-4898: Do not move apache if it is already configured for nonstandard ports
+- ZC-4869: do `proxy_set_header` for `Host` and `X-Real-IP` anywhere we `proxy_pass`
+- ZC-4869: alias img-sys for mailman images
+
 * Wed Mar 13 2019 Dan Muey <dan@cpanel.net> - 1.15.9-1
 - cPanelize nginx SPEC file
 
