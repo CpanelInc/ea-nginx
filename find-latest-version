@@ -1,0 +1,52 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - find-latest-version                  Copyright(c) 2019 cPanel, L.L.C.
+#                                                           All rights Reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+#
+# This provides incremental updates to existing packages in EasyApache4.
+package ea_nginx::find_latest_version;
+
+use strict;
+use warnings;
+
+use lib "../ea-tools/lib/ea4_tool";    # assumes ea-tools is checked out next to this repo
+use ea4_tool::util ();
+
+ea4_tool::util::find_latest_version( \&_get_required, \&_add_sum ) if !caller();
+
+###############
+#### helpers ##
+###############
+
+sub _get_required {
+    my ($http) = @_;
+
+    my $res = $http->get("https://nginx.org/en/download.html");
+    if ( !$res->{success} ) {
+        die "Could not GET nginx dist page ($res->{status} $res->{reason})\n";
+    }
+
+    my @nginx_1 = sort { $b <=> $a } ( $res->{content} =~ m{href="/download/nginx-1\.([0-9]+.[0-9]+)\.tar\.gz"}g );
+    if ( !@nginx_1 ) {
+        die "Could not find Nginx versions\n";
+    }
+
+    my $version = "1.$nginx_1[0]";
+    my $name    = "nginx-$version.tar.gz";
+    my $url     = "https://nginx.org/download/$name";
+
+    return ( $version, $url, $name );
+}
+
+sub _add_sum {
+    my ( $http, $hr ) = @_;
+
+    # https://nginx.org/download/nginx-1.16.0.tar.gz.asc is PGP, which is not yet supported
+    # Optional: Set $hr->{tarball}{sum}{hex} and $hr->{tarball}{sum}{type} (sha256, sha1, md5, anythign Digest.pm can handle)
+    #           die if there is a problem determining either of those values
+    # otherwise this is a no-op
+
+    return;
+}
+
