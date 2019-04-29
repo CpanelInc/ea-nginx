@@ -48,7 +48,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.15.9
+%define main_version 1.16.0
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -407,6 +407,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Apr 23 2019 Daniel Muey <dan@cpanel.net> - 1.16.0-1
+- EA-8415: Update ea-nginx from v1.15.9 to v1.16.0
+
 * Wed Apr 10 2019 Julian Brown <julian.brown@cpanel.net> - 1.15.9-4
 - ZC-4975: Update custom 503 html file.
 
