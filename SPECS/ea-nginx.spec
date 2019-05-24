@@ -89,6 +89,7 @@ Source15: cpanel-chksrvd
 Source16: cpanel-scripts-ea-nginx
 Source17: FPM_50x.html
 Source18: Nginx.pm
+Source19: cpanel-scripts-ea-nginx-userdata
 
 License: 2-clause BSD-like license
 
@@ -170,6 +171,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
 %{__install} -m 644 -p %{SOURCE15} $RPM_BUILD_ROOT/etc/chkserv.d/nginx
 mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
 %{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
+%{__install} -m 755 -p %{SOURCE19} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-userdata
 ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
@@ -250,6 +252,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
+%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-userdata
 /usr/local/cpanel/scripts/restartsrv_nginx
 /etc/chkserv.d/nginx
 
