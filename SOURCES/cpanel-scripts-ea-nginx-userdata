@@ -1,5 +1,5 @@
 #!/usr/local/cpanel/3rdparty/bin/perl
-# cpanel - ea-nginx                                Copyright 2019 cPanel, L.L.C.
+# cpanel - ea-nginx-userdata                       Copyright 2019 cPanel, L.L.C.
 #                                                           All rights Reserved.
 # copyright@cpanel.net                                         http://cpanel.net
 # This code is subject to the cPanel license. Unauthorized copying is prohibited
@@ -171,7 +171,7 @@ sub _get_cur_userdata {
 sub _write_userdata {
     my ( $user, $name, $conf ) = @_;
 
-    # Can’t use Cpanel::Config::userdata:: becasue we can’t backport ULC changes that far
+    # Can’t use Cpanel::Config::userdata:: because we can’t backport ULC changes that far
     # It is safe because:
     #    1. this script is the only writer of it
     #    2. the config script it the only reader of it
@@ -228,6 +228,8 @@ __END__
 =item Step 2. Update the jira issue in the description w/ the one that is adding the feature here
 
 =item Step 3. Add a call to C<_do_feature()> in C<run()> between the “add features [below|above] this line” comments
+
+=item Step 4. Update ea-nginx to consume the new userdata JSON file from Step 3
 
 =back
 
