@@ -184,6 +184,15 @@ sub _write_user_conf {
 
     print "Setting up $userconf …\n";
 
+    if ( !defined &scripts::ea_nginx_userdata::run ) {
+
+        # Can’t use FindBin because the script name is different in repo and in RPM
+        require Cwd;
+        my $cur_abs = Cwd::abs_path($0);
+        require "$cur_abs-userdata";
+    }
+    scripts::ea_nginx_userdata::run($user);
+
     path($userconf)->spew("#### main domain for $user ##\n");
     _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
 
@@ -210,14 +219,6 @@ my ( $tt, $server_tt, $docroots );
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
-    if ( !defined &scripts::ea_nginx_userdata::run ) {
-
-        # Can’t use FindBin because the script name is different in repo and in RPM
-        require Cwd;
-        my $cur_abs = Cwd::abs_path($0);
-        require "$cur_abs-userdata";
-    }
-    scripts::ea_nginx_userdata::run($user);
     my $cpanel_password_protected_directories = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_password_protected_directories.json");
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
@@ -308,6 +309,19 @@ sub _get_basic_auth {
     if ($basic_auth) {
         $basic_auth->{auth_file} = $docroot_rel ? "$homedir/.htpasswds/$docroot_rel/passwd" : "$homedir/.htpasswds/passwd";
     }
+
+    $basic_auth->{locations} = {};
+    for my $dir ( keys %{$cpanel_password_protected_directories} ) {
+        my $abs = "$homedir$dir";
+        if ( $abs =~ m{^\Q$docroot\E(/.+)$} ) {
+            my $loc = $1;
+            $basic_auth->{locations}{$loc} = {
+                auth_file  => "$homedir/.htpasswds$docroot_rel$loc/passwd",
+                realm_name => $cpanel_password_protected_directories->{$dir}{realm_name},
+            };
+        }
+    }
+
     return $basic_auth;
 }
 

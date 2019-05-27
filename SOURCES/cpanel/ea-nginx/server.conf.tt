@@ -13,9 +13,11 @@ server {
     root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;
 
-    [%- IF basic_auth %]
-    auth_basic           "[% basic_auth.realm_name.dquote %]";
-    auth_basic_user_file "[% basic_auth.auth_file.dquote %]";
+    [%- IF basic_auth.realm_name.size %]
+        [% INCLUDE "ea-nginx/cpanel-password-protected-dirs.tt"
+             realm_name = basic_auth.realm_name
+             auth_file  = basic_auth.auth_file
+             FILTER indent %]
     [% END -%]
 
     location = /FPM_50x.html {
@@ -32,9 +34,33 @@ server {
     [%- FOREACH wordpress_uri IN wordpress.non_docroot_uris %]
     # $docroot/[% wordpress_uri %] wordpress install
     location /[% wordpress_uri %] {
+
+        [%- FOREACH location IN basic_auth.locations.keys.sort %]
+            [%- IF location == "/" _ wordpress_uri %]
+                [%- INCLUDE "ea-nginx/cpanel-password-protected-dirs.tt"
+                   realm_name = basic_auth.locations.item(location).realm_name
+                   auth_file  = basic_auth.locations.item(location).auth_file
+                   FILTER indent FILTER indent -%]
+                [%- basic_auth.locations.delete(location) -%]
+            [% END -%]
+        [% END -%]
+
         [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
         [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
     }
+    [% END -%]
+
+    [%- IF basic_auth.locations %]
+        [%- FOREACH location IN basic_auth.locations.keys.sort %]
+    location [% location %] {
+
+        [%- INCLUDE "ea-nginx/cpanel-password-protected-dirs.tt"
+            realm_name = basic_auth.locations.item(location).realm_name
+            auth_file  = basic_auth.locations.item(location).auth_file
+            FILTER indent FILTER indent -%]
+    }
+        [% END -%]
+
     [% END -%]
 
     include conf.d/server-includes/*.conf;
