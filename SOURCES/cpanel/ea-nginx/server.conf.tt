@@ -13,6 +13,11 @@ server {
     root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;
 
+    [%- IF basic_auth %]
+    auth_basic           "[% basic_auth.realm_name.dquote %]";
+    auth_basic_user_file "[% basic_auth.auth_file.dquote %]";
+    [% END -%]
+
     location = /FPM_50x.html {
         root   /etc/nginx/ea-nginx/html;
     }

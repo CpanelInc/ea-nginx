@@ -128,7 +128,7 @@ sub _do_cpanel_password_protected_directories {
         }
     }
 
-    return 2 if !$had_changes;
+    return 2 if keys %{$cur_conf} && !$had_changes;
     return _write_userdata( $user, cpanel_password_protected_directories => $conf );
 }
 
