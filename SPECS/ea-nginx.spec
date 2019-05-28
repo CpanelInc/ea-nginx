@@ -234,6 +234,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
@@ -413,6 +415,7 @@ fi
 %changelog
 * Thu May 23 2019 Daniel Muey <dan@cpanel.net> - 1.16.0-2
 - ZC-5014: Add cPanel Password Protected Directory support
+- ZC-5151: Add CGI and Server-Parsed support via proxy
 
 * Tue Apr 23 2019 Daniel Muey <dan@cpanel.net> - 1.16.0-1
 - EA-8415: Update ea-nginx from v1.15.9 to v1.16.0
