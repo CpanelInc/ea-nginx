@@ -29,6 +29,8 @@ server {
     location / {
         [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
         [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+        include conf.d/includes-optional/cpanel-cgi-location.conf;
+        include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     }
     [% END -%]
     [%- FOREACH wordpress_uri IN wordpress.non_docroot_uris %]
@@ -47,6 +49,8 @@ server {
 
         [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
         [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+        include conf.d/includes-optional/cpanel-cgi-location.conf;
+        include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     }
     [% END -%]
 
@@ -58,6 +62,10 @@ server {
             realm_name = basic_auth.locations.item(location).realm_name
             auth_file  = basic_auth.locations.item(location).auth_file
             FILTER indent FILTER indent -%]
+
+        [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+        include conf.d/includes-optional/cpanel-cgi-location.conf;
+        include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     }
         [% END -%]
 
@@ -68,6 +76,8 @@ server {
     include conf.d/users/[% user %]/[% domains.0 %]/*.conf;
 
     [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
+    include conf.d/includes-optional/cpanel-cgi-location.conf;
+    include conf.d/includes-optional/cpanel-server-parsed-location.conf;
 }
 
 [%- IF ssl_certificate && ssl_certificate_key %]
