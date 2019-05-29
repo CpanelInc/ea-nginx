@@ -219,6 +219,7 @@ my ( $tt, $server_tt, $docroots );
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
+    # at this point that file should exist; if it does not we want this to barf so we know about it
     my $cpanel_password_protected_directories = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_password_protected_directories.json");
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
