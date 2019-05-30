@@ -15,7 +15,8 @@ use Cpanel::Version                       ();
 use Cpanel::Transaction::File::JSON       ();
 use Cpanel::Transaction::File::JSONReader ();
 
-my $current_cpanel_version;
+our $current_cpanel_version;
+our $var_cpanel_userdata = '/var/cpanel/userdata';
 
 exit( run(@ARGV) ) if !caller;
 
@@ -23,7 +24,7 @@ sub run {
     my ( $user, @args ) = @_;
     die "This script should only be called as root\n" if $> != 0;
 
-    if ( grep m/^--help$/, @args ) {
+    if ( grep m/^--help$/, ( $user, @args ) ) {
         print _help();
         return 0;
     }
@@ -158,11 +159,12 @@ sub _get_homedir {
 
 sub _get_cur_userdata {
     my ( $user, $name ) = @_;
-    return {} if !-e "/var/cpanel/userdata/$user/$name.json";
+    my $fname = $var_cpanel_userdata . "/$user/$name.json";
+    return {} if !-e $fname;
 
     my $conf = {};
     eval {
-        my $reader_transaction = Cpanel::Transaction::File::JSONReader->new( path => "/var/cpanel/userdata/$user/$name.json" );
+        my $reader_transaction = Cpanel::Transaction::File::JSONReader->new( path => $fname );
         $conf = $reader_transaction->get_data();
     };
     return $conf;
@@ -170,6 +172,7 @@ sub _get_cur_userdata {
 
 sub _write_userdata {
     my ( $user, $name, $conf ) = @_;
+    my $fname = $var_cpanel_userdata . "/$user/$name.json";
 
     # Can’t use Cpanel::Config::userdata:: because we can’t backport ULC changes that far
     # It is safe because:
@@ -178,7 +181,7 @@ sub _write_userdata {
     #    3. When it is added to ULC via '.htaccess-is-not-a-database story' then this will not be excersized for the feature via 'not_applicable_as_of_cpanel_version'
 
     eval {
-        my $transaction = Cpanel::Transaction::File::JSON->new( path => "/var/cpanel/userdata/$user/$name.json" );
+        my $transaction = Cpanel::Transaction::File::JSON->new( path => $fname );
         $transaction->set_data($conf);
         $transaction->save_and_close_or_die();
     };
