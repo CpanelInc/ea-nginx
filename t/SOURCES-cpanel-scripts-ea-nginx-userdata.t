@@ -319,9 +319,6 @@ describe "ea-nginx-userdata::_do_cpanel_password_protected_directories" => sub {
     share my %mi;
 
     around {
-        local $scripts::ea_nginx_userdata::var_cpanel_userdata = $var_cpanel_userdata;
-        unlink $feature_file if -e $feature_file;
-
         local *scripts::ea_nginx_userdata::_write_userdata = sub {
             my ( $user, $feature, $conf ) = @_;
 
