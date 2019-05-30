@@ -22,85 +22,9 @@ require $conf{require};
 
 use Test::MockModule;
 
-# There is a conflict between "using" Test::MockFile and
-# requiring the modulino script file causing a fatal warning
+my ( $var_cpanel_userdata, $vcu_cpuser_dir, $feature_file, $home, $homedir, $homedir_len, %mtimes, @passwds, $version, $loaduserdomains, $cpuser );
 
-my $version = Test::MockModule->new('Cpanel::Version');
-$version->redefine(
-    'get_short_release_number',
-    sub {
-        my (@args) = @_;
-        return '82';
-    }
-);
-
-my $cpuser = "cpuser$$";
-
-my $loaduserdomains = Test::MockModule->new('Cpanel::Config::LoadUserDomains');
-$loaduserdomains->redefine(
-    'loaduserdomains',
-    sub {
-        my (@args) = @_;
-        return { "$cpuser" => 1 };
-    }
-);
-
-sub modulino_run_trap {
-    my @run_args = @_;
-
-    my $ret = -1;
-
-    trap {
-        $ret = scripts::ea_nginx_userdata::run(@run_args);
-    };
-
-    return $ret;
-}
-
-# var_cpanel user setup
-
-my $var_cpanel_userdata = File::Temp->newdir();
-my $vcu_cpuser_dir      = $var_cpanel_userdata . "/$cpuser";
-my $feature_file        = $vcu_cpuser_dir . '/feature.json';
-
-Path::Tiny::path($vcu_cpuser_dir)->mkpath;
-
-# /home/cpuser .htpasswd stuff
-
-my $home    = File::Temp->newdir();
-my $homedir = $home . '/' . $cpuser;
-
-Path::Tiny::path($homedir)->mkpath;
-
-# put the .htpasswd stuff in place
-
-my @passwds = qw(
-  passwd
-  subdir1/passwd
-  subdir2/subdir3/passwd
-  subdir2/subdir3/subdir4/subdir5/passwd
-);
-
-my %mtimes;
-my $homedir_len = length($homedir);
-
-foreach my $passwd (@passwds) {
-    my $passwd_file = $homedir . '/.htpasswds/' . $passwd;
-    my $dir         = Path::Tiny::path($passwd_file)->parent();
-    Path::Tiny::path($dir)->mkpath;
-    Path::Tiny::path($passwd_file)->spew('howdy mom');
-
-    if ( $passwd ne 'passwd' ) {
-        my $imaginary_file = $homedir . '/' . $passwd;
-        my $dir_to_create  = Path::Tiny::path($imaginary_file)->parent();
-        my $htaccess       = $dir_to_create . "/.htaccess";
-        Path::Tiny::path($dir_to_create)->mkpath;
-        Path::Tiny::path($htaccess)->spew(qq{AuthType Basic\nAuthName "Billy"\n});
-
-        my $mtime = ( stat($htaccess) )[9];
-        $mtimes{ substr( $htaccess, $homedir_len ) } = $mtime;
-    }
-}
+no warnings 'redefine';
 
 describe "ea-nginx-userdata script" => sub {
 
@@ -110,9 +34,6 @@ describe "ea-nginx-userdata script" => sub {
 
     describe "as a modulino accepting a user as an argument," => sub {
         around {
-            # I cannot use Test::MockModule for this, as it thinks
-            # scripts::ea_nginx_userdata has not been loaded
-            no warnings 'redefine';
             local *scripts::ea_nginx_userdata::_do_feature = sub {
                 my (@args) = @_;
                 return;
@@ -151,7 +72,7 @@ describe "ea-nginx-userdata script" => sub {
             like $trap->stdout, qr/Processing $cpuser/;
         };
 
-        it "should return 0 passed --help" => sub {
+        it "should return 0 when passed --help" => sub {
             my $ret = modulino_run_trap('--help');
             is $ret, 0;
         };
@@ -458,7 +379,7 @@ describe "ea-nginx-userdata::_do_cpanel_password_protected_directories" => sub {
                 }
             };
 
-            return {};
+            return $ref;
         };
 
         my $ret = scripts::ea_nginx_userdata::_do_cpanel_password_protected_directories( $cpuser, $homedir );
@@ -500,7 +421,7 @@ describe "ea-nginx-userdata::_do_cpanel_password_protected_directories" => sub {
                 }
             };
 
-            return {};
+            return $ref;
         };
 
         my $ret = scripts::ea_nginx_userdata::_do_cpanel_password_protected_directories( $cpuser, $homedir );
@@ -546,7 +467,7 @@ describe "ea-nginx-userdata::_do_cpanel_password_protected_directories" => sub {
                 }
             };
 
-            return {};
+            return $ref;
         };
 
         my $ret = scripts::ea_nginx_userdata::_do_cpanel_password_protected_directories( $cpuser, $homedir );
@@ -569,5 +490,87 @@ describe "ea-nginx-userdata::_do_cpanel_password_protected_directories" => sub {
         cmp_deeply( $mi{'conf'}, $expected_ref );
     };
 };
+
+######################################################################
+# BEGIN TEST SETUP
+######################################################################
+
+$version = Test::MockModule->new('Cpanel::Version');
+$version->redefine(
+    'get_short_release_number',
+    sub {
+        my (@args) = @_;
+        return '82';
+    }
+);
+
+$cpuser = "cpuser$$";
+
+$loaduserdomains = Test::MockModule->new('Cpanel::Config::LoadUserDomains');
+$loaduserdomains->redefine(
+    'loaduserdomains',
+    sub {
+        my (@args) = @_;
+        return { "$cpuser" => 1 };
+    }
+);
+
+$var_cpanel_userdata = File::Temp->newdir();
+$vcu_cpuser_dir      = $var_cpanel_userdata . "/$cpuser";
+$feature_file        = $vcu_cpuser_dir . '/feature.json';
+
+Path::Tiny::path($vcu_cpuser_dir)->mkpath;
+
+# /home/cpuser .htpasswd stuff
+
+$home    = File::Temp->newdir();
+$homedir = $home . '/' . $cpuser;
+
+Path::Tiny::path($homedir)->mkpath;
+
+# put the .htpasswd stuff in place
+
+@passwds = qw(
+  passwd
+  subdir1/passwd
+  subdir2/subdir3/passwd
+  subdir2/subdir3/subdir4/subdir5/passwd
+);
+
+$homedir_len = length($homedir);
+
+foreach my $passwd (@passwds) {
+    my $passwd_file = $homedir . '/.htpasswds/' . $passwd;
+    my $dir         = Path::Tiny::path($passwd_file)->parent();
+    Path::Tiny::path($dir)->mkpath;
+    Path::Tiny::path($passwd_file)->spew('howdy mom');
+
+    if ( $passwd ne 'passwd' ) {
+        my $imaginary_file = $homedir . '/' . $passwd;
+        my $dir_to_create  = Path::Tiny::path($imaginary_file)->parent();
+        my $htaccess       = $dir_to_create . "/.htaccess";
+        Path::Tiny::path($dir_to_create)->mkpath;
+        Path::Tiny::path($htaccess)->spew(qq{AuthType Basic\nAuthName "Billy"\n});
+
+        my $mtime = ( stat($htaccess) )[9];
+        $mtimes{ substr( $htaccess, $homedir_len ) } = $mtime;
+    }
+}
+
+sub modulino_run_trap {
+    my @run_args = @_;
+
+    my $ret = -1;
+
+    trap {
+        $ret = scripts::ea_nginx_userdata::run(@run_args);
+    };
+
+    return $ret;
+}
+
+######################################################################
+# END TEST SETUP
+######################################################################
 
 runtests unless caller;
