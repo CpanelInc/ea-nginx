@@ -297,10 +297,11 @@ sub _get_basic_auth {
     my $basic_auth = $cpanel_password_protected_directories->{$docroot_rel};
 
     if ( !$basic_auth ) {
-        while ($docroot_rel) {
-            $docroot_rel =~ s{/[^/]+$}{};
-            if ( exists $cpanel_password_protected_directories->{$docroot_rel} ) {
-                $basic_auth = $cpanel_password_protected_directories->{$docroot_rel};
+        my $docroot_rel_copy = $docroot_rel;
+        while ($docroot_rel_copy) {
+            $docroot_rel_copy =~ s{/[^/]+$}{};
+            if ( exists $cpanel_password_protected_directories->{$docroot_rel_copy} ) {
+                $basic_auth = $cpanel_password_protected_directories->{$docroot_rel_copy};
                 last;
             }
         }
