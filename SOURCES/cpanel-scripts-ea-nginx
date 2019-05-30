@@ -296,12 +296,14 @@ sub _get_basic_auth {
     $docroot_rel =~ s{\Q$homedir\E}{};
     my $basic_auth = $cpanel_password_protected_directories->{$docroot_rel};
 
+    my $auth_file_from;
     if ( !$basic_auth ) {
         my $docroot_rel_copy = $docroot_rel;
         while ($docroot_rel_copy) {
             $docroot_rel_copy =~ s{/[^/]+$}{};
             if ( exists $cpanel_password_protected_directories->{$docroot_rel_copy} ) {
-                $basic_auth = $cpanel_password_protected_directories->{$docroot_rel_copy};
+                $basic_auth     = $cpanel_password_protected_directories->{$docroot_rel_copy};
+                $auth_file_from = $docroot_rel_copy;
                 last;
             }
         }
@@ -309,7 +311,10 @@ sub _get_basic_auth {
 
     $basic_auth ||= $cpanel_password_protected_directories->{""} || undef;
     if ($basic_auth) {
-        $basic_auth->{auth_file} = $docroot_rel ? "$homedir/.htpasswds/$docroot_rel/passwd" : "$homedir/.htpasswds/passwd";
+        $basic_auth->{auth_file} =
+            $auth_file_from ? "$homedir/.htpasswds$auth_file_from/passwd"
+          : $docroot_rel    ? "$homedir/.htpasswds$docroot_rel/passwd"
+          :                   "$homedir/.htpasswds/passwd";
     }
 
     $basic_auth->{locations} = {};
