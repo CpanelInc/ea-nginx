@@ -272,7 +272,7 @@ In that case create a new CPANEL jira issue with a Summary like:
 
 And then a Description like this:
 
-    … and write Apache config in .htaccess based on that data.
+    … and write Apache config as an include (and remove it from .htaccess) based on that data.
 
     it should:
 
