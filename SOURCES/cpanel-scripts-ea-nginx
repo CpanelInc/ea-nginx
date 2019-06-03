@@ -184,6 +184,15 @@ sub _write_user_conf {
 
     print "Setting up $userconf …\n";
 
+    if ( !defined &scripts::ea_nginx_userdata::run ) {
+
+        # Can’t use FindBin because the script name is different in repo and in RPM
+        require Cwd;
+        my $cur_abs = Cwd::abs_path($0);
+        require "$cur_abs-userdata";
+    }
+    scripts::ea_nginx_userdata::run($user);
+
     path($userconf)->spew("#### main domain for $user ##\n");
     _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
 
@@ -210,10 +219,16 @@ my ( $tt, $server_tt, $docroots );
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
+    # at this point that file should exist; if it does not we want this to barf so we know about it
+    my $cpanel_password_protected_directories = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_password_protected_directories.json");
+
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
     $tt ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
     $server_tt ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
+    my $docroot = $docroots->{$user}{ $domains->[0] };
+
+    my $basic_auth = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
 
     my $fpm_socket;
     my $fpm_socket_php_major_version;
@@ -239,7 +254,7 @@ sub _render_and_append {
     $tt->process(
         \$server_tt,
         {
-            docroot                      => $docroots->{$user}{ $domains->[0] },
+            docroot                      => $docroot,
             ssl_certificate              => $combined_tls,
             ssl_certificate_key          => $combined_tls,
             domains                      => $domains,
@@ -251,6 +266,7 @@ sub _render_and_append {
                 docroot_install  => $wordpress_hr->{docroot_install},
                 non_docroot_uris => $wordpress_hr->{non_docroot_uris},
             },
+            basic_auth => $basic_auth,
         },
         sub {
             my ($out) = @_;
@@ -265,6 +281,55 @@ sub _render_and_append {
     }
 
     return 1;
+}
+
+sub _get_homedir {
+    my ($user) = @_;
+    return ( getpwnam($user) )[7];
+}
+
+sub _get_basic_auth {
+    my ( $user, $docroot, $cpanel_password_protected_directories ) = @_;
+
+    my $docroot_rel = $docroot;
+    my $homedir     = _get_homedir($user);
+    $docroot_rel =~ s{\Q$homedir\E}{};
+    my $basic_auth = $cpanel_password_protected_directories->{$docroot_rel};
+
+    my $auth_file_from;
+    if ( !$basic_auth ) {
+        my $docroot_rel_copy = $docroot_rel;
+        while ($docroot_rel_copy) {
+            $docroot_rel_copy =~ s{/[^/]+$}{};
+            if ( exists $cpanel_password_protected_directories->{$docroot_rel_copy} ) {
+                $basic_auth     = $cpanel_password_protected_directories->{$docroot_rel_copy};
+                $auth_file_from = $docroot_rel_copy;
+                last;
+            }
+        }
+    }
+
+    $basic_auth ||= $cpanel_password_protected_directories->{""} || undef;
+    if ($basic_auth) {
+        $basic_auth->{auth_file} =
+            $auth_file_from ? "$homedir/.htpasswds$auth_file_from/passwd"
+          : $docroot_rel    ? "$homedir/.htpasswds$docroot_rel/passwd"
+          :                   "$homedir/.htpasswds/passwd";
+    }
+
+    $basic_auth->{locations} = {};
+    for my $dir ( keys %{$cpanel_password_protected_directories} ) {
+        my $abs = "$homedir$dir";
+        if ( $abs =~ m{^\Q$docroot\E(/.+)$} ) {
+            my $loc = $1;
+            $basic_auth->{locations}{$loc} = {
+                auth_file  => "$homedir/.htpasswds$docroot_rel$loc/passwd",
+                realm_name => $cpanel_password_protected_directories->{$dir}{realm_name},
+            };
+        }
+    }
+
+    return $basic_auth;
 }
 
 my $wordpress_lu;

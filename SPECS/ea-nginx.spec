@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -89,6 +89,7 @@ Source15: cpanel-chksrvd
 Source16: cpanel-scripts-ea-nginx
 Source17: FPM_50x.html
 Source18: Nginx.pm
+Source19: cpanel-scripts-ea-nginx-userdata
 
 License: 2-clause BSD-like license
 
@@ -170,6 +171,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
 %{__install} -m 644 -p %{SOURCE15} $RPM_BUILD_ROOT/etc/chkserv.d/nginx
 mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
 %{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
+%{__install} -m 755 -p %{SOURCE19} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-userdata
 ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
@@ -232,6 +234,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
@@ -244,12 +248,14 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
+%{_sysconfdir}/nginx/ea-nginx/cpanel-password-protected-dirs.tt
 %{_sysconfdir}/nginx/ea-nginx/cpanel-php-location.tt
 %{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
+%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-userdata
 /usr/local/cpanel/scripts/restartsrv_nginx
 /etc/chkserv.d/nginx
 
@@ -407,6 +413,10 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu May 23 2019 Daniel Muey <dan@cpanel.net> - 1.16.0-2
+- ZC-5014: Add cPanel Password Protected Directory support
+- ZC-5151: Add CGI and Server-Parsed support via proxy
+
 * Tue Apr 23 2019 Daniel Muey <dan@cpanel.net> - 1.16.0-1
 - EA-8415: Update ea-nginx from v1.15.9 to v1.16.0
 

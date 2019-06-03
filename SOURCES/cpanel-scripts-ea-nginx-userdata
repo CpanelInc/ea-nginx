@@ -1,0 +1,284 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - ea-nginx-userdata                       Copyright 2019 cPanel, L.L.C.
+#                                                           All rights Reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+use strict;
+use warnings;
+
+package scripts::ea_nginx_userdata;
+
+use Path::Iter                            ();
+use Cpanel::Config::LoadUserDomains       ();
+use Cpanel::Version                       ();
+use Cpanel::Transaction::File::JSON       ();
+use Cpanel::Transaction::File::JSONReader ();
+
+our $current_cpanel_version;
+our $var_cpanel_userdata = '/var/cpanel/userdata';
+
+exit( run(@ARGV) ) if !caller;
+
+sub run {
+    my ( $user, @args ) = @_;
+    die "This script should only be called as root\n" if $> != 0;
+
+    if ( grep m/^--help$/, ( $user, @args ) ) {
+        print _help();
+        return 0;
+    }
+    elsif (@args) {
+        warn "Unknown arguments\n";
+        print _help();
+        return 1;    # exit value
+    }
+    else {
+        _validate_user_arg($user);    # dies
+
+        $current_cpanel_version = Cpanel::Version::get_short_release_number();
+        my $homedir = _get_homedir($user);
+        print "Processing $user ($homedir)\n";
+
+        #### add features below this line ##
+        _do_feature(
+            "cPanel password protected directories" => sub {
+                _do_cpanel_password_protected_directories( $user, $homedir );
+            },
+            ".htaccess-is-not-a-database story" => "CPANEL-27537",
+            not_applicable_as_of_cpanel_version => undef,
+        );
+
+        #### add features above this line ##
+
+        print " … done ($user).\n";
+    }
+
+    return 0;
+}
+
+################
+#### features ##
+################
+
+sub _do_cpanel_password_protected_directories {
+    my ( $user, $homedir ) = @_;    # these are safe at this point
+
+    my @password_protected_dirs;
+    my $iter = Path::Iter::get_iterator("$homedir/.htpasswds/");
+    while ( my $next = $iter->() ) {
+        next if -l $next || !-d _;
+        if ( -e "$next/passwd" ) {    # can be empty (no users) so do not check -s
+            my $real = $next;
+            $real =~ s{\Q$homedir\E/\.htpasswds}{};    # no trailing / so that we get ~
+            push @password_protected_dirs, $real;      # store relative so this doesn't need update on user modification
+        }
+    }
+
+    my $cur_conf    = _get_cur_userdata( $user, "cpanel_password_protected_directories" );
+    my $had_changes = 0;
+    my $conf        = {};
+    for my $dir (@password_protected_dirs) {
+        my $htaccess = "$homedir$dir/.htaccess";
+        my $mtime    = ( stat($htaccess) )[9];
+
+        if ( !$mtime || !-s $htaccess ) {
+            $had_changes++;
+            next;
+        }
+
+        if ( !$cur_conf->{$dir} || $mtime > $cur_conf->{$dir}{_htaccess_mtime} ) {
+            my $realm_name;
+
+            if ( open my $fh, "<", $htaccess ) {
+                my $have_authtype_basic = 0;
+                while ( my $line = <$fh> ) {
+                    if ( !$have_authtype_basic ) {
+                        if ( $line =~ m/^\s*AuthType Basic/ ) {
+                            $have_authtype_basic++;
+                        }
+                    }
+                    elsif ( $have_authtype_basic == 1 ) {
+                        if ( $line =~ m/^\s*AuthName "(.*)"/ ) {
+                            $realm_name = $1;
+                            $realm_name =~ s{\\"}{"}g;
+                            $have_authtype_basic++;
+                        }
+                    }
+                }
+                close $fh;
+
+                if ($realm_name) {
+                    $conf->{$dir} = {
+                        realm_name      => $realm_name,
+                        _htaccess_mtime => $mtime,
+                    };
+                    $had_changes++;
+                }
+                else {
+                    $had_changes++;
+                }
+            }
+            else {
+                warn "Could not read “$htaccess”: $!\n";
+                $conf->{$dir} = $cur_conf->{$dir} if $cur_conf->{$dir};
+            }
+        }
+        else {
+            $conf->{$dir} = $cur_conf->{$dir} if $cur_conf->{$dir};
+        }
+    }
+
+    return 2 if keys %{$cur_conf} && !$had_changes;
+    return _write_userdata( $user, cpanel_password_protected_directories => $conf );
+}
+
+###############
+#### helpers ##
+###############
+
+sub _do_feature {
+    my ( $label, $code, %args ) = @_;
+
+    print "\t$label …\n";
+    if ( $args{not_applicable_as_of_cpanel_version} ) {
+        if ( $current_cpanel_version >= $args{not_applicable_as_of_cpanel_version} ) {
+            print "\t\tN/A in cPanel v$current_cpanel_version\n";
+            return;
+        }
+    }
+
+    $code->();
+    return;
+}
+
+sub _get_homedir {
+    my ($user) = @_;
+    return ( getpwnam($user) )[7];
+}
+
+sub _get_cur_userdata {
+    my ( $user, $name ) = @_;
+    my $fname = $var_cpanel_userdata . "/$user/$name.json";
+    return {} if !-e $fname;
+
+    my $conf = {};
+    eval {
+        my $reader_transaction = Cpanel::Transaction::File::JSONReader->new( path => $fname );
+        $conf = $reader_transaction->get_data();
+    };
+    return $conf;
+}
+
+sub _write_userdata {
+    my ( $user, $name, $conf ) = @_;
+    my $fname = $var_cpanel_userdata . "/$user/$name.json";
+
+    # Can’t use Cpanel::Config::userdata:: because we can’t backport ULC changes that far
+    # It is safe because:
+    #    1. this script is the only writer of it
+    #    2. the config script it the only reader of it
+    #    3. When it is added to ULC via '.htaccess-is-not-a-database story' then this will not be excersized for the feature via 'not_applicable_as_of_cpanel_version'
+
+    eval {
+        my $transaction = Cpanel::Transaction::File::JSON->new( path => $fname );
+        $transaction->set_data($conf);
+        $transaction->save_and_close_or_die();
+    };
+    return 1 if !$@;
+
+    warn $@;
+    return;
+}
+
+sub _help {
+    return <<"END_HELP";
+Usage: $0 <USER>
+
+   --help - show this information
+
+This script will ensure certain userdata is up to date so that `ea-nginx config …` can consume it.
+
+There is no need to run this manually since `ea-nginx config …` will run it before configuring a user.
+END_HELP
+}
+
+my $user_lookup;
+
+sub _validate_user_arg {
+    my ($user) = @_;
+
+    die "The user argument is missing.\n" . _help() if !$user;
+
+    $user_lookup //= Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 );
+    die "The given user is not a cPanel user.\n" . _help() if !$user_lookup->{$user};
+
+    return 1;
+}
+
+1;
+
+__END__
+
+=encoding utf-8
+
+=head1 How to add a new feature
+
+=over
+
+=item Step 1. clone CPANEL-27537 (including title, description, and labels) ensuring the status is appropriate
+
+=item Step 2. Update the jira issue in the description w/ the one that is adding the feature here
+
+=item Step 3. Add a call to C<_do_feature()> in C<run()> between the “add features [below|above] this line” comments
+
+=item Step 4. Update ea-nginx to consume the new userdata JSON file from Step 3
+
+=back
+
+=head2 _do_feature(name => CODE, %ARGS)
+
+Return is void.
+
+First arg: "The name of the feature as a string"
+
+Second arg: A coderef that does the actual work of building the userdata file in question. The function should warn (i.e. instead of dieing) if there are problems so that the script can get as much as possible done. Any keys only necessary at this stage that will not be necessary when C<.htaccess-is-not-a-database story> happens should be prefixed w/ C<_htaccess> (e.g. C<_htaccess_mtime> so we can check the mtime to determine if an updat eis needed).
+
+After that it takes a hash (not a hashref) with the following keys:
+
+=over
+
+=item ".htaccess-is-not-a-database story"
+
+Value should be the jira issue you created in Step 1
+
+=item not_applicable_as_of_cpanel_version
+
+If the value is C<undef> (which it most likely will be initially) it means always run this.
+
+Otherwise, once C<.htaccess-is-not-a-database story> is ready, it should be the C<Cpanel::Version::get_short_release_number()> of the version that C<.htaccess-is-not-a-database story> is in.
+
+=back
+
+=head1 How to mark a feature as no-longer applicable once a given version does the needful
+
+Update the C<_do_feature()> call’s C<not_applicable_as_of_cpanel_version> value with the C<Cpanel::Version::get_short_release_number()> of the version that C<.htaccess-is-not-a-database story> is in.
+
+=head1 CPANEL-27537 was changed so I am not sure what to clone!
+
+In that case create a new CPANEL jira issue with a Summary like:
+
+    $FEATURE should store data in userdata …
+
+And then a Description like this:
+
+    … and write Apache config as an include (and remove it from .htaccess) based on that data.
+
+    it should:
+
+    # follow the same userdata that $JIRA_ISSUE creates (except remove _htaccess* keys)
+    #* This includes making a proper Cpanel/Config/userdata/ perl module
+    # create a ZC story to conditionalize the userdata creation that $JIRA_ISSUE added to based on the version of cpanel it is in
+    #* i.e. update the value of the feature’s `not_applicable_as_of_cpanel_version` from undef to Cpanel::Version::get_short_release_number()
+
+Add the label C<.htaccess-is-not-a-database>
