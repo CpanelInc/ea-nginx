@@ -48,7 +48,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.17.2
+%define main_version 1.17.3
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -413,6 +413,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Aug 15 2019 Cory McIntire <cory@cpanel.net> - 1.17.3-1
+- EA-8613: Update ea-nginx from v1.17.2 to v1.17.3
+
 * Mon Jul 29 2019 Cory McIntire <cory@cpanel.net> - 1.17.2-1
 - EA-8589: Update ea-nginx from v1.17.1 to v1.17.2
 
