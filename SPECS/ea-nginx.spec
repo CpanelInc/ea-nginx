@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -356,6 +356,7 @@ BANNER
         fi
     fi
 
+/usr/local/cpanel/scripts/restartsrv_httpd --stop
 %{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_to_alt_ports
 echo "nginx:1" >> /etc/chkserv.d/chkservd.conf
 
@@ -393,7 +394,11 @@ if [ $1 -eq 0 ]; then
     /sbin/chkconfig --del nginx-debug
 %endif
 
+/usr/local/cpanel/scripts/restartsrv_httpd --stop
+/usr/local/cpanel/scripts/restartsrv_nginx --stop
+
 sed -i '/nginx:1/d' /etc/chkserv.d/chkservd.conf
+
 %{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
 
 if [ -e /etc/nginx/ea-nginx/meta/fileprotect ]; then
@@ -413,6 +418,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Sep 09 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-2
+- ZC-5423 - Apache not releasing 80/443 when installing ea-nginx
+
 * Thu Aug 15 2019 Cory McIntire <cory@cpanel.net> - 1.17.3-1
 - EA-8613: Update ea-nginx from v1.17.2 to v1.17.3
 
