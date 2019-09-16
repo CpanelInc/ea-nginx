@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -380,7 +380,9 @@ fi
 
 /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
 
-# now that it is running:
+%posttrans
+# I move this to here, to deal with the craziness of the order of operations
+# on yum upgrade and downgrades.
 /usr/local/cpanel/scripts/ea-nginx config --all
 
 %preun
@@ -418,6 +420,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Sep 16 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-3
+- ZC-5554 - Do config/restart in %posttrans
+
 * Mon Sep 09 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-2
 - ZC-5423 - Apache not releasing 80/443 when installing ea-nginx
 
