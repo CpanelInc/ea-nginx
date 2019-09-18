@@ -15,10 +15,15 @@ use Cpanel::Config::userdata        ();
 use Cpanel::Config::LoadUserDomains ();
 use Cpanel::DomainIp                ();
 use Cpanel::DomainLookup::DocRoot   ();
+use Cpanel::Hostname                ();
 use Cpanel::PHP::Config             ();
 use Cpanel::PHPFPM::Get             ();
 use Cpanel::Validate::Username      ();
 use Cpanel::Apache::TLS             ();
+use Cpanel::FileUtils::TouchFile    ();
+use Cpanel::PwCache                 ();
+use Whostmgr::TweakSettings         ();
+use Cpanel::Config::LoadWwwAcctConf ();
 use Template                        ();
 use File::Glob                      ();
 use Path::Tiny;
@@ -134,6 +139,8 @@ sub config {
     my ( $app, $user, @args ) = @_;
 
     if ( $user eq '--all' ) {
+        _write_global_logging();
+
         mkdir "/etc/nginx/conf.d/users/";
         unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
         for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
@@ -156,6 +163,44 @@ sub reload { _reload() }
 ###############
 #### helpers ##
 ###############
+
+my $tt;
+
+sub _write_global_logging {
+
+    $tt ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
+    my $logging_tt = path("/etc/nginx/ea-nginx/global-logging.tt")->slurp;
+    my $logging_hr = _get_logging_hr();
+
+    $tt->process(
+        \$logging_tt,
+        {
+            logging  => $logging_hr,
+            hostname => scalar( Cpanel::Hostname::gethostname() ),
+        },
+        sub {
+            my ($out) = @_;
+            path("/etc/nginx/conf.d/global-logging.conf")->spew($out);
+            return 1;
+        }
+    );
+
+    if ( $tt->error() ) {
+        unlink "/etc/nginx/conf.d/global-logging.conf";
+        die $tt->error();
+    }
+
+    my $piped_module_conf = "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf";
+    if ( $logging_hr->{piped_logs} ) {
+        path($piped_module_conf)->spew("load_module modules/ngx_http_pipelog_module.so;");
+    }
+    else {
+        unlink $piped_module_conf;
+        die "Failed to ensure “$piped_module_conf” does not exist: $!\n" if -e $piped_module_conf;
+    }
+
+    return 1;
+}
 
 sub _reload {
     my ($new_file) = @_;
@@ -214,7 +259,28 @@ sub _write_user_conf {
     return 1;
 }
 
-my ( $tt, $server_tt, $docroots );
+my ( $server_tt, $docroots, $logging_hr );
+
+sub _get_logging_hr {
+    return $logging_hr if $logging_hr;
+
+    $logging_hr->{piped_logs} = Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
+    $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
+    $logging_hr->{loglevel} = "warn";
+
+    if ( $logging_hr->{default_format_name} ne "combined" && $logging_hr->{default_format_name} ne "common" ) {
+        warn "Invalid “LOGSTYLE”, using `combined`\n";
+        $logging_hr->{default_format_name} = "combined";
+    }
+
+    if ( eval { require Cpanel::EA4::Conf::Tiny; 1 } ) {
+        my $e4c = Cpanel::EA4::Conf::Tiny::get_ea4_conf_hr();
+
+        $logging_hr->{loglevel} = $e4c->{loglevel};
+    }
+
+    return $logging_hr;
+}
 
 sub _render_and_append {
     my ( $user, $domains ) = @_;
@@ -229,6 +295,15 @@ sub _render_and_append {
     my $docroot = $docroots->{$user}{ $domains->[0] };
 
     my $basic_auth = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
+    my $logging_hr = _get_logging_hr();
+
+    # create no matter what because the are either used directly or via piped logging
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
+    chmod 0640, "/var/log/nginx/domains/$domains->[0]";
+    chown 0, ( Cpanel::PwCache::getpwnam($user) )[3], "/var/log/nginx/domains/$domains->[0]";
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]-bytes_log");
+    chmod 0644, "/var/log/nginx/domains/$domains->[0]-bytes_log";
+    chown 0, 0, "/var/log/nginx/domains/$domains->[0]-bytes_log";
 
     my $fpm_socket;
     my $fpm_socket_php_major_version;
@@ -267,6 +342,7 @@ sub _render_and_append {
                 non_docroot_uris => $wordpress_hr->{non_docroot_uris},
             },
             basic_auth => $basic_auth,
+            logging    => $logging_hr,
         },
         sub {
             my ($out) = @_;
