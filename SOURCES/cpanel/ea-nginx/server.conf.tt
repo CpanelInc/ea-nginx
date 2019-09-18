@@ -2,6 +2,11 @@ server {
     server_name[% FOREACH domain IN domains %] [% domain %] www.[% domain %][% END %];
     listen 80;
 
+    [%- IF !logging.piped_logs %]
+    access_log /var/log/nginx/domains/[% domains.0 %] cp_combined;
+    access_log /var/log/nginx/domains/[% domains.0 %]-bytes_log cp_bytes_server;
+    [% END -%]
+
     set $CPANEL_APACHE_PROXY_IP [% ip %];
 
     [%- IF ssl_certificate && ssl_certificate_key %]

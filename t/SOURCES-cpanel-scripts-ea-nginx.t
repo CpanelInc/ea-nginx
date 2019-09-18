@@ -30,7 +30,8 @@ require $conf{require};
 
 spec_helper "/usr/local/cpanel/t/small/.spec_helpers/App-CmdDispatch_based_modulinos.pl";
 
-use Test::MockFile ();
+use App::CmdDispatch ();
+use Test::MockFile   ();
 
 my ( @_write_user_conf, @_reload );
 my $orig__write_user_conf = \&scripts::ea_nginx::_write_user_conf;
@@ -78,6 +79,7 @@ describe "ea-nginx script" => sub {
     share my %mi;
     around {
         local $ENV{"scripts::ea_nginx::bail_die"} = 1;
+        local *scripts::ea_nginx::_write_global_logging = sub { };
 
         no warnings "redefine", "once";
         use warnings "redefine", "once";

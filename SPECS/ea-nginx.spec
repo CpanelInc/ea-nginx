@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -90,6 +90,8 @@ Source16: cpanel-scripts-ea-nginx
 Source17: FPM_50x.html
 Source18: Nginx.pm
 Source19: cpanel-scripts-ea-nginx-userdata
+Source20: ngx_http_pipelog_module-ngx_http_pipelog_module.c
+Source21: ngx_http_pipelog_module-config
 
 License: 2-clause BSD-like license
 
@@ -115,17 +117,23 @@ sed -e 's|%%DEFAULTSTART%%|2 3 4 5|g' -e 's|%%DEFAULTSTOP%%|0 1 6|g' \
 sed -e 's|%%DEFAULTSTART%%||g' -e 's|%%DEFAULTSTOP%%|0 1 2 3 4 5 6|g' \
     -e 's|%%PROVIDES%%|nginx-debug|g' < %{SOURCE2} > nginx-debug.init
 
+%{__mkdir} -p ngx_http_pipelog_module/
+cp %{SOURCE20} ngx_http_pipelog_module/ngx_http_pipelog_module.c
+cp %{SOURCE21} ngx_http_pipelog_module/config
+
 %build
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
-    --with-debug
+    --with-debug \
+    --add-dynamic-module=ngx_http_pipelog_module
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx \
     %{bdir}/objs/nginx-debug
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
-    --with-ld-opt="%{WITH_LD_OPT}"
+    --with-ld-opt="%{WITH_LD_OPT}" \
+    --add-dynamic-module=ngx_http_pipelog_module
 make %{?_smp_mflags}
 
 %install
@@ -138,7 +146,7 @@ make %{?_smp_mflags}
 %{__rm} -f $RPM_BUILD_ROOT%{_sysconfdir}/nginx/*.default
 %{__rm} -f $RPM_BUILD_ROOT%{_sysconfdir}/nginx/fastcgi.conf
 
-%{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/log/nginx
+%{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/log/nginx/domains
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/run/nginx
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/cache/nginx
 
@@ -150,7 +158,7 @@ cd $RPM_BUILD_ROOT%{_sysconfdir}/nginx && \
 %{__install} -m 644 -p %{SOURCE12} \
     $RPM_BUILD_ROOT%{_datadir}/doc/%{upstream_name}-%{main_version}/
 
-%{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
+%{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/modules
 %{__rm} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
 %{__install} -m 644 -p %{SOURCE4} \
     $RPM_BUILD_ROOT%{_sysconfdir}/nginx/nginx.conf
@@ -231,6 +239,9 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %dir %{_sysconfdir}/nginx
 %dir %{_sysconfdir}/nginx/conf.d
+%dir %{_sysconfdir}/nginx/conf.d/modules
+%ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
+
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
@@ -253,6 +264,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
+%{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-userdata
@@ -286,12 +298,15 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %attr(0755,root,root) %dir %{_libdir}/nginx
 %attr(0755,root,root) %dir %{_libdir}/nginx/modules
+%attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_pipelog_module.so
+
 %dir %{_datadir}/nginx
 %dir %{_datadir}/nginx/html
 %{_datadir}/nginx/html/*
 
 %attr(0755,root,root) %dir %{_localstatedir}/cache/nginx
 %attr(0755,root,root) %dir %{_localstatedir}/log/nginx
+%attr(0711,root,root) %dir %{_localstatedir}/log/nginx/domains
 
 %dir %{_datadir}/doc/%{upstream_name}-%{main_version}
 %doc %{_datadir}/doc/%{upstream_name}-%{main_version}/COPYRIGHT
@@ -413,13 +428,24 @@ fi
 %if %use_systemd
 /usr/bin/systemctl daemon-reload >/dev/null 2>&1 ||:
 %endif
+
+# /etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf is a %ghost so will get removed
+# /etc/nginx/conf.d/global-logging.conf will be left behind and, if it has
+#   piped logging enabled then its an invalid configuraiton *but* we don't have nginc
+#  at this point and reinstalling should regen config so do we care?
+rm -rf  /etc/nginx/conf.d/global-logging.conf
+
 if [ $1 -ge 1 ]; then
     /sbin/service nginx status  >/dev/null 2>&1 || exit 0
     /sbin/service nginx upgrade >/dev/null 2>&1 || echo \
         "Binary upgrade failed, please check nginx's error.log"
 fi
 
+
 %changelog
+* Wed Sep 16 2019 Julian Brown <dan@cpanel.net> - 1.17.3-4
+- ZC-4961: Add Apache domlog style logging (piped logs will be done via ZC-5517)
+
 * Mon Sep 16 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-3
 - ZC-5554 - Do config/restart in %posttrans
 
