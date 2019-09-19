@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -92,6 +92,10 @@ Source18: Nginx.pm
 Source19: cpanel-scripts-ea-nginx-userdata
 Source20: ngx_http_pipelog_module-ngx_http_pipelog_module.c
 Source21: ngx_http_pipelog_module-config
+Source22: NginxHooks.pm
+Source23: NginxTasks.pm
+Source24: nginx-adminbin
+Source25: nginx-adminbin.conf
 
 License: 2-clause BSD-like license
 
@@ -135,6 +139,11 @@ make %{?_smp_mflags}
     --with-ld-opt="%{WITH_LD_OPT}" \
     --add-dynamic-module=ngx_http_pipelog_module
 make %{?_smp_mflags}
+
+cp -f %{SOURCE22} .
+cp -f %{SOURCE23} .
+cp -f %{SOURCE24} .
+cp -f %{SOURCE25} .
 
 %install
 %{__rm} -rf $RPM_BUILD_ROOT
@@ -228,6 +237,16 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services
 %{__install} -m 600 -p %{SOURCE18} $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
+
+%{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl5/lib
+%{__mkdir} -p $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel
+%{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/TaskProcessors/
+
+%{__install} -p %{SOURCE20} $RPM_BUILD_ROOT/var/cpanel/perl5/lib/NginxHooks.pm
+%{__install} -p %{SOURCE21} $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/TaskProcessors/NginxTasks.pm
+%{__install} -p %{SOURCE22} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
+%{__install} -p %{SOURCE23} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx.conf
+
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
 
@@ -317,7 +336,25 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %attr(600, root, root) /var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
 
+%attr(0755, root, root) /var/cpanel/perl5/lib/NginxHooks.pm
+%attr(0644, root, root) /var/cpanel/perl/Cpanel/TaskProcessors/NginxTasks.pm
+
+%attr(0755,root,root) /usr/local/cpanel/bin/admin/Cpanel/nginx
+%attr(0644,root,root) /usr/local/cpanel/bin/admin/Cpanel/nginx.conf
+
 %pre
+# we need to know the version of cPanel, the hooks cannot be deployed
+# before version 11.80
+cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
+if [ $cpversion -ge 80 ]; then
+    # do not let nginx hooks run during upgrade. Use GTE because it can go higher,
+    # but anything 2 or greater is still an upgrade.
+    # Also deregister the hooks on this step, as that's the right point to do it
+    if [ $1 -ge 2 ]; then
+        /usr/local/cpanel/bin/manage_hooks delete module NginxHooks
+    fi
+fi
+
 # Add the "nginx" user
 getent group %{nginx_group} >/dev/null || groupadd -r %{nginx_group}
 getent passwd %{nginx_user} >/dev/null || \
@@ -400,7 +437,22 @@ fi
 # on yum upgrade and downgrades.
 /usr/local/cpanel/scripts/ea-nginx config --all
 
+cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
+if [ $cpversion -ge 80 ]; then
+    # Remove "bad" hooks that were left around by a bad previous version of the RPM
+    # Ignore failures in case you are on a version of cPanel too old for feature
+    /usr/local/cpanel/bin/manage_hooks prune; /bin/true;
+    /usr/local/cpanel/bin/manage_hooks add module NginxHooks
+fi
+
 %preun
+# we need to know the version of cPanel, the hooks cannot be deployed
+# before version 11.80
+cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
+if [ $cpversion -ge 80 ]; then
+    /usr/local/cpanel/bin/manage_hooks delete module NginxHooks
+fi
+
 if [ $1 -eq 0 ]; then
 %if %use_systemd
     /usr/bin/systemctl --no-reload disable nginx.service >/dev/null 2>&1 ||:
@@ -443,6 +495,9 @@ fi
 
 
 %changelog
+* Thu Sep 19 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-5
+- Hook into cPanel when anything changes update Nginx config.
+
 * Wed Sep 16 2019 Dan Muey <dan@cpanel.net> - 1.17.3-4
 - ZC-4961: Configure logging to match how we do it with Apache
 

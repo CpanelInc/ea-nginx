@@ -1,0 +1,79 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+
+# cpanel - bin/admin/Cpanel/nginx                    Copyright 2019 cPanel L.L.C.
+#                                                           All rights reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+package bin::admin::Cpanel::nginx;
+
+use strict;
+
+use base qw( Cpanel::AdminBin::Script::Call );
+
+use lib '/var/cpanel/perl5/lib';
+use Cpanel::Debug ();
+
+__PACKAGE__->run( 'alarm' => 120 ) unless caller;
+
+sub _actions {
+    return qw/UPDATE_CONFIG/;
+}
+
+sub UPDATE_CONFIG {
+    my ($self) = @_;
+
+    if ($Cpanel::Debug::level) {
+        Cpanel::Debug::log_info("UPDATE_CONFIG: called");
+    }
+
+    my $cpuser = $self->get_caller_username();
+
+    require '/var/cpanel/perl5/lib/NginxHooks.pm';
+
+    local $@;
+    eval {
+        require Cpanel::ServerTasks;
+        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], NginxHooks::get_time_to_wait(0), "rebuild_user $cpuser" );
+    };
+
+    return 1;
+}
+
+1;
+
+__END__
+
+=head1 NAME
+
+nginx
+
+=head1 SYNOPSIS
+
+my $nginx = bin::admin::Cpanel::nginx->new ();
+
+@actions = $nginx->_actions ();
+
+$nginx->UPDATE_CONFIG ();
+
+=head1 DESCRIPTION
+
+This is the nginx hooks admin bin, allowing the various cpusers
+via API1/API2/UAPI to cause changes to the Nginx configuration.
+
+nginx is deployed by the RPM to /usr/local/cpanel/bin/admin/Cpanel.
+
+=head1 SUBROUTINES
+
+=head2 _actions
+
+Lists the one action allowed by this admin bin script.
+
+=head2 UPDATE_CONFIG
+
+This function determines the user calling, and then schedules a
+rebuild of the user's Nginx configuration to happen in the time
+needed depending on whether PHP-FPM is defaulted to on or not.
+
+=cut
+
