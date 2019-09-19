@@ -242,10 +242,10 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{__mkdir} -p $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel
 %{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/TaskProcessors/
 
-%{__install} -p %{SOURCE20} $RPM_BUILD_ROOT/var/cpanel/perl5/lib/NginxHooks.pm
-%{__install} -p %{SOURCE21} $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/TaskProcessors/NginxTasks.pm
-%{__install} -p %{SOURCE22} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
-%{__install} -p %{SOURCE23} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx.conf
+%{__install} -p %{SOURCE22} $RPM_BUILD_ROOT/var/cpanel/perl5/lib/NginxHooks.pm
+%{__install} -p %{SOURCE23} $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/TaskProcessors/NginxTasks.pm
+%{__install} -p %{SOURCE24} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
+%{__install} -p %{SOURCE25} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx.conf
 
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
