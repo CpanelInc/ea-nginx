@@ -443,8 +443,8 @@ fi
 
 
 %changelog
-* Wed Sep 16 2019 Julian Brown <dan@cpanel.net> - 1.17.3-4
-- ZC-4961: Add Apache domlog style logging (piped logs will be done via ZC-5517)
+* Wed Sep 16 2019 Dan Muey <dan@cpanel.net> - 1.17.3-4
+- ZC-4961: Configure logging to match how we do it with Apache
 
 * Mon Sep 16 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-3
 - ZC-5554 - Do config/restart in %posttrans
