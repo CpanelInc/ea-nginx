@@ -1,1 +1,1 @@
-service[nginx]=80,GET / HTTP/1.0,HTTP/1..,killall -TERM nginx;sleep 2;killall -9 nginx;/usr/local/cpanel/scripts/restartsrv_nginx stop;/usr/local/cpanel/scripts/restartsrv_nginx start
+service[nginx]=80,GET / HTTP/1.0,HTTP/1..,killall -TERM nginx;sleep 2;killall -9 nginx;ps -C nginx -o pid,command= --no-headers | grep "nginx: logger process" | awk '{ print $1 }' | xargs -r kill -9;/usr/local/cpanel/scripts/restartsrv_nginx stop;/usr/local/cpanel/scripts/restartsrv_nginx start
