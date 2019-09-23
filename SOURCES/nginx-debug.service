@@ -8,8 +8,10 @@ Wants=network-online.target
 Type=forking
 PIDFile=/var/run/nginx.pid
 ExecStart=/usr/sbin/nginx-debug -c /etc/nginx/nginx.conf
-ExecReload=/bin/kill -s HUP $MAINPID
+ExecStartPost=ps -C nginx -o pid,command= --no-headers | grep "nginx: logger process" | awk '{ print $1 }' | xargs -r kill -9
+ExecReload=/bin/kill -s HUP $MAINPID; ps -C nginx -o pid,command= --no-headers | grep "nginx: logger process" | awk '{ print $1 }' | xargs -r kill -9
 ExecStop=/bin/kill -s TERM $MAINPID
+ExecStopPost=ps -C nginx -o pid,command= --no-headers | grep "nginx: logger process" | awk '{ print $1 }' | xargs -r kill -9
 
 [Install]
 WantedBy=multi-user.target
