@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -495,6 +495,10 @@ fi
 
 
 %changelog
+* Mon Sep 23 2019 Daniel Muey <dan@cpanel.net> - 1.17.3-6
+- ZC-5574: Ensure ngx_http_pipelog_module processes are cleaned up
+-   Work around https://github.com/pandax381/ngx_http_pipelog_module/issues/7
+
 * Thu Sep 19 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-5
 - Hook into cPanel when anything changes update Nginx config.
 
