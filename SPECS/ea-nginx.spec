@@ -26,13 +26,14 @@ Requires(pre): shadow-utils
 Requires: systemd
 BuildRequires: systemd
 %define os_minor %(lsb_release -rs | cut -d '.' -f 2)
+%define ea_openssl_ver 1.1.1d-1
 %if %{os_minor} >= 4
-Requires: openssl >= 1.0.2
-BuildRequires: openssl-devel >= 1.0.2
+Requires: openssl >= %{ea_openssl_ver}
+BuildRequires: openssl-devel >=  %{ea_openssl_ver}
 %define dist .el7_4
 %else
-Requires: openssl >= 1.0.1
-BuildRequires: openssl-devel >= 1.0.1
+Requires: openssl >= %{ea_openssl_ver}
+BuildRequires: openssl-devel >= %{ea_openssl_ver}
 %define dist .el7
 %endif
 %endif
@@ -61,7 +62,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -495,6 +496,9 @@ fi
 
 
 %changelog
+* Wed Oct 01 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-2
+- ZC-4361: Update ea-openssl requirement to v1.1.1 (ZC-5583)
+
 * Fri Sep 27 2019 Cory McIntire <cory@cpanel.net> - 1.17.4-1
 - EA-8669: Update ea-nginx from v1.17.3 to v1.17.4
 
