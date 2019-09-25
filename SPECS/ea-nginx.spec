@@ -510,7 +510,7 @@ fi
 * Thu Sep 19 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-5
 - Hook into cPanel when anything changes update Nginx config.
 
-* Wed Sep 16 2019 Dan Muey <dan@cpanel.net> - 1.17.3-4
+* Wed Sep 18 2019 Dan Muey <dan@cpanel.net> - 1.17.3-4
 - ZC-4961: Configure logging to match how we do it with Apache
 
 * Mon Sep 16 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-3
