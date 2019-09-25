@@ -8,13 +8,15 @@
 # distribution specific definitions
 %define use_systemd (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7) || (0%{?suse_version} >= 1315)
 
+%define ea_openssl_ver 1.1.1d-1
+
 %if 0%{?rhel} == 6
 %define _group System Environment/Daemons
 Requires(pre): shadow-utils
 Requires: initscripts >= 8.36
 Requires(post): chkconfig
-Requires: openssl >= 1.0.1
-BuildRequires: openssl-devel >= 1.0.1
+Requires: ea-openssl11 >= %{ea_openssl_ver}
+BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 %endif
 
 %if 0%{?rhel} == 7
@@ -26,14 +28,13 @@ Requires(pre): shadow-utils
 Requires: systemd
 BuildRequires: systemd
 %define os_minor %(lsb_release -rs | cut -d '.' -f 2)
-%define ea_openssl_ver 1.1.1d-1
 %if %{os_minor} >= 4
-Requires: openssl >= %{ea_openssl_ver}
-BuildRequires: openssl-devel >=  %{ea_openssl_ver}
+Requires: ea-openssl11 >= %{ea_openssl_ver}
+BuildRequires: ea-openssl11-devel >=  %{ea_openssl_ver}
 %define dist .el7_4
 %else
-Requires: openssl >= %{ea_openssl_ver}
-BuildRequires: openssl-devel >= %{ea_openssl_ver}
+Requires: ea-openssl11 >= %{ea_openssl_ver}
+BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 %define dist .el7
 %endif
 %endif
