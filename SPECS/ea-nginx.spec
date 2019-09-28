@@ -48,7 +48,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.17.3
+%define main_version 1.17.4
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -61,7 +61,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -495,6 +495,9 @@ fi
 
 
 %changelog
+* Fri Sep 27 2019 Cory McIntire <cory@cpanel.net> - 1.17.4-1
+- EA-8669: Update ea-nginx from v1.17.3 to v1.17.4
+
 * Mon Sep 23 2019 Daniel Muey <dan@cpanel.net> - 1.17.3-6
 - ZC-5574: Ensure ngx_http_pipelog_module processes are cleaned up
 -   Work around https://github.com/pandax381/ngx_http_pipelog_module/issues/7
