@@ -8,13 +8,16 @@
 # distribution specific definitions
 %define use_systemd (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7) || (0%{?suse_version} >= 1315)
 
+%define ea_openssl_ver 1.1.1d-1
+Requires: ea-openssl11 >= %{ea_openssl_ver}
+BuildRequires: ea-openssl11 >= %{ea_openssl_ver}
+BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
+
 %if 0%{?rhel} == 6
 %define _group System Environment/Daemons
 Requires(pre): shadow-utils
 Requires: initscripts >= 8.36
 Requires(post): chkconfig
-Requires: openssl >= 1.0.1
-BuildRequires: openssl-devel >= 1.0.1
 %endif
 
 %if 0%{?rhel} == 7
@@ -27,12 +30,8 @@ Requires: systemd
 BuildRequires: systemd
 %define os_minor %(lsb_release -rs | cut -d '.' -f 2)
 %if %{os_minor} >= 4
-Requires: openssl >= 1.0.2
-BuildRequires: openssl-devel >= 1.0.2
 %define dist .el7_4
 %else
-Requires: openssl >= 1.0.1
-BuildRequires: openssl-devel >= 1.0.1
 %define dist .el7
 %endif
 %endif
@@ -52,16 +51,16 @@ BuildRequires: systemd
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
-%define WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC
-%define WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie
+%define WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include
+%define WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib}
 
-%define BASE_CONFIGURE_ARGS $(echo "--prefix=%{_sysconfdir}/nginx --sbin-path=%{_sbindir}/nginx --modules-path=%{_libdir}/nginx/modules --conf-path=%{_sysconfdir}/nginx/nginx.conf --error-log-path=%{_localstatedir}/log/nginx/error.log --http-log-path=%{_localstatedir}/log/nginx/access.log --pid-path=%{_localstatedir}/run/nginx.pid --lock-path=%{_localstatedir}/run/nginx.lock --http-client-body-temp-path=%{_localstatedir}/cache/nginx/client_temp --http-proxy-temp-path=%{_localstatedir}/cache/nginx/proxy_temp --http-fastcgi-temp-path=%{_localstatedir}/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=%{_localstatedir}/cache/nginx/uwsgi_temp --http-scgi-temp-path=%{_localstatedir}/cache/nginx/scgi_temp --user=%{nginx_user} --group=%{nginx_group} --with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module")
+%define BASE_CONFIGURE_ARGS $(echo "--prefix=%{_sysconfdir}/nginx --sbin-path=%{_sbindir}/nginx --modules-path=%{_libdir}/nginx/modules --conf-path=%{_sysconfdir}/nginx/nginx.conf --error-log-path=%{_localstatedir}/log/nginx/error.log --http-log-path=%{_localstatedir}/log/nginx/access.log --pid-path=%{_localstatedir}/run/nginx.pid --lock-path=%{_localstatedir}/run/nginx.lock --http-client-body-temp-path=%{_localstatedir}/cache/nginx/client_temp --http-proxy-temp-path=%{_localstatedir}/cache/nginx/proxy_temp --http-fastcgi-temp-path=%{_localstatedir}/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=%{_localstatedir}/cache/nginx/uwsgi_temp --http-scgi-temp-path=%{_localstatedir}/cache/nginx/scgi_temp --user=%{nginx_user} --group=%{nginx_group} --with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module --with-openssl-opt=enable-tls1_3 --with-openssl-opt=no-nextprotoneg")
 
 Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -495,6 +494,9 @@ fi
 
 
 %changelog
+* Wed Oct 01 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-2
+- ZC-4361: Update ea-openssl requirement to v1.1.1 (ZC-5583)
+
 * Fri Sep 27 2019 Cory McIntire <cory@cpanel.net> - 1.17.4-1
 - EA-8669: Update ea-nginx from v1.17.3 to v1.17.4
 
@@ -505,7 +507,7 @@ fi
 * Thu Sep 19 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-5
 - Hook into cPanel when anything changes update Nginx config.
 
-* Wed Sep 16 2019 Dan Muey <dan@cpanel.net> - 1.17.3-4
+* Wed Sep 18 2019 Dan Muey <dan@cpanel.net> - 1.17.3-4
 - ZC-4961: Configure logging to match how we do it with Apache
 
 * Mon Sep 16 2019 Julian Brown <julian.brown@cpanel.net> - 1.17.3-3
