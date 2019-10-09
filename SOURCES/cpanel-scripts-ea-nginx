@@ -326,6 +326,9 @@ sub _render_and_append {
     my $ip = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
 
     my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
+
+    require Cpanel::EA4::Conf;
+    my $ea4_conf_hr = Cpanel::EA4::Conf->instance->as_hr();
     $tt->process(
         \$server_tt,
         {
@@ -343,6 +346,7 @@ sub _render_and_append {
             },
             basic_auth => $basic_auth,
             logging    => $logging_hr,
+            ea4conf   => $ea4_conf_hr,
         },
         sub {
             my ($out) = @_;
