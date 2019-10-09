@@ -13,9 +13,9 @@ server {
     listen 443 ssl;
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
-        [%- IF ea4conf.sslprotocol_list || ea4conf.sslprotocol %]
+        [% IF ea4conf.sslprotocol_list || ea4conf.sslprotocol %]
     ssl_protocols [% ea4conf.sslprotocol_list || ea4conf.sslprotocol %];
-        [% END -%]
+        [%- END -%]
         [%- IF ea4conf.sslciphersuite %]
     ssl_prefer_server_ciphers on;
     ssl_ciphers [% ea4conf.sslciphersuite %];
