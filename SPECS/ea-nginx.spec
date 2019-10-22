@@ -60,7 +60,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -494,6 +494,9 @@ fi
 
 
 %changelog
+* Tue Oct 22 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-3
+- ZC-5738: Update template key `sslprotocol_list` to `sslprotocol_list_str`
+
 * Wed Oct 01 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-2
 - ZC-4361: Update ea-openssl requirement to v1.1.1 (ZC-5583)
 
