@@ -47,7 +47,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.17.4
+%define main_version 1.17.5
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -60,7 +60,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -494,6 +494,9 @@ fi
 
 
 %changelog
+* Wed Oct 23 2019 Cory McIntire <cory@cpanel.net> - 1.17.5-1
+- EA-8713: Update ea-nginx from v1.17.4 to v1.17.5
+
 * Tue Oct 22 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-3
 - ZC-5738: Update template key `sslprotocol_list` to `sslprotocol_list_str`
 
