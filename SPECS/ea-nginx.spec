@@ -60,7 +60,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -494,6 +494,9 @@ fi
 
 
 %changelog
+* Mon Nov 18 2019 Travis Holloway <t.holloway@cpanel.net> - 1.17.5-2
+- ZC-5789: Fix scripts/ea-nginx to work on LTS version
+
 * Wed Oct 23 2019 Cory McIntire <cory@cpanel.net> - 1.17.5-1
 - EA-8713: Update ea-nginx from v1.17.4 to v1.17.5
 
