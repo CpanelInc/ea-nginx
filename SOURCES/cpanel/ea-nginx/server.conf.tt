@@ -1,5 +1,5 @@
 server {
-    server_name[% FOREACH domain IN domains %] [% domain %] www.[% domain %][% END %];
+    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% END %][% END %];
     listen 80;
 
     [%- IF !logging.piped_logs %]
@@ -92,7 +92,11 @@ server {
     include conf.d/includes-optional/cpanel-server-parsed-location.conf;
 }
 
-[%- IF ssl_certificate && ssl_certificate_key %]
+# nginx does not support a subdomain of a wildcard domain
+# Example:  whm.*.mydomain.tld would not be allowed
+[%- SET domains = domains.grep('^[^\*]') %]
+
+[%- IF ssl_certificate && ssl_certificate_key && domains.size %]
 #### SSL Proxies for [% domains.join(', ') %] ##
     [%- SET subdom_map = {
             cpanel  = 2082, webmail    = 2095, whm        = 2086,
