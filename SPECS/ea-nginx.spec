@@ -47,7 +47,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.17.10
+%define main_version 1.18.0
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -494,6 +494,10 @@ fi
 
 
 %changelog
+* Tue Apr 21 2020 Cory McIntire <cory@cpanel.net> - 1.18.0-1
+- EA-9016: Update ea-nginx from v1.17.10 to v1.18.0
+- Change Nginx.pm to use Moo
+
 * Thu Apr 16 2020 Cory McIntire <cory@cpanel.net> - 1.17.10-1
 - EA-9006: Update ea-nginx from v1.17.9 to v1.17.10
 
