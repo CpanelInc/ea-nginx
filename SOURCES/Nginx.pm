@@ -14,7 +14,10 @@ use warnings;
 # Cpanel::Class is not explicitly declared here.  Even if I use
 # Cpanel::ServiceManager::Base I still need.
 
-use Cpanel::Class;
+# Cpanel::Class was moved to Moo.
+
+#use Cpanel::Class;
+use Moo;
 use Cpanel::SafeRun::Simple;
 use Cpanel::LoadFile;
 use Cwd;

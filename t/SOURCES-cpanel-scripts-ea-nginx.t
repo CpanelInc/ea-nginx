@@ -78,10 +78,10 @@ shared_examples_for "any sub command that taks a cpanel user" => sub {
 describe "ea-nginx script" => sub {
     share my %mi;
     around {
+        no warnings "redefine", "once";
         local $ENV{"scripts::ea_nginx::bail_die"} = 1;
         local *scripts::ea_nginx::_write_global_logging = sub { };
 
-        no warnings "redefine", "once";
         use warnings "redefine", "once";
 
         %mi = %conf;
