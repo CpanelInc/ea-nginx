@@ -60,7 +60,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -494,6 +494,9 @@ fi
 
 
 %changelog
+* Thu May 07 2020 Daniel Muey <dan@cpanel.net> - 1.18.0-2
+- ZC-4887: Add cPanel Redirects to nginx config
+
 * Tue Apr 21 2020 Cory McIntire <cory@cpanel.net> - 1.18.0-1
 - EA-9016: Update ea-nginx from v1.17.10 to v1.18.0
 - Change Nginx.pm to use Moo
