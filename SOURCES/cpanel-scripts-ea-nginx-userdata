@@ -14,6 +14,7 @@ use Cpanel::Config::LoadUserDomains       ();
 use Cpanel::Version                       ();
 use Cpanel::Transaction::File::JSON       ();
 use Cpanel::Transaction::File::JSONReader ();
+use Cpanel::HttpUtils::Htaccess           ();
 
 our $current_cpanel_version;
 our $var_cpanel_userdata = '/var/cpanel/userdata';
@@ -49,6 +50,14 @@ sub run {
             not_applicable_as_of_cpanel_version => undef,
         );
 
+        _do_feature(
+            "cPanel redirects" => sub {
+                _do_cpanel_redirects( $user, $homedir );
+            },
+            ".htaccess-is-not-a-database story" => "CPANEL-32662",
+            not_applicable_as_of_cpanel_version => undef,
+        );
+
         #### add features above this line ##
 
         print " … done ($user).\n";
@@ -60,6 +69,12 @@ sub run {
 ################
 #### features ##
 ################
+
+sub _do_cpanel_redirects {
+    my ( $user, $homedir ) = @_;
+    my @redirects = Cpanel::HttpUtils::Htaccess::getredirects( undef, $user );
+    return _write_userdata( $user, cpanel_redirects => \@redirects );
+}
 
 sub _do_cpanel_password_protected_directories {
     my ( $user, $homedir ) = @_;    # these are safe at this point
