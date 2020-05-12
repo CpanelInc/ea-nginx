@@ -22,6 +22,7 @@ use Cpanel::Validate::Username      ();
 use Cpanel::Apache::TLS             ();
 use Cpanel::FileUtils::TouchFile    ();
 use Cpanel::PwCache                 ();
+use Cpanel::UTF8::Utils             ();
 use Whostmgr::TweakSettings         ();
 use Cpanel::Config::LoadWwwAcctConf ();
 use Template                        ();
@@ -264,9 +265,9 @@ my ( $server_tt, $docroots, $logging_hr );
 sub _get_logging_hr {
     return $logging_hr if $logging_hr;
 
-    $logging_hr->{piped_logs} = Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
+    $logging_hr->{piped_logs}          = Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
     $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
-    $logging_hr->{loglevel} = "warn";
+    $logging_hr->{loglevel}            = "warn";
 
     if ( $logging_hr->{default_format_name} ne "combined" && $logging_hr->{default_format_name} ne "common" ) {
         warn "Invalid “LOGSTYLE”, using `combined`\n";
@@ -287,14 +288,16 @@ sub _render_and_append {
 
     # at this point that file should exist; if it does not we want this to barf so we know about it
     my $cpanel_password_protected_directories = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_password_protected_directories.json");
+    my $cpanel_redirects                      = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_redirects.json");
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
-    $tt ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
-    $server_tt ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
+    $tt                ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
+    $server_tt         ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
     my $docroot = $docroots->{$user}{ $domains->[0] };
 
     my $basic_auth = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
+    my $redirects  = _get_redirects( $domains, $cpanel_redirects );
     my $logging_hr = _get_logging_hr();
 
     # create no matter what because the are either used directly or via piped logging
@@ -344,6 +347,7 @@ sub _render_and_append {
                 non_docroot_uris => $wordpress_hr->{non_docroot_uris},
             },
             basic_auth => $basic_auth,
+            redirects  => $redirects,
             logging    => $logging_hr,
             ea4conf    => $ea4_conf_hr,
         },
@@ -365,6 +369,49 @@ sub _render_and_append {
 sub _get_homedir {
     my ($user) = @_;
     return ( getpwnam($user) )[7];
+}
+
+sub _get_redirects {
+    my ( $domains, $cpanel_redirects ) = @_;
+
+    my %domains;
+    @domains{ @{$domains} } = ();
+
+    my @applicable_redirects;
+    for my $redirect ( @{$cpanel_redirects} ) {
+        next unless exists $domains{ $redirect->{domain} } || $redirect->{domain} eq '.*';
+
+        my %res;
+        if ( $redirect->{statuscode} eq "301" ) {
+            $res{flag} = "permanent";
+        }
+        elsif ( $redirect->{statuscode} eq "302" ) {
+            $res{flag} = "redirect";
+        }
+        else {
+            warn "Skipping non 301/302 redirect\n";
+            next;
+        }
+
+        # sourceurl and targeturl can be anything meaning a user would take down the server (not just their site) if its invalid
+        # or worse they could inject configuration into nginx. We need to ensure nginx sees them as a single string
+        # Cpanel::UTF8::Utils::quotemeta() make sense for sourceurl since its a regex
+        # it is weird for targeturl but it is syntactically correct ¯\_(ツ)_/¯
+        if ( $redirect->{wildcard} ) {
+            $res{regex} = $redirect->{sourceurl};
+            $res{regex} =~ s{/+$}{};
+            $res{regex}       = '^' . Cpanel::UTF8::Utils::quotemeta( $res{regex} ) . '\\/?(.*)$';
+            $res{replacement} = Cpanel::UTF8::Utils::quotemeta( $redirect->{targeturl} ) . '$1';
+        }
+        else {
+            $res{regex}       = '^' . Cpanel::UTF8::Utils::quotemeta( $redirect->{sourceurl} ) . '$';
+            $res{replacement} = Cpanel::UTF8::Utils::quotemeta( $redirect->{targeturl} );
+        }
+
+        push @applicable_redirects, \%res;
+    }
+
+    return \@applicable_redirects;
 }
 
 sub _get_basic_auth {

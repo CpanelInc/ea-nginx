@@ -22,6 +22,10 @@ server {
         [% END -%]
     [% END -%]
 
+    [%- FOREACH redirect IN redirects %]
+    rewrite [% redirect.regex %] [% redirect.replacement %] [% redirect.flag %];
+    [%- END %]
+
     root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;
 
