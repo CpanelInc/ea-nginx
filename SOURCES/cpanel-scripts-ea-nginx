@@ -296,9 +296,10 @@ sub _render_and_append {
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
     my $docroot = $docroots->{$user}{ $domains->[0] };
 
-    my $basic_auth = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
-    my $redirects  = _get_redirects( $domains, $cpanel_redirects );
-    my $logging_hr = _get_logging_hr();
+    my $basic_auth   = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
+    my $redirects    = _get_redirects( $domains, $cpanel_redirects );
+    my $logging_hr   = _get_logging_hr();
+    my $ssl_redirect = _get_ssl_redirect( $user => $domains );
 
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
@@ -337,6 +338,7 @@ sub _render_and_append {
             docroot                      => $docroot,
             ssl_certificate              => $combined_tls,
             ssl_certificate_key          => $combined_tls,
+            ssl_redirect                 => $ssl_redirect,
             domains                      => $domains,
             user                         => $user,
             ip                           => $ip,
@@ -369,6 +371,17 @@ sub _render_and_append {
 sub _get_homedir {
     my ($user) = @_;
     return ( getpwnam($user) )[7];
+}
+
+sub _get_ssl_redirect {
+    my ( $user, $domains ) = @_;
+
+    for my $dom ( @{$domains} ) {
+        my $lu = Cpanel::Config::userdata::Load::load_userdata( $user => $dom ) || {};
+        return 1 if $lu->{ssl_redirect};
+    }
+
+    return;
 }
 
 sub _get_redirects {

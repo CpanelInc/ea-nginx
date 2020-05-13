@@ -10,6 +10,14 @@ server {
     set $CPANEL_APACHE_PROXY_IP [% ip %];
 
     [%- IF ssl_certificate && ssl_certificate_key %]
+    [%- IF ssl_redirect %]
+    location ~ ^/(?!(?:\.well-known/(?:pki-validation|cpanel-dcv))) {
+        if ($scheme = http) {
+            return 301 https://$host$request_uri;
+        }
+    }
+    [% END -%]
+
     listen 443 ssl;
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
