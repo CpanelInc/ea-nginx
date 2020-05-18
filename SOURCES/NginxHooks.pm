@@ -73,6 +73,7 @@ sub describe {
         'UAPI::SubDomain::addsubdomain',    # I do not see a delsubdomain
         'UAPI::Mime::add_redirect',
         'UAPI::Mime::delete_redirect',
+        'UAPI::SSL::toggle_ssl_redirect_for_domains',
         'Api2::SubDomain::addsubdomain',
         'Api2::AddonDomain::addaddondomain',
         'Api2::Park::park',
