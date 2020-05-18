@@ -22,12 +22,13 @@ use Cpanel::Validate::Username      ();
 use Cpanel::Apache::TLS             ();
 use Cpanel::FileUtils::TouchFile    ();
 use Cpanel::PwCache                 ();
-use Cpanel::UTF8::Utils             ();
+use Cpanel::Validate::URL           ();
 use Whostmgr::TweakSettings         ();
 use Cpanel::Config::LoadWwwAcctConf ();
 use Template                        ();
 use File::Glob                      ();
 use Path::Tiny;
+use String::UnicodeUTF8 ();
 
 my $nginxroot = "/etc/nginx";
 
@@ -407,18 +408,24 @@ sub _get_redirects {
         }
 
         # sourceurl and targeturl can be anything meaning a user would take down the server (not just their site) if its invalid
-        # or worse they could inject configuration into nginx. We need to ensure nginx sees them as a single string
+        # or worse they could inject configuration into nginx. We need to ensure nginx sees them as a single string.
         # Cpanel::UTF8::Utils::quotemeta() make sense for sourceurl since its a regex
-        # it is weird for targeturl but it is syntactically correct ¯\_(ツ)_/¯
+        # 78 does not have Cpanel::UTF8::Utils so we use String::UnicodeUTF8 which it does have.
+        # Escaping is bad for targeturl because the slashes are literal despite it being syntactically correct ¯\_(ツ)_/¯
+        if ( !Cpanel::Validate::URL::is_valid_url( $redirect->{targeturl} ) ) {
+            warn "Skipping invalid targeturl “$redirect->{targeturl}”\n";
+            next;
+        }
+
         if ( $redirect->{wildcard} ) {
             $res{regex} = $redirect->{sourceurl};
             $res{regex} =~ s{/+$}{};
-            $res{regex}       = '^' . Cpanel::UTF8::Utils::quotemeta( $res{regex} ) . '\\/?(.*)$';
-            $res{replacement} = Cpanel::UTF8::Utils::quotemeta( $redirect->{targeturl} ) . '$1';
+            $res{regex}       = '^' . String::UnicodeUTF8::quotemeta_bytes( $res{regex} ) . '\\/?(.*)$';
+            $res{replacement} = $redirect->{targeturl} . '$1';
         }
         else {
-            $res{regex}       = '^' . Cpanel::UTF8::Utils::quotemeta( $redirect->{sourceurl} ) . '$';
-            $res{replacement} = Cpanel::UTF8::Utils::quotemeta( $redirect->{targeturl} );
+            $res{regex}       = '^' . String::UnicodeUTF8::quotemeta_bytes( $redirect->{sourceurl} ) . '$';
+            $res{replacement} = $redirect->{targeturl};
         }
 
         push @applicable_redirects, \%res;
