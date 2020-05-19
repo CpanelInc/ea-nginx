@@ -1,6 +1,6 @@
 #!/usr/local/cpanel/3rdparty/bin/perl
 
-# cpanel - t/SOURCES-cpanel-scripts-ea-nginx.t     Copyright 2019 cPanel, L.L.C.
+# cpanel - t/SOURCES-cpanel-scripts-ea-nginx.t     Copyright 2020 cPanel, L.L.C.
 #                                                           All rights Reserved.
 # copyright@cpanel.net                                         http://cpanel.net
 # This code is subject to the cPanel license. Unauthorized copying is prohibited
@@ -49,14 +49,47 @@ use warnings "redefine";
 shared_examples_for "any circular redirect" => sub {
     share my %ti;
 
-    it "should skip with no trailing slash";
-    it "should skip with no trailing slash and anchor";
-    it "should skip with no trailing slash and query string";
+    it "should skip with no trailing slash" => sub {
+        local $cpanel_redirects->[0]{targeturl} = "$ti{protocol}dan.test";
+        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+        is_deeply $res, [];
+    };
 
-    it "should skip with trailing slash";
-    it "should skip with trailing slash and anchor";
-    it "should skip with trailing slash and query string";
-    it "should skip with trailing slash and URI";
+    it "should skip with no trailing slash and anchor" => sub {
+        local $cpanel_redirects->[0]{targeturl} = "$ti{protocol}dan.test#foo";
+        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+        is_deeply $res, [];
+    };
+
+    it "should skip with no trailing slash and query string" => sub {
+        local $cpanel_redirects->[0]{targeturl} = "$ti{protocol}dan.test?foo=bar";
+        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+        is_deeply $res, [];
+    };
+
+    it "should skip with trailing slash" => sub {
+        local $cpanel_redirects->[0]{targeturl} = "$ti{protocol}dan.test/";
+        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+        is_deeply $res, [];
+    };
+
+    it "should skip with trailing slash and anchor" => sub {
+        local $cpanel_redirects->[0]{targeturl} = "$ti{protocol}dan.test/#foo";
+        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+        is_deeply $res, [];
+    };
+
+    it "should skip with trailing slash and query string" => sub {
+        local $cpanel_redirects->[0]{targeturl} = "$ti{protocol}dan.test/?foo=bar";
+        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+        is_deeply $res, [];
+    };
+
+    it "should skip with trailing slash and URI" => sub {
+        local $cpanel_redirects->[0]{targeturl} = "$ti{protocol}dan.test/foo";
+        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+        is_deeply $res, [];
+    };
 };
 
 shared_examples_for "any sub command that takes a cpanel user" => sub {
@@ -379,16 +412,75 @@ describe "ea-nginx script" => sub {
                 };
 
                 describe "potential domain-is-target infinite loops" => sub {
-                    it "should warn when skipping";
-                    it "should not include the redirect when skipping";
+                    around {
+                        local $cpanel_redirects = [
+                            {
+                                domain     => "dan.test",
+                                sourceurl  => "/",
+                                targeturl  => "https://dan.test/",
+                                statuscode => 301,
+                            }
+                        ];
 
-                    it "should skip non-www. version";
-                    it "should skip www. version";
+                        yield;
+                    };
 
-                    it "should not skip if the domain matches another domain (before)";
-                    it "should not skip if the domain matches another domain (after)";
-                    it "should not skip if the domain is part of another domain (before)";
-                    it "should not skip if the domain is part of another domain (after)";
+                    it "should warn when skipping" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        is $trap->warn->[0], "Skipping circular redirect for “dan.test” to “https://dan.test/”\n";
+                    };
+
+                    it "should not include the redirect when skipping" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        is_deeply $res, [];
+                    };
+
+                    it "should skip non-www. version" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        is_deeply $res, [];
+                    };
+
+                    it "should skip www. version" => sub {
+                        local $cpanel_redirects->[0]{targeturl} = "https://www.dan.test/";
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        is_deeply $res, [];
+                    };
+
+                    it "should not skip if the domain matches another domain (before)" => sub {
+                        local $cpanel_redirects->[0]{targeturl} = "https://dan.testermax/";
+                        my $res = scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects );
+                        is scalar( @{$res} ), 1;
+                    };
+
+                    it "should not skip if the domain matches another domain (middle)" => sub {
+                        local $cpanel_redirects->[0]{targeturl} = "https://mynameisdan.testermax/";
+                        my $res = scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects );
+                        is scalar( @{$res} ), 1;
+                    };
+
+                    it "should not skip if the domain matches another domain (after)" => sub {
+                        local $cpanel_redirects->[0]{targeturl} = "https://mynameisdan.test/";
+                        my $res = scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects );
+                        is scalar( @{$res} ), 1;
+                    };
+
+                    it "should not skip if the domain is part of another domain (before)" => sub {
+                        local $cpanel_redirects->[0]{targeturl} = "https://dan.test.com/";
+                        my $res = scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects );
+                        is scalar( @{$res} ), 1;
+                    };
+
+                    it "should not skip if the domain is part of another domain (middle)" => sub {
+                        local $cpanel_redirects->[0]{targeturl} = "https://yo.dan.test.com/";
+                        my $res = scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects );
+                        is scalar( @{$res} ), 1;
+                    };
+
+                    it "should not skip if the domain is part of another domain (after)" => sub {
+                        local $cpanel_redirects->[0]{targeturl} = "https://yo.dan.test/";
+                        my $res = scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects );
+                        is scalar( @{$res} ), 1;
+                    };
 
                     describe "- https" => sub {
                         around {
