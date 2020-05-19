@@ -41,7 +41,7 @@ no warnings "redefine";
 *scripts::ea_nginx::_reload          = sub { push @_reload,          [@_] };
 use warnings "redefine";
 
-shared_examples_for "any sub command that taks a cpanel user" => sub {
+shared_examples_for "any sub command that takes a cpanel user" => sub {
     share my %ti;
 
     it "should error out when not given a user" => sub {
@@ -104,7 +104,7 @@ describe "ea-nginx script" => sub {
                 local *File::Glob::bsd_glob = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
                 yield;
             };
-            it_should_behave_like "any sub command that taks a cpanel user";
+            it_should_behave_like "any sub command that takes a cpanel user";
 
             it "should create the config for the given user if needed" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
@@ -121,7 +121,7 @@ describe "ea-nginx script" => sub {
             };
 
             it "should delete no-longer existing users’ conf given --all" => sub {
-                my $mock = Test::MockFile->dir( '/etc/nginx/conf.d/users/', ["iamnomore$$.conf"] );
+                my $mock     = Test::MockFile->dir( '/etc/nginx/conf.d/users/', ["iamnomore$$.conf"] );
                 my $mockfile = Test::MockFile->file( "/etc/nginx/conf.d/users/iamnomore$$.conf", "i am conf hear me rawr" );
                 local @glob_res = ("/etc/nginx/conf.d/users/iamnomore$$.conf");
                 modulino_run_trap( config => "--all" );
@@ -171,7 +171,7 @@ describe "ea-nginx script" => sub {
                 local $mi{cmd} = "remove";
                 yield;
             };
-            it_should_behave_like "any sub command that taks a cpanel user";
+            it_should_behave_like "any sub command that takes a cpanel user";
 
             it "should remove the file if it exists" => sub {
                 my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/cpuser$$.conf", "# i am a config file" );
