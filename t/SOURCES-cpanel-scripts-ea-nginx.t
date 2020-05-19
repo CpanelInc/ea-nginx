@@ -24,6 +24,8 @@ use Test::Mock::Cmd 'system' => sub { $current_system->(@_) };
 
 our @glob_res;
 our $userdata;
+our $cpanel_redirects;
+our @redirect_results;
 
 my %conf = (
     require => "$FindBin::Bin/../SOURCES/cpanel-scripts-ea-nginx",
@@ -194,28 +196,173 @@ describe "ea-nginx script" => sub {
             };
 
             describe "cPanel Redirects" => sub {
-                it "should warn about invalid `targeturl`s";
-                it "should not include invalid `targeturl`s";
+                around {
+                    local $cpanel_redirects = [
+                        {
+                            docroot    => '/home/dantest/public_html',
+                            domain     => '.*',
+                            kind       => 'rewrite',
+                            matchwww   => 1,
+                            opts       => 'L',
+                            sourceurl  => 'glob',
+                            statuscode => '301',
+                            targeturl  => 'https://cpanel.net/alldomains',
+                            type       => 'permanent',
+                            wildcard   => 0
+                        },
+                        {
+                            docroot    => '/home/dantest/public_html',
+                            domain     => 'dan.test',
+                            kind       => 'rewrite',
+                            matchwww   => 1,
+                            opts       => 'L',
+                            sourceurl  => '/index.html',
+                            statuscode => '301',
+                            targeturl  => 'https://cpanel.net/index',
+                            type       => 'permanent',
+                            wildcard   => 0
+                        },
+                        {
+                            docroot    => '/home/dantest/public_html',
+                            domain     => 'dan.test',
+                            kind       => 'rewrite',
+                            matchwww   => 1,
+                            opts       => 'L',
+                            sourceurl  => '/derp',
+                            statuscode => '301',
+                            targeturl  => 'http://this is not a good/url yo',
+                            type       => 'permanent',
+                            wildcard   => 0
+                        },
+                        {
+                            docroot    => '/home/dantest/public_html',
+                            domain     => 'dan.test',
+                            kind       => 'rewrite',
+                            matchwww   => 1,
+                            opts       => 'L',
+                            sourceurl  => '/foo',
+                            statuscode => '302',
+                            targeturl  => 'https://cpanel.net/302/Y',
+                            type       => 'temporary',
+                            wildcard   => 1
+                        },
+                        {
+                            docroot    => '/home/dantest/public_html',
+                            domain     => "$$.test",
+                            kind       => 'rewrite',
+                            matchwww   => 1,
+                            opts       => 'L',
+                            sourceurl  => '/foo',
+                            statuscode => '302',
+                            targeturl  => 'https://cpanel.net/302/X',
+                            type       => 'temporary',
+                            wildcard   => 1
+                        },
+                    ];
+                    local @redirect_results = (
+                        {
+                            flag        => 'permanent',
+                            regex       => '^glob$',
+                            replacement => 'https://cpanel.net/alldomains'
+                        },
+                        {
+                            'flag'        => 'permanent',
+                            'regex'       => '^\\/index\\.html$',
+                            'replacement' => 'https://www.youtube.com/watch?v=kr_CFydcBZc'
+                        },
+                        {
+                            'flag'        => 'redirect',
+                            'regex'       => '^\\/foo\\/?(.*)$',
+                            'replacement' => 'https://cpanel.net/302/Y$1'
+                        },
+                        {
+                            'flag'        => 'redirect',
+                            'regex'       => '^\\/foo\\/?(.*)$',
+                            'replacement' => 'https://cpanel.net/302/X$1'
+                        },
+                    );
+                    yield;
+                };
 
-                it "should always include '.*' redirects";
-                it "should include, in addition to '.*', only the given domains’ redirects";
+                it "should warn about invalid `targeturl`s" => sub {
+                    my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                    is $trap->warn->[0], "Skipping invalid targeturl “http://this is not a good/url yo”\n";
+                };
 
-                it "should warn about `statuscode` that is not 301 or 302";
-                it "should not include `statuscode` that is not 301 or 302";
+                it "should not include invalid `targeturl`s" => sub {
+                    my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                    is_deeply [ grep /this is not a good/, map { $_->{replacement} } @{$res} ], [];
+                };
 
-                it "should have a `flag` of `permanent` for 301 `statuscode`";
-                it "should have a `flag` of `redirect` for 302 `statuscode`";
+                it "should always include '.*' redirects" => sub {
+                    my $res = trap { scripts::ea_nginx::_get_redirects( ["$$.test"], $cpanel_redirects ) };
+                    is $res->[0]{regex}, '^glob$';
+                };
+
+                it "should include, in addition to '.*', only the given domains’ redirects" => sub {
+                    my $res = trap { scripts::ea_nginx::_get_redirects( ["$$.test"], $cpanel_redirects ) };
+                    is_deeply $res, [ $redirect_results[0], $redirect_results[3] ];
+                };
+
+                it "should warn about `statuscode` that is not 301 or 302" => sub {
+                    local $cpanel_redirects = [ { domain => "dan.test", statuscode => 418, targeturl => "teapot.test" } ];
+                    my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                    is $trap->warn->[0], "Skipping non 301/302 redirect\n";
+                };
+
+                it "should not include `statuscode` that is not 301 or 302" => sub {
+                    local $cpanel_redirects = [ { domain => "dan.test", statuscode => 418, targeturl => "teapot.test" } ];
+                    my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                    is_deeply $res, [];
+                };
+
+                it "should have a `flag` of `permanent` for 301 `statuscode`" => sub {
+                    local $cpanel_redirects = [ { domain => "dan.test", statuscode => 301, targeturl => "301.yo" } ];
+                    my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                    is $res->[0]{flag}, "permanent";
+                };
+
+                it "should have a `flag` of `redirect` for 302 `statuscode`" => sub {
+                    local $cpanel_redirects = [ { domain => "dan.test", statuscode => 302,, targeturl => "302.yo" } ];
+                    my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                    is $res->[0]{flag}, "redirect";
+                };
 
                 describe "non-wildcard" => sub {
-                    it "should escape `sourceurl` in `regex`";
-                    it "should pass through `targeturl` to `replacement`";
+                    it "should escape `sourceurl` in `regex`" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                        is $res->[1]{regex}, $redirect_results[1]{regex};
+                    };
+
+                    it "should pass through `targeturl` to `replacement`" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( [ "dan.test", "$$.test" ], $cpanel_redirects ) };
+                        is $res->[1]{replacement}, $cpanel_redirects->[1]{targeturl};
+                    };
                 };
 
                 describe "wildcard" => sub {
-                    it "should escape `sourceurl` in `regex`";
-                    it "should append URI capture to `sourceurl` in `regex` (trailing /)";
-                    it "should append URI capture to `sourceurl` in `regex` (w/out trailing /)";
-                    it "should append capture variable to `replacement`";
+
+                    # these should all be $redirect_results[2] but an is() test is not as specific
+                    it "should escape `sourceurl` in `regex`" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        like $res->[2]{regex}, qr{\\/foo};
+                    };
+
+                    it "should append URI capture to `sourceurl` in `regex` (trailing /)" => sub {
+                        local $cpanel_redirects->[3]{sourceurl} = "$cpanel_redirects->[3]{sourceurl}/";
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        like $res->[2]{regex}, qr{foo\\/\?\(\.\*\)\$};
+                    };
+
+                    it "should append URI capture to `sourceurl` in `regex` (w/out trailing /)" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        like $res->[2]{regex}, qr{foo\\/\?\(\.\*\)\$};
+                    };
+
+                    it "should append capture variable to `replacement`" => sub {
+                        my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
+                        like $res->[2]{replacement}, qr/\$1$/;
+                    };
                 };
             };
         };
