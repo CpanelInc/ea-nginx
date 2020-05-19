@@ -164,6 +164,40 @@ describe "ea-nginx script" => sub {
                 ok -d $mock->filename;
                 is_deeply \@_write_user_conf, [ ["cpuser$$"] ];
             };
+
+            describe "cPanel Password protected directories" => sub { it "should be tested" };
+
+            describe "cPanel Domains - Force HTTPS redirects" => sub {
+                it "should set `ssl_redirect` to true when enabled in userdata";
+                it "should set `ssl_redirect` to false when disabled in userdata";
+                it "should set `ssl_redirect` to false when does not exist in userdata";
+            };
+
+            describe "cPanel Redirects" => sub {
+                it "should warn about invalid `targeturl`s";
+                it "should not include invalid `targeturl`s";
+
+                it "should always include '.*' redirects";
+                it "should include, in addition to '.*', only the given domains’ redirects";
+
+                it "should warn about `statuscode` that is not 301 or 302";
+                it "should not include `statuscode` that is not 301 or 302";
+
+                it "should have a `flag` of `permanent` for 301 `statuscode`";
+                it "should have a `flag` of `redirect` for 302 `statuscode`";
+
+                describe "non-wildcard" => sub {
+                    it "should escape `sourceurl` in `regex`";
+                    it "should pass through `targeturl` to `replacement`";
+                };
+
+                describe "wildcard" => sub {
+                    it "should escape `sourceurl` in `regex`";
+                    it "should append URI capture to `sourceurl` in `regex` (trailing /)";
+                    it "should append URI capture to `sourceurl` in `regex` (w/out trailing /)";
+                    it "should append capture variable to `replacement`";
+                };
+            };
         };
 
         describe "`remove`" => sub {
