@@ -11,6 +11,8 @@ use Test::Spec;    # automatically turns on strict and warnings
 use FindBin;
 use File::Glob ();
 
+use Cpanel::Config::userdata::Load ();
+
 our $system_calls   = [];
 our $system_rv      = 0;
 our $current_system = sub {
@@ -21,6 +23,7 @@ our $current_system = sub {
 use Test::Mock::Cmd 'system' => sub { $current_system->(@_) };
 
 our @glob_res;
+our $userdata;
 
 my %conf = (
     require => "$FindBin::Bin/../SOURCES/cpanel-scripts-ea-nginx",
@@ -168,9 +171,26 @@ describe "ea-nginx script" => sub {
             describe "cPanel Password protected directories" => sub { it "should be tested" };
 
             describe "cPanel Domains - Force HTTPS redirects" => sub {
-                it "should set `ssl_redirect` to true when enabled in userdata";
-                it "should set `ssl_redirect` to false when disabled in userdata";
-                it "should set `ssl_redirect` to false when does not exist in userdata";
+                around {
+                    no warnings "redefine";
+                    local *Cpanel::Config::userdata::Load::load_userdata = sub { $userdata };
+                    yield;
+                };
+
+                it "should set `ssl_redirect` to true when enabled in userdata" => sub {
+                    local $userdata = { ssl_redirect => 1 };
+                    ok scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                };
+
+                it "should set `ssl_redirect` to false when disabled in userdata" => sub {
+                    local $userdata = { ssl_redirect => 0 };
+                    ok !scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                };
+
+                it "should set `ssl_redirect` to false when does not exist in userdata" => sub {
+                    local $userdata = undef;
+                    ok !scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                };
             };
 
             describe "cPanel Redirects" => sub {
