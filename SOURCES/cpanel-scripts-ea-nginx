@@ -395,6 +395,11 @@ sub _get_redirects {
     for my $redirect ( @{$cpanel_redirects} ) {
         next unless exists $domains{ $redirect->{domain} } || $redirect->{domain} eq '.*';
 
+        if ( $redirect->{domain} ne '.*' && $redirect->{targeturl} =~ m{^(?:\w*:)?//(?:www\.)?\Q$redirect->{domain}\E(?:$|/)} ) {
+            warn "Skipping circular redirect for “$redirect->{domain}” to “$redirect->{targeturl}”\n";
+            next;
+        }
+
         my %res;
         if ( $redirect->{statuscode} eq "301" ) {
             $res{flag} = "permanent";

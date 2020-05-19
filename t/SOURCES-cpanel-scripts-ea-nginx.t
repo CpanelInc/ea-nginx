@@ -46,6 +46,19 @@ no warnings "redefine";
 *scripts::ea_nginx::_reload          = sub { push @_reload,          [@_] };
 use warnings "redefine";
 
+shared_examples_for "any circular redirect" => sub {
+    share my %ti;
+
+    it "should skip with no trailing slash";
+    it "should skip with no trailing slash and anchor";
+    it "should skip with no trailing slash and query string";
+
+    it "should skip with trailing slash";
+    it "should skip with trailing slash and anchor";
+    it "should skip with trailing slash and query string";
+    it "should skip with trailing slash and URI";
+};
+
 shared_examples_for "any sub command that takes a cpanel user" => sub {
     share my %ti;
 
@@ -362,6 +375,51 @@ describe "ea-nginx script" => sub {
                     it "should append capture variable to `replacement`" => sub {
                         my $res = trap { scripts::ea_nginx::_get_redirects( ["dan.test"], $cpanel_redirects ) };
                         like $res->[2]{replacement}, qr/\$1$/;
+                    };
+                };
+
+                describe "potential domain-is-target infinite loops" => sub {
+                    it "should warn when skipping";
+                    it "should not include the redirect when skipping";
+
+                    it "should skip non-www. version";
+                    it "should skip www. version";
+
+                    it "should not skip if the domain matches another domain (before)";
+                    it "should not skip if the domain matches another domain (after)";
+                    it "should not skip if the domain is part of another domain (before)";
+                    it "should not skip if the domain is part of another domain (after)";
+
+                    describe "https" => sub {
+                        around {
+                            local $mi{protocol} = "https://";
+                            yield;
+                        };
+                        it_should_behave_like "any circular redirect";
+                    };
+
+                    describe "http" => sub {
+                        around {
+                            local $mi{protocol} = "http://";
+                            yield;
+                        };
+                        it_should_behave_like "any circular redirect";
+                    };
+
+                    describe "protocol relative" => sub {
+                        around {
+                            local $mi{protocol} = "//";
+                            yield;
+                        };
+                        it_should_behave_like "any circular redirect";
+                    };
+
+                    describe "arbitrary word-like" => sub {
+                        around {
+                            local $mi{protocol} = "Alph4.Num3riC+plus_undy.dot-dash:colon//";
+                            yield;
+                        };
+                        it_should_behave_like "any circular redirect";
                     };
                 };
             };
