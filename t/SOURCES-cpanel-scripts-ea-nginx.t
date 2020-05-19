@@ -390,7 +390,7 @@ describe "ea-nginx script" => sub {
                     it "should not skip if the domain is part of another domain (before)";
                     it "should not skip if the domain is part of another domain (after)";
 
-                    describe "https" => sub {
+                    describe "- https" => sub {
                         around {
                             local $mi{protocol} = "https://";
                             yield;
@@ -398,7 +398,7 @@ describe "ea-nginx script" => sub {
                         it_should_behave_like "any circular redirect";
                     };
 
-                    describe "http" => sub {
+                    describe "- http" => sub {
                         around {
                             local $mi{protocol} = "http://";
                             yield;
@@ -406,7 +406,7 @@ describe "ea-nginx script" => sub {
                         it_should_behave_like "any circular redirect";
                     };
 
-                    describe "protocol relative" => sub {
+                    describe "- protocol relative" => sub {
                         around {
                             local $mi{protocol} = "//";
                             yield;
@@ -414,7 +414,7 @@ describe "ea-nginx script" => sub {
                         it_should_behave_like "any circular redirect";
                     };
 
-                    describe "arbitrary word-like" => sub {
+                    describe "- arbitrary word-like protocol" => sub {
                         around {
                             local $mi{protocol} = "Alph4.Num3riC+plus_undy.dot-dash:colon//";
                             yield;
