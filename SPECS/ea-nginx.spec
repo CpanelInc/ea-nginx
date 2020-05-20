@@ -265,6 +265,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-non-www.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-www.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
