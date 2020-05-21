@@ -60,7 +60,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -265,6 +265,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-non-www.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-www.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
@@ -494,6 +496,9 @@ fi
 
 
 %changelog
+* Thu May 07 2020 Daniel Muey <dan@cpanel.net> - 1.18.0-2
+- ZC-4887: Add cPanel Redirects to nginx config
+
 * Tue Apr 21 2020 Cory McIntire <cory@cpanel.net> - 1.18.0-1
 - EA-9016: Update ea-nginx from v1.17.10 to v1.18.0
 - Change Nginx.pm to use Moo

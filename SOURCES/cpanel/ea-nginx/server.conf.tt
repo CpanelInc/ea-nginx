@@ -10,6 +10,14 @@ server {
     set $CPANEL_APACHE_PROXY_IP [% ip %];
 
     [%- IF ssl_certificate && ssl_certificate_key %]
+    [%- IF ssl_redirect %]
+    location ~ ^/(?!(?:\.well-known/(?:pki-validation|cpanel-dcv))) {
+        if ($scheme = http) {
+            return 301 https://$host$request_uri;
+        }
+    }
+    [% END -%]
+
     listen 443 ssl;
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
@@ -21,6 +29,10 @@ server {
     ssl_ciphers [% ea4conf.sslciphersuite %];
         [% END -%]
     [% END -%]
+
+    [%- FOREACH redirect IN redirects %]
+    rewrite [% redirect.regex %] [% redirect.replacement %] [% redirect.flag %];
+    [%- END %]
 
     root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;

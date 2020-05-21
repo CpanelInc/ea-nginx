@@ -14,8 +14,10 @@ use File::Glob ();
 use Path::Tiny ();
 
 require "$FindBin::Bin/../SOURCES/cpanel-scripts-ea-nginx-userdata";
+our @write_args;
 
 use Test::MockModule;
+use Cpanel::HttpUtils::Htaccess ();
 
 # Forward references for data created in _setup ();
 my ( $var_cpanel_userdata, $vcu_cpuser_dir, $feature_file, $home, $homedir, $homedir_len, %mtimes, @passwds, $version, $loaduserdomains, $cpuser );
@@ -255,7 +257,7 @@ describe "ea-nginx-userdata " => sub {
                 my $outref;
                 my $ret;
                 trap {
-                    $ret = scripts::ea_nginx_userdata::_write_userdata( $cpuser, 'feature', $ref );
+                    $ret    = scripts::ea_nginx_userdata::_write_userdata( $cpuser, 'feature', $ref );
                     $outref = scripts::ea_nginx_userdata::_get_cur_userdata( $cpuser, 'feature' );
                 };
 
@@ -307,6 +309,21 @@ describe "ea-nginx-userdata " => sub {
                 };
             };
         };
+    };
+};
+
+describe "ea-nginx-userdata::_do_cpanel_redirects" => sub {
+    around {
+        local @write_args;
+        no warnings "redefine";
+        local *scripts::ea_nginx_userdata::_write_userdata = sub { push @write_args, \@_ };
+        local *Cpanel::HttpUtils::Htaccess::getredirects = sub { return ( { a => 1 }, { b => 2 } ) };
+        yield;
+    };
+
+    it "should dump getredirects() to userdata file cpanel_redirects.json" => sub {
+        scripts::ea_nginx_userdata::_do_cpanel_redirects( "user$$", "HOME" );
+        is_deeply $write_args[0], [ "user$$", "cpanel_redirects", [ { a => 1 }, { b => 2 } ] ];
     };
 };
 
