@@ -23,9 +23,14 @@
         notifempty
         create 640 nginx adm
         sharedscripts
+        prerotate
+                killall -SIGHUP --quiet splitlogs # flush logs to disk if needed
+                exit 0
+        endrotate
         postrotate
                 if [ -f /var/run/nginx.pid ]; then
                         kill -USR1 `cat /var/run/nginx.pid`
                 fi
+                /usr/local/cpanel/scripts/ea-nginx-logrotate $1.1
         endscript
 }

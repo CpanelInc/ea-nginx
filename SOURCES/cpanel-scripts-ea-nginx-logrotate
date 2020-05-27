@@ -1,0 +1,36 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - ea-nginx                                Copyright 2020 cPanel, L.L.C.
+#                                                           All rights Reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+use strict;
+use warnings;
+
+use Whostmgr::TweakSettings ();
+
+package scripts::ea_nginx::logrotate;
+
+exit( run(@ARGV) ? 0 : 1 ) if !caller;
+
+sub run {
+    my ($rotated_file) = @_;
+
+    if ( substr( $rotated_file, -2, 2 ) ne ".1" ) {
+        warn "Given file does not end in .1 (i.e. it is not the most recently rotated file)\n";
+    }
+
+    my $piped_logging_enabled = Whostmgr::TweakSettings::get_value( Main => "enable_piped_logs" );
+    if ($piped_logging_enabled) {
+        print "TODO: process “$rotated_file” under piped logging\n";
+    }
+    else {
+        print "TODO: process “$rotated_file” under unpiped logging\n";
+    }
+}
+
+###############
+#### helpers ##
+###############
+
+1;
