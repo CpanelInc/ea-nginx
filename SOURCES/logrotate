@@ -4,7 +4,6 @@
         compress
         delaycompress
         notifempty
-        create 640 nobody adm
         nodateext
         sharedscripts
         postrotate
@@ -20,7 +19,6 @@
         compress
         delaycompress
         notifempty
-        create 640 nobody adm
         nodateext
         prerotate
                 killall -SIGHUP --quiet splitlogs # flush logs to disk if needed
