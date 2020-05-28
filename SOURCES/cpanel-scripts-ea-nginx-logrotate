@@ -7,8 +7,6 @@
 use strict;
 use warnings;
 
-#### TODO: optimize/cache make reusable what can be (CPAN maybe?)
-
 package scripts::ea_nginx::logrotate;
 
 exit( run(@ARGV) ? 0 : 1 ) if !caller;
@@ -16,137 +14,238 @@ exit( run(@ARGV) ? 0 : 1 ) if !caller;
 sub run {
     my ($rotated_file) = @_;
 
-    die "No file given\n" if !$rotated_file;    #undef, "", and 0 are all invalid paths here
+    _load_logrotate_class();    # will go away once we do split this out per the TODO comment in the function
 
-    # * is not valid in log file names since it has meaning to logrotate
-    die "Pattern given instead of single file (logrotate’s `sharedscripts` enabled?)\n" if index( $rotated_file => '*' ) != -1;    # or should we allow globs (i.e. under `sharedscripts`)? it’d be a mix of users …
+    # ZC-6912: should we allow globs (i.e. under `sharedscripts`)? it’d be a mix of users to setuid/spork etc
+    my $file = Cpanel::Logrotate::File->new(
+        path              => $rotated_file,
+        protocol          => "http",
+        server            => "nginx",
+        process_stats_log => \&nginx_process_stats_log,
+    );
 
-    if ( substr( $rotated_file, -2, 2 ) ne ".1" ) {
-        warn "Given file does not end in .1 (i.e. it is not the most recently rotated file)\n";
-    }
-
-    my $user = get_user_for_file($rotated_file);
-
-    require Cpanel::Logger::Persistent;
-    my $logger = Cpanel::Logger::Persistent->new( { alternate_logfile => '/usr/local/cpanel/logs/logrotate' } );
-
-    if ( $rotated_file =~ m/-bytes_log(?:\.[0-9]+)?$/ ) {
-        return process_bytes_log( $user => $rotated_file, $logger );
-    }
-    else {
-        require Whostmgr::TweakSettings;
-        my $piped_logging_enabled = Whostmgr::TweakSettings::get_value( Main => "enable_piped_logs" );
-
-        if ($piped_logging_enabled) {
-
-            # if not -ssl_log ignore SSL from first :443 column
-            print "TODO: process “$rotated_file” under piped logging\n";
-        }
-        else {
-
-            # if not -ssl_log get SSL from first :443 column
-            print "TODO: process “$rotated_file” under unpiped logging\n";
-        }
-    }
-
-    return 1;
-}
-
-#######################
-#### file processors ##
-#######################
-
-sub process_bytes_log {
-    my ( $user, $bytes_log, $logger ) = @_;
-
-    require Cpanel::BandwidthDB;
-    my $bw_db  = Cpanel::BandwidthDB::get_writer($user);
-    my $domain = get_domain_for_file($bytes_log);
-
-    $logger->info("[bandwidth] User: $user - FQDN: $domain (file: $bytes_log)");
-
-    require Cpanel::Bandwidth::BytesLogs;
-    Cpanel::Bandwidth::BytesLogs::parse( "http/$domain", $bytes_log, ( 1024 * 1024 * 1024 * 9 ), $bw_db );
-
-    $logger->info("[bandwidth] $bytes_log processed");
-
-    $bw_db->write();
-
-    require Cpanel::BandwidthDB::RootCache;
-    local $@;
-    my $root_bw_cache = eval { Cpanel::BandwidthDB::RootCache->new_without_rebuild() };    # best effort, its ok if this fails
-    my $now           = time;
-    cache_bw_for_time_user_domain( $bw_db, $root_bw_cache, $now, $user, $domain, $logger ) if $root_bw_cache;
-
-    return 1;
+    return $file->process_rotated_file();
 }
 
 ###############
 #### helpers ##
 ###############
 
-sub get_domain_for_file {
-    my ($file) = @_;
+sub nginx_process_stats_log {
+    my ($self) = @_;
 
-    my $domain = $file;
-    $domain =~ s{.*/}{};
-    $domain =~ s/(?:-\w+_log)?(?:\.[0-9]+)?$//;
+    if ( $self->piped_logging_enabled ) {
 
-    die "Could not get domain from “$file”\n" if !$domain;
-    return $domain;
+        # if !$self->is_ssl ignore SSL from first :443 column
+        print "TODO: process “" . $self->path . "” under piped logging\n";
+    }
+    else {
+
+        # if not !$self->is_ssl get SSL from first :443 column
+        print "TODO: process “" . $self->path . "” under unpiped logging\n";
+    }
+
+    return 1;
 }
 
-sub get_user_for_file {
-    my ($file) = @_;
+sub _load_logrotate_class {
+#### TODO: break this out for re-useability (w/ proper unit tests and POD) ##
+    package Cpanel::Logrotate::File;
 
-    my $domain = get_domain_for_file($file);
+    use Moo;
 
-    require Cpanel::AcctUtils::DomainOwner::Tiny;
-    my $user = Cpanel::AcctUtils::DomainOwner::Tiny::getdomainowner( $domain, { default => undef } );
-
-    die "Could not determine owner of “$domain”\n" if !$user;
-    return $user;
-}
-
-##################
-##### bandwidth ##
-##################
-
-sub cache_bw_for_time_user_domain {
-    my ( $bw_db, $root_bw_cache, $now, $user, $domain, $logger ) = @_;
-    return if !$root_bw_cache;    # just in case, again, just a best effort
-
-    my ( $thismonth, $thisyear ) = ( localtime($now) )[ 4, 5 ];
-    $thismonth++;
-    $thisyear += 1900;
-
-    my $total_ar = $bw_db->get_bytes_totals_as_array(
-        start     => "$thisyear-$thismonth",
-        end       => "$thisyear-$thismonth",
-        protocols => ['http'],
-        domains   => [$domain],
-        grouping  => [],
+    has process_bytes_log => (
+        is  => "rw",
+        isa => sub { die "must be a coderef" unless ref( $_[0] ) eq 'CODE' },
+    );
+    has process_stats_log => (
+        is  => "rw",
+        isa => sub { die "must be a coderef" unless ref( $_[0] ) eq 'CODE' },
     );
 
-    my $total_num = $total_ar->[0][0] || 0;
+    has path => (
+        is       => "ro",
+        required => 1,
+        isa      => sub {
+            my ($rotated_file) = @_;
 
-    $logger->info("[bandwidth] User: $user - FQDN: $domain (total bytes from nginx `http` $thisyear-$thismonth: $total_num)");
+            die "No file given\n" if !$rotated_file;    # undef, "", and 0 are all invalid paths here
 
-    my $user_id   = $root_bw_cache->get_or_create_id_for_user($user);
-    my $domain_id = $root_bw_cache->get_or_create_id_for_domain($domain);
-    local $@;
-    eval {
-        $root_bw_cache->set_user_domain_year_month_bytes(
-            $user_id,
-            $domain_id,
-            $thisyear,
-            $thismonth,
-            $total_num,
+            # * is not valid in log file names since it has meaning to logrotate
+            die "Pattern given instead of single file (logrotate’s `sharedscripts` enabled?)\n" if index( $rotated_file => '*' ) != -1;
+
+            if ( substr( $rotated_file, -2, 2 ) ne ".1" ) {
+                warn "Given file does not end in .1 (i.e. it is not the most recently rotated file)\n";
+            }
+
+            return 1;
+        },
+    );
+
+    has piped_logging_enabled => (
+        is      => "ro",
+        lazy    => 1,
+        default => sub {
+            require Whostmgr::TweakSettings;
+            return Whostmgr::TweakSettings::get_value( Main => "enable_piped_logs" );
+        },
+    );
+
+    has protocol => (
+        is       => "ro",
+        required => 1,
+        isa      => sub { die "can only contain [a-zA-Z0-9_]\n" unless $_[0] =~ m/\A[a-zA-Z0-9_]+\z/; },
+    );
+
+    has server => (
+        is       => "ro",
+        required => 1,
+        isa      => sub { die "can only contain [a-zA-Z0-9_]\n" unless $_[0] =~ m/\A[a-zA-Z0-9_]+\z/; },
+    );
+
+    has domain => (
+        is      => "ro",
+        lazy    => 1,
+        default => sub {
+            my ($self) = @_;
+
+            my $domain = $self->path;
+            $domain =~ s{.*/}{};
+            $domain =~ s/(?:-\w+_log)?(?:\.[0-9]+)?$//;
+
+            die "Could not get domain from “" . $self->path . "”\n" if !$domain;
+            return $domain;
+        },
+    );
+
+    has user => (
+        is      => "ro",
+        lazy    => 1,
+        default => sub {
+            my ($self) = @_;
+
+            my $domain = $self->domain;
+
+            require Cpanel::AcctUtils::DomainOwner::Tiny;
+            my $user = Cpanel::AcctUtils::DomainOwner::Tiny::getdomainowner( $domain, { default => undef } );
+
+            die "Could not determine owner of “$domain”\n" if !$user;
+            return $user;
+        },
+    );
+
+    has logger => (
+        is      => "rw",
+        lazy    => 1,
+        default => sub {
+            require Cpanel::Logger::Persistent;
+            return Cpanel::Logger::Persistent->new( { alternate_logfile => '/usr/local/cpanel/logs/logrotate' } );
+        },
+    );
+
+    sub is_bytes {
+        my ($self) = @_;
+        return $self->path =~ m/-bytes_log(?:\.[0-9]+)?$/;
+    }
+
+    sub is_ssl {
+        my ($self) = @_;
+        return $self->path =~ m/-ssl_log(?:\.[0-9]+)?$/;
+    }
+
+    sub process_rotated_file {
+        my ($self) = @_;
+
+        die "log processing must be started as root\n" if $< != 0;
+        if ( $self->is_bytes ) {
+
+            # as root
+            return $self->process_bytes_log ? $self->process_bytes_log->($self) : $self->std_process_bytes_log;
+        }
+        else {
+            # as user
+            return $self->process_stats_log ? $self->process_stats_log->($self) : $self->std_process_stats_log;
+        }
+
+        return 1;
+    }
+
+    sub std_process_stats_log {
+        my ($self) = @_;
+        print "TODO: std_process_stats_log()\n";
+    }
+
+    sub std_process_bytes_log {
+        my ($self) = @_;
+
+        my $user      = $self->user;
+        my $domain    = $self->domain;
+        my $bytes_log = $self->path;
+
+        require Cpanel::BandwidthDB;
+        my $bw_db = Cpanel::BandwidthDB::get_writer($user);
+
+        $self->logger->info("[bandwidth] User: $user - FQDN: $domain (file: $bytes_log)");
+
+        require Cpanel::Bandwidth::BytesLogs;
+        Cpanel::Bandwidth::BytesLogs::parse( $self->protocol . "/$domain", $bytes_log, ( 1024 * 1024 * 1024 * 9 ), $bw_db );
+        $self->logger->info("[bandwidth] $bytes_log processed");
+
+        $bw_db->write();
+        $self->logger->info("[bandwidth] $bytes_log written");
+
+        $self->bw_try_cache( bw_db => $bw_db );
+
+        return 1;
+    }
+
+    sub bw_try_cache {
+        my ( $self, %args ) = @_;
+        $args{now} //= time;
+        my $bw_db = $args{bw_db};
+
+        require Cpanel::BandwidthDB::RootCache;
+        local $@;
+        my $root_bw_cache = eval { Cpanel::BandwidthDB::RootCache->new_without_rebuild() };    # best effort, its ok if this fails
+
+        return if !$root_bw_cache;                                                             # just in case, again, just a best effort
+
+        my $user   = $self->user;
+        my $domain = $self->domain;
+
+        my ( $thismonth, $thisyear ) = ( localtime( $args{now} ) )[ 4, 5 ];
+        $thismonth++;
+        $thisyear += 1900;
+
+        my $protocol = $self->protocol;
+        my $total_ar = $bw_db->get_bytes_totals_as_array(
+            start     => "$thisyear-$thismonth",
+            end       => "$thisyear-$thismonth",
+            protocols => [$protocol],
+            domains   => [$domain],
+            grouping  => [],
         );
-    };
-    warn $@ if $@;
 
-    return;
+        my $total_num = $total_ar->[0][0] || 0;
+
+        $self->logger->info( "[bandwidth] User: $user - FQDN: $domain (total bytes from " . $self->server . " `$protocol` $thisyear-$thismonth: $total_num)" );
+
+        my $user_id   = $root_bw_cache->get_or_create_id_for_user($user);
+        my $domain_id = $root_bw_cache->get_or_create_id_for_domain($domain);
+        local $@;
+        eval {
+            $root_bw_cache->set_user_domain_year_month_bytes(
+                $user_id,
+                $domain_id,
+                $thisyear,
+                $thismonth,
+                $total_num,
+            );
+        };
+        warn $@ if $@;
+
+        return;
+    }
 }
 
 1;
