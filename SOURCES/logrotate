@@ -1,7 +1,6 @@
 /var/log/nginx/*.log {
-        daily
         missingok
-        rotate 52
+        rotate 21
         compress
         delaycompress
         notifempty
@@ -15,14 +14,12 @@
 }
 
 /var/log/nginx/domains/* {
-        daily
         missingok
-        rotate 52
+        rotate 21
         compress
         delaycompress
         notifempty
         create 640 nobody adm
-        sharedscripts
         prerotate
                 killall -SIGHUP --quiet splitlogs # flush logs to disk if needed
                 exit 0
