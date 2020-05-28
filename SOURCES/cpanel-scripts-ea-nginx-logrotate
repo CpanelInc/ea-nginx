@@ -7,7 +7,7 @@
 use strict;
 use warnings;
 
-use Whostmgr::TweakSettings ();
+#### TODO: optimize/cache make reusable what can be (CPAN maybe?)
 
 package scripts::ea_nginx::logrotate;
 
@@ -19,23 +19,134 @@ sub run {
     die "No file given\n" if !$rotated_file;    #undef, "", and 0 are all invalid paths here
 
     # * is not valid in log file names since it has meaning to logrotate
-    die "Pattern given instead of single file (`sharedscripts` enabled?)\n" if index( $rotated_file => '*' ) != -1;    # or should we allow globs (i.e. under `sharedscripts`)? it’d be a mix of users …
+    die "Pattern given instead of single file (logrotate’s `sharedscripts` enabled?)\n" if index( $rotated_file => '*' ) != -1;    # or should we allow globs (i.e. under `sharedscripts`)? it’d be a mix of users …
 
     if ( substr( $rotated_file, -2, 2 ) ne ".1" ) {
         warn "Given file does not end in .1 (i.e. it is not the most recently rotated file)\n";
     }
 
-    my $piped_logging_enabled = Whostmgr::TweakSettings::get_value( Main => "enable_piped_logs" );
-    if ($piped_logging_enabled) {
-        print "TODO: process “$rotated_file” under piped logging\n";
+    my $user = get_user_for_file($rotated_file);
+
+    require Cpanel::Logger::Persistent;
+    my $logger = Cpanel::Logger::Persistent->new( { alternate_logfile => '/usr/local/cpanel/logs/logrotate' } );
+
+    if ( $rotated_file =~ m/-bytes_log(?:\.[0-9]+)?$/ ) {
+        return process_bytes_log( $user => $rotated_file, $logger );
     }
     else {
-        print "TODO: process “$rotated_file” under unpiped logging\n";
+        require Whostmgr::TweakSettings;
+        my $piped_logging_enabled = Whostmgr::TweakSettings::get_value( Main => "enable_piped_logs" );
+
+        if ($piped_logging_enabled) {
+
+            # if not -ssl_log ignore SSL from first :443 column
+            print "TODO: process “$rotated_file” under piped logging\n";
+        }
+        else {
+
+            # if not -ssl_log get SSL from first :443 column
+            print "TODO: process “$rotated_file” under unpiped logging\n";
+        }
     }
+
+    return 1;
+}
+
+#######################
+#### file processors ##
+#######################
+
+sub process_bytes_log {
+    my ( $user, $bytes_log, $logger ) = @_;
+
+    require Cpanel::BandwidthDB;
+    my $bw_db  = Cpanel::BandwidthDB::get_writer($user);
+    my $domain = get_domain_for_file($bytes_log);
+
+    $logger->info("[bandwidth] User: $user - FQDN: $domain (file: $bytes_log)");
+
+    require Cpanel::Bandwidth::BytesLogs;
+    Cpanel::Bandwidth::BytesLogs::parse( "http/$domain", $bytes_log, ( 1024 * 1024 * 1024 * 9 ), $bw_db );
+
+    $logger->info("[bandwidth] $bytes_log processed");
+
+    $bw_db->write();
+
+    require Cpanel::BandwidthDB::RootCache;
+    local $@;
+    my $root_bw_cache = eval { Cpanel::BandwidthDB::RootCache->new_without_rebuild() };    # best effort, its ok if this fails
+    my $now           = time;
+    cache_bw_for_time_user_domain( $bw_db, $root_bw_cache, $now, $user, $domain, $logger ) if $root_bw_cache;
+
+    return 1;
 }
 
 ###############
 #### helpers ##
 ###############
+
+sub get_domain_for_file {
+    my ($file) = @_;
+
+    my $domain = $file;
+    $domain =~ s{.*/}{};
+    $domain =~ s/(?:-\w+_log)?(?:\.[0-9]+)?$//;
+
+    die "Could not get domain from “$file”\n" if !$domain;
+    return $domain;
+}
+
+sub get_user_for_file {
+    my ($file) = @_;
+
+    my $domain = get_domain_for_file($file);
+
+    require Cpanel::AcctUtils::DomainOwner::Tiny;
+    my $user = Cpanel::AcctUtils::DomainOwner::Tiny::getdomainowner( $domain, { default => undef } );
+
+    die "Could not determine owner of “$domain”\n" if !$user;
+    return $user;
+}
+
+##################
+##### bandwidth ##
+##################
+
+sub cache_bw_for_time_user_domain {
+    my ( $bw_db, $root_bw_cache, $now, $user, $domain, $logger ) = @_;
+    return if !$root_bw_cache;    # just in case, again, just a best effort
+
+    my ( $thismonth, $thisyear ) = ( localtime($now) )[ 4, 5 ];
+    $thismonth++;
+    $thisyear += 1900;
+
+    my $total_ar = $bw_db->get_bytes_totals_as_array(
+        start     => "$thisyear-$thismonth",
+        end       => "$thisyear-$thismonth",
+        protocols => ['http'],
+        domains   => [$domain],
+        grouping  => [],
+    );
+
+    my $total_num = $total_ar->[0][0] || 0;
+
+    $logger->info("[bandwidth] User: $user - FQDN: $domain (total bytes from nginx `http` $thisyear-$thismonth: $total_num)");
+
+    my $user_id   = $root_bw_cache->get_or_create_id_for_user($user);
+    my $domain_id = $root_bw_cache->get_or_create_id_for_domain($domain);
+    local $@;
+    eval {
+        $root_bw_cache->set_user_domain_year_month_bytes(
+            $user_id,
+            $domain_id,
+            $thisyear,
+            $thismonth,
+            $total_num,
+        );
+    };
+    warn $@ if $@;
+
+    return;
+}
 
 1;
