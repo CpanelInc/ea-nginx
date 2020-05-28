@@ -37,19 +37,20 @@ sub nginx_process_stats_log {
     if ( $self->piped_logging_enabled ) {
 
         # if !$self->is_ssl ignore SSL from first :443 column
-        print "TODO: process “" . $self->path . "” under piped logging\n";
+        $self->logger->info( "TODO: process “" . $self->path . "” under piped logging" );
     }
     else {
 
         # if not !$self->is_ssl get SSL from first :443 column
-        print "TODO: process “" . $self->path . "” under unpiped logging\n";
+        $self->logger->info( "TODO: process “" . $self->path . "” under unpiped logging" );
     }
 
     return 1;
 }
 
 sub _load_logrotate_class {
-#### TODO: break this out for re-useability (w/ proper unit tests and POD) ##
+
+    #### TODO: break this out for re-useability (w/ proper unit tests and POD) ##
     package Cpanel::Logrotate::File;
 
     use Moo;
@@ -163,7 +164,7 @@ sub _load_logrotate_class {
             return $self->process_bytes_log ? $self->process_bytes_log->($self) : $self->std_process_bytes_log;
         }
         else {
-            # as user
+            # TODO: as user
             return $self->process_stats_log ? $self->process_stats_log->($self) : $self->std_process_stats_log;
         }
 
