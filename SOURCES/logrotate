@@ -23,7 +23,7 @@
         prerotate
                 killall -SIGHUP --quiet splitlogs # flush logs to disk if needed
                 exit 0
-        endrotate
+        endscript
         postrotate
                 if [ -f /var/run/nginx.pid ]; then
                         kill -USR1 `cat /var/run/nginx.pid`
