@@ -16,6 +16,11 @@ exit( run(@ARGV) ? 0 : 1 ) if !caller;
 sub run {
     my ($rotated_file) = @_;
 
+    die "No file given\n" if !$rotated_file;    #undef, "", and 0 are all invalid paths here
+
+    # * is not valid in log file names since it has meaning to logrotate
+    die "Pattern given instead of single file (`sharedscripts` enabled?)\n" if index( $rotated_file => '*' ) != -1;    # or should we allow globs (i.e. under `sharedscripts`)? it’d be a mix of users …
+
     if ( substr( $rotated_file, -2, 2 ) ne ".1" ) {
         warn "Given file does not end in .1 (i.e. it is not the most recently rotated file)\n";
     }
