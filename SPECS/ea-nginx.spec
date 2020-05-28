@@ -79,7 +79,6 @@ Source5: nginx.vh.default.conf
 Source7: nginx-debug.sysconf
 Source8: nginx.service
 Source9: nginx.upgrade.sh
-Source10: nginx.suse.logrotate
 Source11: nginx-debug.service
 Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
@@ -226,13 +225,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 # install log rotation stuff
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
-%if 0%{?suse_version}
-%{__install} -m 644 -p %{SOURCE10} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/nginx
-%else
 %{__install} -m 644 -p %{SOURCE1} \
     $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/nginx
-%endif
 
 %{__install} -m755 %{bdir}/objs/nginx-debug \
     $RPM_BUILD_ROOT%{_sbindir}/nginx-debug
