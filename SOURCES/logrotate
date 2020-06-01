@@ -14,12 +14,15 @@
 }
 
 /var/log/nginx/domains/* {
+        olddir /var/log/nginx/domains.rotated
+        createolddir 711 root root
         missingok
         rotate 21
         compress
         delaycompress
         notifempty
         nodateext
+        nosharedscripts
         prerotate
                 killall -SIGHUP --quiet splitlogs # flush logs to disk if needed
                 exit 0
@@ -28,6 +31,24 @@
                 if [ -f /var/run/nginx.pid ]; then
                         kill -USR1 `cat /var/run/nginx.pid`
                 fi
-                /usr/local/cpanel/scripts/ea-nginx-logrotate $1.1
+
+                if [ ! -z "$2" ]; then
+                    # v3.16.0
+                    # Normally (i.e. not under `sharedscripts`),
+                    # the absolute path to the log file is passed as the first argument to the script and
+                    # the absolute path to the final rotated log file is passed as the second argument
+                    /usr/local/cpanel/scripts/ea-nginx-logrotate $2
+                else
+                   # v3.8.6
+                   # Normally (i.e. not under `sharedscripts`),
+                   # the absolute path to the log file is passed as first argument to the script.
+                   just_rotated_path="$1.1";
+
+                   # this will work when /bin/sh -> /bin/bash or /bin/zsh
+                   # just_rotated_path=${just_rotated_path/\/var\/log\/nginx\/domains\//\/var\/log\/nginx\/domains.rotated\/}
+                   # this will work when /bin/sh -> /bin/dash or /bin/bash or /bin/zsh
+                   just_rotated_path=$(echo "$just_rotated_path" | sed "s/\/var\/log\/nginx\/domains\//\/var\/log\/nginx\/domains.rotated\//")
+                   /usr/local/cpanel/scripts/ea-nginx-logrotate $just_rotated_path
+                fi
         endscript
 }

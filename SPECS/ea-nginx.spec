@@ -155,6 +155,8 @@ cp -f %{SOURCE25} .
 %{__rm} -f $RPM_BUILD_ROOT%{_sysconfdir}/nginx/fastcgi.conf
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/log/nginx/domains
+%{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/log/nginx/domains.rotated
+
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/run/nginx
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/cache/nginx
 
@@ -326,6 +328,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %attr(0755,root,root) %dir %{_localstatedir}/cache/nginx
 %attr(0755,root,root) %dir %{_localstatedir}/log/nginx
 %attr(0711,root,root) %dir %{_localstatedir}/log/nginx/domains
+%attr(0711,root,root) %dir %{_localstatedir}/log/nginx/domains.rotated
 
 %dir %{_datadir}/doc/%{upstream_name}-%{main_version}
 %doc %{_datadir}/doc/%{upstream_name}-%{main_version}/COPYRIGHT
