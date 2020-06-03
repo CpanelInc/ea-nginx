@@ -6,6 +6,7 @@
 
 use strict;
 use warnings;
+use Try::Tiny;
 
 package scripts::ea_nginx::logrotate;
 
@@ -59,6 +60,7 @@ sub _load_logrotate_class {
         is  => "rw",
         isa => sub { die "must be a coderef" unless ref( $_[0] ) eq 'CODE' },
     );
+
     has process_stats_log => (
         is  => "rw",
         isa => sub { die "must be a coderef" unless ref( $_[0] ) eq 'CODE' },
@@ -144,6 +146,64 @@ sub _load_logrotate_class {
         },
     );
 
+    has stats_apps_conf => (
+        is      => "ro",
+        lazy    => 1,
+        default => sub {
+
+            # A simpler/saner(-ish) version of Cpanel::Logd::get_userLogConfig()
+            my %apps;
+
+            require Cpanel::Config::LoadCpUserFile;
+            require Cpanel::Config::LoadConfig;
+            require Cpanel::Config::LoadCpConf;
+            my $cpuser = Cpanel::Config::LoadCpUserFile::loadcpuserfile($user);
+            my $cpconf = {
+
+                # partially from libexec/cpanellogd’s loadcpconfWithDefaults()
+                # defaults
+                skipanalog   => 0,
+                skipwebalize => 0,
+                skipawstats  => 1,
+
+                # actual settings
+                Cpanel::Config::LoadCpConf::loadcpconf()
+            };
+            my $stconf = Cpanel::Config::LoadConfig::loadConfig('/etc/stats.conf');
+
+            my @stat_apps = $cpuser->{STATGENS} ? map { lc } split( /,/, $cpuser->{STATGENS} ) : qw(webalizer awstats analog);
+
+            for my $app (@stat_apps) {
+                $apps{$app} = $cpconf->{"skip$app"} ? 0 : 1;
+            }
+
+            if ( $stconf->{DEFAULTGENS} ) {
+                for my $defapp ( map { lc } split( /,/, $stconf->{DEFAULTGENS} ) ) {
+                    $apps{$defapp}++;
+                }
+            }
+
+            if ( defined $stconf->{VALIDUSERS} && defined $stconf->{ALLOWALL} && lc( $stconf->{ALLOWALL} ) ne 'yes' ) {
+                my %validusers;
+                @validusers{ split( /,/, $stconf->{VALIDUSERS} ) } = ();
+                return \%apps if !exists $validusers{ $self->user };
+            }
+
+            require Cpanel::PwCache;
+            my $homedir = Cpanel::PwCache::gethomedir($user);
+            if ( -e "$homedir/tmp/stats.conf" ) {
+                my $u_conf_hr = Cpanel::Config::LoadConfig::loadConfig("$homedir/tmp/stats.conf") || {};
+
+                foreach my $key ( sort keys %{$u_conf_hr} ) {
+                    my ( $app, $dom ) = split( /-/, $key, 2 );
+                    $apps{$app}{$dom}++ if lc $u_conf_hr->{$key} eq 'yes';
+                }
+            }
+
+            return \%apps;
+        },
+    );
+
     sub is_bytes {
         my ($self) = @_;
         return $self->path =~ m/-bytes_log(?:\.[0-9]+)?$/;
@@ -159,12 +219,9 @@ sub _load_logrotate_class {
 
         die "log processing must be started as root\n" if $< != 0;
         if ( $self->is_bytes ) {
-
-            # as root
             return $self->process_bytes_log ? $self->process_bytes_log->($self) : $self->std_process_bytes_log;
         }
         else {
-            # TODO: as user
             return $self->process_stats_log ? $self->process_stats_log->($self) : $self->std_process_stats_log;
         }
 
@@ -173,7 +230,111 @@ sub _load_logrotate_class {
 
     sub std_process_stats_log {
         my ($self) = @_;
-        print "TODO: std_process_stats_log()\n";
+        my $log = $self->path;
+
+        $self->make_user_readable;
+        my $stats_apps_conf = $self->stats_apps_conf;
+
+        require Cpanel::Locale;
+        require Cpanel::Logd;
+        require Cpanel::PwCache;
+        require Cpanel::SafeDir::MK;
+        require Cpanel::Config::userdata::Load;
+        require Cpanel::AccessIds::ReducedPrivileges;    # is in at least 76
+        return Cpanel::AccessIds::ReducedPrivileges::call_as_user(
+            sub {
+                my $user           = $self->user;
+                my $domain         = $self->domain;
+                my $domains        = Cpanel::Config::userdata::Load::load_userdata_main($user);
+                my $locale         = Cpanel::Locale->get_handle();
+                my $logdir         = $self->is_ssl ? '/ssl' : '';
+                my $homedir        = Cpanel::PwCache::gethomedir($user);
+                my $domain_is_main = exists $domains->{main_domain} && $domains->{main_domain} eq $domain ? 1 : 0;
+
+                for my $stats_app (qw(webalizer analog awstats)) {
+                    next if !$stats_apps_conf->{$stats_app};
+                    next if ref( $stats_apps_conf->{$stats_app} ) eq 'HASH' && !exists $stats_apps_conf->{$stats_app}{$domain};
+
+                    $self->logger->info("[stats] User: $user - FQDN: $domain (file: $log)");
+
+                    try {
+                        my $meth = "_run_$stats_app";
+                        $self->$meth(
+                            access_log     => $log,
+                            domain         => $domain,
+                            locale         => $locale,
+                            logdir         => $logdir,
+                            domain_is_main => $domain_is_main,
+                            homedir        => $homedir,
+                            domains        => $domains,
+                        );
+                    }
+                    catch {
+                        $self->logger->info("[stats] $log failed\n$_");
+                    }
+                    finally {
+                        $self->logger->info("[stats] $log processed") if !@_;    # if there was no error caught
+                    };
+                }
+            },
+            $self->user
+        );
+    }
+
+    sub make_user_readable {
+        my ($self) = @_;
+        my $log = $self->path;
+
+        # best effort to ensure user can read $log
+        my $gid = getgrnam( $self->user );
+        chmod 0640, $log;
+        chown 0, $gid, $log;
+
+        return 1;
+    }
+
+    sub _run_webalizer {
+        my ( $self, %args ) = @_;
+
+        my $applang = $args{locale}->cpanel_get_3rdparty_lang('webalizer') || 'en';
+
+        my $outputdir =
+          !$args{logdir} && $args{domain_is_main}
+          ? "$args{homedir}/tmp/webalizer"
+          : "$args{homedir}/tmp/webalizer$args{logdir}/$args{domain}";
+        Cpanel::SafeDir::MK::safemkdir( $outputdir => 0700 );
+
+        return Cpanel::Logd::_webalizerGo( $applang, $outputdir, $args{access_log}, $args{domain} );    # last arg is “log name”
+    }
+
+    sub _run_analog {
+        my ( $self, %args ) = @_;
+
+        my $applang = $args{locale}->cpanel_get_3rdparty_lang('analog') || 'en';
+
+        my $outputdir =
+          !$args{logdir} && $args{domain_is_main}
+          ? "$args{homedir}/tmp/analog"
+          : "$args{homedir}/tmp/analog$args{logdir}/$args{domain}";
+        Cpanel::SafeDir::MK::safemkdir( $outputdir => 0700 );
+
+        return Cpanel::Logd::_analogGo( $applang, $outputdir, $args{access_log}, $args{domain} );    # last arg is “log name”
+    }
+
+    sub _run_awstats {
+        my ( $self, %args ) = @_;
+
+        my $outputdir = "$args{homedir}/tmp/awstats$args{logdir}";
+        Cpanel::SafeDir::MK::safemkdir( $outputdir => 0700 );
+
+        my $domain_list = [
+            @{ $args{domains}{parked_domains} },
+            @{ $args{domains}{sub_domains} },
+            keys %{ $args{domains}{addon_domains} },
+        ];
+
+        local $ENV{AWSTATS_SSL_DIR} = $self->is_ssl ? 1 : 0;    # AWSTATS_SSL_DIR is used internally by awstats.pl
+        return Cpanel::Logd::_awstatsGo( $outputdir, $args{access_log}, $args{domain}, $args{domains}{main_domain}, $domain_list );
     }
 
     sub std_process_bytes_log {
