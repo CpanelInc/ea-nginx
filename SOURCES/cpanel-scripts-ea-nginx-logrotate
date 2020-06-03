@@ -7,6 +7,7 @@
 use strict;
 use warnings;
 use Try::Tiny;
+use Path::Tiny;
 
 package scripts::ea_nginx::logrotate;
 
@@ -35,18 +36,48 @@ sub run {
 sub nginx_process_stats_log {
     my ($self) = @_;
 
+    # nginx SSL requests get an extra colum prepeneded for SSL requests: `$domain:443`
     if ( $self->piped_logging_enabled ) {
 
-        # if !$self->is_ssl ignore SSL from first :443 column
-        $self->logger->info( "TODO: process “" . $self->path . "” under piped logging" );
+        # piped logging w/ nginx has -ssl_log file under piped logging (splitlogs)
+        # so we want to edit non-SSL $self->path and remove 1st column if its :443
+        if ( !$self->is_ssl ) {
+            path( $self->path )->edit_lines( sub { $_ =~ s/^\S+:443\s+//; } );
+        }
+
+        return $self->std_process_bytes_log;
     }
     else {
+        # not-piped logging w/ does not do -ssl_log
+        # so we want to create one from the first :443 column and process that seperately
+        if ( !$self->is_ssl ) {
 
-        # if not !$self->is_ssl get SSL from first :443 column
-        $self->logger->info( "TODO: process “" . $self->path . "” under unpiped logging" );
+            my $ssl_log = $self->path . "-ssl_log";
+
+            # create $ssl_log based on first column of $self->path
+            # remove frist column from $self->path if its :443
+            my $ssl_fh = path($ssl_log)->openw;
+            path( $self->path )->edit_lines(
+                sub {
+                    if ( $_ =~ s/^\S+:443\s+// ) {
+                        print {$ssl_fh} $_;
+                    }
+                }
+            );
+            close $ssl_fh;
+
+            my $ssl = Cpanel::Logrotate::File->new(
+                path     => $ssl_log,
+                protocol => scalar( $self->protocol ),
+                server   => scalar( $self->server ),
+            );
+            $ssl->std_process_stats_log;
+        }
+
+        return $self->std_process_stats_log;
     }
 
-    return 1;
+    return;
 }
 
 sub _load_logrotate_class {
