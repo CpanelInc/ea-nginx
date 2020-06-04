@@ -181,6 +181,8 @@ sub _load_logrotate_class {
         is      => "ro",
         lazy    => 1,
         default => sub {
+            my ($self) = @_;
+            my $user = $self->user;
 
             # TODO: cache me to /var/cpanel/cache/userstatsconfig/$user (in ZC-6949 perhaps?)
 
