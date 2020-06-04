@@ -36,20 +36,20 @@ sub run {
 sub nginx_process_stats_log {
     my ($self) = @_;
 
-    # nginx SSL requests get an extra colum prepeneded for SSL requests: `$domain:443`
     if ( $self->piped_logging_enabled ) {
 
-        # piped logging w/ nginx has -ssl_log file under piped logging (splitlogs)
-        # so we want to edit non-SSL $self->path and remove 1st column if its :443
-        if ( !$self->is_ssl ) {
-            path( $self->path )->edit_lines( sub { $_ =~ s/^\S+:443\s+//; } );
-        }
-
+        # piped logging w/ nginx:
+        #  1. has -ssl_log file (splitlogs)
+        #  2. does not add the extra initial port-related column
         return $self->std_process_bytes_log;
     }
     else {
-        # not-piped logging w/ does not do -ssl_log
-        # so we want to create one from the first :443 column and process that seperately
+        # not-piped logging w/ nginx (because SSL and non-SSL are done int he same server block)
+        #   1. does not do -ssl_log
+        #   2. Adds an extra initial port-related column
+        # so when we get a non-ssl file we want to
+        #   1. create -ssl_log from the first :443 column
+        #   2. remove the :80 column from the non-SSL file
         if ( !$self->is_ssl ) {
 
             my $ssl_log = $self->path . "-ssl_log";
@@ -60,7 +60,11 @@ sub nginx_process_stats_log {
             path( $self->path )->edit_lines(
                 sub {
                     if ( $_ =~ s/^\S+:443\s+// ) {
-                        print {$ssl_fh} $_;
+                        print {$ssl_fh} $_;    # add the modified line to SSL log
+                        $_ = "";               # remove it from non-SSL log
+                    }
+                    else {
+                        $_ =~ s/^\S+:80\s+//    # remove extra port-related column
                     }
                 }
             );
@@ -232,6 +236,7 @@ sub _load_logrotate_class {
                 foreach my $key ( sort keys %{$u_conf_hr} ) {
                     my ( $app, $dom ) = split( /-/, $key, 2 );
                     $apps{$app}{$dom}++ if lc $u_conf_hr->{$key} eq 'yes';
+                    $apps{$app}{"www.$dom"}++ if $apps{$app}{$dom};
                 }
             }
 
@@ -288,7 +293,7 @@ sub _load_logrotate_class {
 
                 for my $stats_app (qw(webalizer analog awstats)) {
                     next if !$stats_apps_conf->{$stats_app};
-                    next if ref( $stats_apps_conf->{$stats_app} ) eq 'HASH' && !exists $stats_apps_conf->{$stats_app}{$domain};
+                    next if ref( $stats_apps_conf->{$stats_app} ) eq 'HASH' && !exists $stats_apps_conf->{$stats_app}{$domain};    # www. and non-www. is in config hash
 
                     $self->logger->info("[stats] User: $user - FQDN: $domain (file: $log)");
 
