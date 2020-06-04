@@ -16,7 +16,7 @@ exit( run(@ARGV) ? 0 : 1 ) if !caller;
 sub run {
     my ($rotated_file) = @_;
 
-    _load_logrotate_class();    # will go away once we do split this out per the TODO comment in the function
+    _load_logrotate_class();    # will go away once we do split this out per the TODO comment (ZC-6949) in the function
 
     # ZC-6912: should we allow globs (i.e. under `sharedscripts`)? it’d be a mix of users to setuid/spork etc
     my $file = Cpanel::Logrotate::File->new(
@@ -82,7 +82,7 @@ sub nginx_process_stats_log {
 
 sub _load_logrotate_class {
 
-    #### TODO: break this out for re-useability (w/ proper unit tests and POD) ##
+    #### TODO: ZC-6949 break this out for re-useability (w/ proper unit tests and POD) ##
     package Cpanel::Logrotate::File;
 
     use Moo;
@@ -181,6 +181,8 @@ sub _load_logrotate_class {
         is      => "ro",
         lazy    => 1,
         default => sub {
+
+            # TODO: cache me to /var/cpanel/cache/userstatsconfig/$user (in ZC-6949 perhaps?)
 
             # A simpler/saner(-ish) version of Cpanel::Logd::get_userLogConfig()
             my %apps;
