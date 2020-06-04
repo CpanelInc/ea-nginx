@@ -6,8 +6,6 @@
 
 use strict;
 use warnings;
-use Try::Tiny;
-use Path::Tiny;
 
 package scripts::ea_nginx::logrotate;
 
@@ -41,7 +39,7 @@ sub nginx_process_stats_log {
         # piped logging w/ nginx:
         #  1. has -ssl_log file (splitlogs)
         #  2. does not add the extra initial port-related column
-        return $self->std_process_bytes_log;
+        return $self->std_process_stats_log;
     }
     else {
         # not-piped logging w/ nginx (because SSL and non-SSL are done int he same server block)
@@ -52,19 +50,23 @@ sub nginx_process_stats_log {
         #   2. remove the :80 column from the non-SSL file
         if ( !$self->is_ssl ) {
 
-            my $ssl_log = $self->path . "-ssl_log";
+            my $ssl_log = $self->path;
+            if ( $ssl_log !~ s/(\.[0-9]+)$/-ssl_log$1/ ) {
+                $ssl_log .= "-ssl_log";
+            }
 
             # create $ssl_log based on first column of $self->path
             # remove frist column from $self->path if its :443
-            my $ssl_fh = path($ssl_log)->openw;
-            path( $self->path )->edit_lines(
+            require Path::Tiny;
+            my $ssl_fh = Path::Tiny::path($ssl_log)->openw;
+            Path::Tiny::path( $self->path )->edit_lines(
                 sub {
                     if ( $_ =~ s/^\S+:443\s+// ) {
-                        print {$ssl_fh} $_;    # add the modified line to SSL log
-                        $_ = "";               # remove it from non-SSL log
+                        print {$ssl_fh} "$_";    # add the modified line to SSL log
+                        $_ = "";                 # remove it from non-SSL log
                     }
                     else {
-                        $_ =~ s/^\S+:80\s+//    # remove extra port-related column
+                        $_ =~ s/^\S+:80\s+//     # remove extra port-related column
                     }
                 }
             );
@@ -89,6 +91,9 @@ sub _load_logrotate_class {
     #### TODO: ZC-6949 break this out for re-useability (w/ proper unit tests and POD) ##
     package Cpanel::Logrotate::File;
 
+    use strict;
+    use warnings;
+    use Try::Tiny;
     use Moo;
 
     has process_bytes_log => (
@@ -291,11 +296,22 @@ sub _load_logrotate_class {
                 my $homedir        = Cpanel::PwCache::gethomedir($user);
                 my $domain_is_main = exists $domains->{main_domain} && $domains->{main_domain} eq $domain ? 1 : 0;
 
+                # This is why nobody likes you cpanellogd:
+                no warnings "redefine", "once";
+
+                package Cpanel::Logd::StatsLog { }
+                my $main_statslog = $self->logger;
+                local @Cpanel::Logger::Persistent::ISA = ( "Cpanel::Logd::StatsLog", @Cpanel::Logger::Persistent::ISA );
+                local $Cpanel::Logd::stats_log_obj     = $main_statslog;
+                local *Cpanel::Logger::Persistent::log = sub { shift; shift; $main_statslog->info(@_) };
+                local *main::StatsLog                  = sub { shift; $main_statslog->info(@_) };
+                use warnings "redefine", "once";
+
                 for my $stats_app (qw(webalizer analog awstats)) {
                     next if !$stats_apps_conf->{$stats_app};
                     next if ref( $stats_apps_conf->{$stats_app} ) eq 'HASH' && !exists $stats_apps_conf->{$stats_app}{$domain};    # www. and non-www. is in config hash
 
-                    $self->logger->info("[stats] User: $user - FQDN: $domain (file: $log)");
+                    $self->logger->info("[stats] [$stats_app] User: $user - FQDN: $domain (file: $log)");
 
                     try {
                         my $meth = "_run_$stats_app";
@@ -310,10 +326,10 @@ sub _load_logrotate_class {
                         );
                     }
                     catch {
-                        $self->logger->info("[stats] $log failed\n$_");
+                        $self->logger->info("[stats] [$stats_app] $log failed\n$_");
                     }
                     finally {
-                        $self->logger->info("[stats] $log processed") if !@_;    # if there was no error caught
+                        $self->logger->info("[stats] [$stats_app] $log processed") if !@_;    # if there was no error caught
                     };
                 }
             },
