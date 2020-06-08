@@ -24,8 +24,12 @@
         nodateext
         nosharedscripts
         prerotate
-                killall -SIGHUP --quiet splitlogs # flush logs to disk if needed
-                exit 0
+                LASTRUNFILE="/var/cpanel/lastrun/splitlogs-flush"
+                SECONDS=3600
+                if [ ! -f "$LASTRUNFILE" ] || [ "$(( $(date +"%s") - $(stat -c "%Y" "$LASTRUNFILE") ))" -gt "$SECONDS" ]; then
+                        killall -SIGHUP --quiet splitlogs # flush logs to disk if needed
+                        touch $LASTRUNFILE
+                fi
         endscript
         postrotate
                 if [ -f /var/run/nginx.pid ]; then
