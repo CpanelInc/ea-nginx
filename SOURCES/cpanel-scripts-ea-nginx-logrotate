@@ -284,6 +284,7 @@ sub _load_logrotate_class {
         require Cpanel::Logd;
         require Cpanel::PwCache;
         require Cpanel::SafeDir::MK;
+        require Cpanel::Config::LoadCpConf;
         require Cpanel::Config::userdata::Load;
         require Cpanel::AccessIds::ReducedPrivileges;    # is in at least 76
         return Cpanel::AccessIds::ReducedPrivileges::call_as_user(
@@ -305,6 +306,8 @@ sub _load_logrotate_class {
                 local $Cpanel::Logd::stats_log_obj     = $main_statslog;
                 local *Cpanel::Logger::Persistent::log = sub { shift; shift; $main_statslog->info(@_) };
                 local *main::StatsLog                  = sub { shift; $main_statslog->info(@_) };
+                local %main::CPCONF                    = Cpanel::Config::LoadCpConf::loadcpconf();
+
                 use warnings "redefine", "once";
 
                 for my $stats_app (qw(webalizer analog awstats)) {
