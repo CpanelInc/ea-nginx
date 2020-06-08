@@ -335,6 +335,8 @@ sub _load_logrotate_class {
                         $self->logger->info("[stats] [$stats_app] $log processed") if !@_;    # if there was no error caught
                     };
                 }
+
+                return 1;
             },
             $self->user
         );
