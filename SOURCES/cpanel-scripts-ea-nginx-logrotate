@@ -410,6 +410,16 @@ sub _load_logrotate_class {
 
         $self->logger->info("[bandwidth] User: $user - FQDN: $domain (file: $bytes_log)");
 
+        # turn high res timestamp (e.g. what nginx does: `1591634459.222 240`)
+        # into low res timestamp that Cpanel::Bandwidth::BytesLogs::parse()
+        # knows how deal with (e.g. what apache does: `1591634459 240`)
+        require Path::Tiny;
+        Path::Tiny::path( $self->path )->edit_lines(
+            sub {
+                $_ =~ s/^([0-9]+)\.[0-9]+\s/$1 /;
+            }
+        );
+
         require Cpanel::Bandwidth::BytesLogs;
         Cpanel::Bandwidth::BytesLogs::parse( $self->protocol . "/$domain", $bytes_log, ( 1024 * 1024 * 1024 * 9 ), $bw_db );
         $self->logger->info("[bandwidth] $bytes_log processed");
