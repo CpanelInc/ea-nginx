@@ -134,7 +134,6 @@ case "$1" in
     start)
         rh_status >/dev/null 2>&1 && exit 0
         start
-        clean_ngx_http_pipelog_module_processes
         ;;
     stop)
         stop
