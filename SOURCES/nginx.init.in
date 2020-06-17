@@ -113,6 +113,8 @@ rh_status() {
 
 clean_ngx_http_pipelog_module_processes() {
     ps -C nginx -o pid,command= --no-headers | grep "nginx: logger process" | awk '{ print $1 }' | xargs -r kill -9
+    ps -C splitlogs -o pid,command= --no-headers | grep "nginx/domains" | awk '{ print $1 }' | xargs -r kill -9
+    return 0
 }
 
 check_reload() {
@@ -132,7 +134,6 @@ case "$1" in
     start)
         rh_status >/dev/null 2>&1 && exit 0
         start
-        clean_ngx_http_pipelog_module_processes
         ;;
     stop)
         stop

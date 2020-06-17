@@ -60,7 +60,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -79,7 +79,6 @@ Source5: nginx.vh.default.conf
 Source7: nginx-debug.sysconf
 Source8: nginx.service
 Source9: nginx.upgrade.sh
-Source10: nginx.suse.logrotate
 Source11: nginx-debug.service
 Source12: COPYRIGHT
 Source13: nginx.check-reload.sh
@@ -95,6 +94,7 @@ Source22: NginxHooks.pm
 Source23: NginxTasks.pm
 Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
+Source26: cpanel-scripts-ea-nginx-logrotate
 
 License: 2-clause BSD-like license
 
@@ -155,6 +155,8 @@ cp -f %{SOURCE25} .
 %{__rm} -f $RPM_BUILD_ROOT%{_sysconfdir}/nginx/fastcgi.conf
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/log/nginx/domains
+%{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/log/nginx/domains.rotated
+
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/run/nginx
 %{__mkdir} -p $RPM_BUILD_ROOT%{_localstatedir}/cache/nginx
 
@@ -188,6 +190,8 @@ mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
 mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
 %{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
 %{__install} -m 755 -p %{SOURCE19} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-userdata
+%{__install} -m 755 -p %{SOURCE26} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-logrotate
+
 ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
@@ -223,13 +227,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 # install log rotation stuff
 %{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
-%if 0%{?suse_version}
-%{__install} -m 644 -p %{SOURCE10} \
-    $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/nginx
-%else
 %{__install} -m 644 -p %{SOURCE1} \
     $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/nginx
-%endif
 
 %{__install} -m755 %{bdir}/objs/nginx-debug \
     $RPM_BUILD_ROOT%{_sbindir}/nginx-debug
@@ -288,6 +287,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-userdata
+%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-logrotate
+
 /usr/local/cpanel/scripts/restartsrv_nginx
 /etc/chkserv.d/nginx
 
@@ -327,6 +328,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %attr(0755,root,root) %dir %{_localstatedir}/cache/nginx
 %attr(0755,root,root) %dir %{_localstatedir}/log/nginx
 %attr(0711,root,root) %dir %{_localstatedir}/log/nginx/domains
+%attr(0711,root,root) %dir %{_localstatedir}/log/nginx/domains.rotated
 
 %dir %{_datadir}/doc/%{upstream_name}-%{main_version}
 %doc %{_datadir}/doc/%{upstream_name}-%{main_version}/COPYRIGHT
@@ -496,6 +498,9 @@ fi
 
 
 %changelog
+* Wed May 27 2020 Daniel Muey <dan@cpanel.net> - 1.19.0-2
+- ZC-5534: process logs via logrotate akin to what cpanellogd does w/ Apache
+
 * Tue May 26 2020 Cory McIntire <cory@cpanel.net> - 1.19.0-1
 - EA-9080: Update ea-nginx from v1.18.0 to v1.19.0
 
