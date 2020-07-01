@@ -1,0 +1,14 @@
+passenger_root [% passenger.global.passenger_root %];
+passenger_enabled off;
+passenger_user_switching on;
+passenger_disable_security_update_check on;
+passenger_instance_registry_dir [% passenger.global.passenger_instance_registry_dir %];
+[%- IF passenger.global.default.ruby %]
+passenger_ruby [% passenger.global.default.ruby %];
+[%- END %]
+[%- IF passenger.global.default.python %]
+passenger_python [% passenger.global.default.python %];
+[%- END %]
+[%- IF passenger.global.default.nodejs %]
+passenger_nodejs [% passenger.global.default.nodejs %];
+[%- END %]

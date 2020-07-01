@@ -142,6 +142,7 @@ sub config {
 
     if ( $user eq '--all' ) {
         _write_global_logging();
+        _write_global_passenger();
 
         mkdir "/etc/nginx/conf.d/users/";
         unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
@@ -168,29 +169,66 @@ sub reload { _reload() }
 
 my $tt;
 
-sub _write_global_logging {
+sub _render_tt_to_file {
+    my ( $tt_file, $output_file, $tt_data ) = @_;
 
     $tt ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
-    my $logging_tt = path("/etc/nginx/ea-nginx/global-logging.tt")->slurp;
-    my $logging_hr = _get_logging_hr();
+
+    my $output_path = "/etc/nginx/conf.d/$output_file";
+    path($output_path)->touchpath;
+
+    my $output_tt = path("/etc/nginx/ea-nginx/$tt_file")->slurp;
 
     $tt->process(
-        \$logging_tt,
-        {
-            logging  => $logging_hr,
-            hostname => scalar( Cpanel::Hostname::gethostname() ),
-        },
+        \$output_tt, $tt_data,
         sub {
             my ($out) = @_;
-            path("/etc/nginx/conf.d/global-logging.conf")->spew($out);
+            path($output_path)->spew($out);
             return 1;
         }
     );
 
     if ( $tt->error() ) {
-        unlink "/etc/nginx/conf.d/global-logging.conf";
-        die $tt->error();
+        my $tt_err = $tt->error();
+        unlink $output_path;
+        die "$tt_err\nFailed to ensure “$output_path” does not exist: $!\n" if -e $output_path;
+        die $tt_err;
     }
+
+    return 1;
+}
+
+sub _write_global_passenger {
+
+    return _render_tt_to_file(
+        'ngx_http_passenger_module.conf.tt' => 'passenger.conf',
+        {
+            passenger => {
+                global => {    #only one ruby and nodejs so, for now, hardcode them
+                    passenger_root                  => "/opt/cpanel/ea-ruby24/root/usr/share/passenger/phusion_passenger/locations.ini",
+                    passenger_instance_registry_dir => "/opt/cpanel/ea-ruby24/root/var/run/passenger-instreg",
+                    default                         => {
+                        ruby   => "/opt/cpanel/ea-ruby24/root/usr/libexec/passenger-ruby24",
+                        python => undef,
+                        nodejs => "/opt/cpanel/ea-nodejs10/bin/node",
+                    },
+                },
+            },
+        },
+    );
+
+}
+
+sub _write_global_logging {
+
+    my $logging_hr = _get_logging_hr();
+    _render_tt_to_file(
+        'global-logging.tt' => 'global-logging.conf',
+        {
+            logging  => $logging_hr,
+            hostname => scalar( Cpanel::Hostname::gethostname() ),
+        },
+    );
 
     my $piped_module_conf = "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf";
     if ( $logging_hr->{piped_logs} ) {
@@ -284,8 +322,27 @@ sub _get_logging_hr {
     return $logging_hr;
 }
 
+my %group_cache;
+
+sub _get_group_for {
+    my ($user) = @_;
+    return $group_cache{$user} if $group_cache{$user};
+
+    # prefer: group same name as user
+    $group_cache{$user} = scalar getgrnam($user) ? $user : undef;
+    return $group_cache{$user} if $group_cache{$user};
+
+    # otherwise: via gid
+    my $gid = ( getpwnam($user) )[3];
+    $group_cache{$user} = getgrgid($gid);
+
+    return $group_cache{$user};
+}
+
 sub _render_and_append {
     my ( $user, $domains ) = @_;
+
+    my $group = _get_group_for($user);
 
     # at this point that file should exist; if it does not we want this to barf so we know about it
     my $cpanel_password_protected_directories = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_password_protected_directories.json");
@@ -297,10 +354,11 @@ sub _render_and_append {
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
     my $docroot = $docroots->{$user}{ $domains->[0] };
 
-    my $basic_auth   = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
-    my $redirects    = _get_redirects( $domains, $cpanel_redirects );
-    my $logging_hr   = _get_logging_hr();
-    my $ssl_redirect = _get_ssl_redirect( $user => $domains );
+    my $basic_auth     = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
+    my $redirects      = _get_redirects( $domains, $cpanel_redirects );
+    my $logging_hr     = _get_logging_hr();
+    my $ssl_redirect   = _get_ssl_redirect( $user => $domains );
+    my $passenger_apps = _get_passenger_apps( $user => $domains );
 
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
@@ -342,6 +400,7 @@ sub _render_and_append {
             ssl_redirect                 => $ssl_redirect,
             domains                      => $domains,
             user                         => $user,
+            group                        => $group,
             ip                           => $ip,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
@@ -353,6 +412,9 @@ sub _render_and_append {
             redirects  => $redirects,
             logging    => $logging_hr,
             ea4conf    => $ea4_conf_hr,
+            passenger  => {
+                apps => $passenger_apps,
+            },
         },
         sub {
             my ($out) = @_;
@@ -372,6 +434,25 @@ sub _render_and_append {
 sub _get_homedir {
     my ($user) = @_;
     return ( getpwnam($user) )[7];
+}
+
+sub _get_passenger_apps {
+    my ( $user, $domains ) = @_;
+    my @apps;
+
+    my %domains;
+    @domains{ @{$domains} } = ();
+
+    my $apps_hr = eval { Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/applications.json") } || {};
+
+    for my $app_name ( sort keys %{$apps_hr} ) {
+        my $app = $apps_hr->{$app_name};
+        if ( $app->{enabled} && exists $domains{ $app->{domain} } ) {
+            push @apps, { ruby => undef, python => undef, nodjs => undef, %{$app} };
+        }
+    }
+
+    return \@apps;
 }
 
 sub _get_ssl_redirect {

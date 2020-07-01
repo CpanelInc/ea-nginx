@@ -92,7 +92,38 @@ server {
         include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     }
         [% END -%]
+    [% END -%]
 
+    [%- IF passenger.apps.size %]
+       [%- FOREACH app IN passenger.apps %]
+    location [% app.base_uri %] {
+        [%- IF app.envvars.size %]
+            [%- FOREACH name IN app.envvars.keys.sort %]
+        passenger_env_var [% name %] "[% app.envvars.$name.dquote %]";
+            [%- END %]
+        [% END -%]
+
+        passenger_user [% user %];
+        passenger_group [% group %];
+        passenger_app_env [% app.deployment_mode %];
+        passenger_enabled on;
+        passenger_base_uri [% app.base_uri %];
+        passenger_app_root "[% app.path.dquote %]";
+        passenger_app_group_name "[% user _ ' - ' _ app.name.dquote %]";
+        [%- IF app.ruby %]
+        passenger_ruby [% app.ruby %];
+        [%- END %]
+        [%- IF app.python %]
+        passenger_python [% app.python %];
+        [%- END %]
+        [%- IF app.nodejs %]
+        passenger_nodejs [% app.nodejs %];
+        [%- END %]
+
+        allow all; # `Allow from all` && newer `Require all granted`
+        autoindex off; # `Options -Indexes` (nginx does not do `MultiViews` so no need for equivalent `Options -MultiViews`)
+    }
+       [% END -%]
     [% END -%]
 
     include conf.d/server-includes/*.conf;

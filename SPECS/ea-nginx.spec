@@ -311,6 +311,7 @@ rm -rf %{bdir}/_passenger_source_code
 %{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
+%{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
