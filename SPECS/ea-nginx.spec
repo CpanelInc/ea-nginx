@@ -70,7 +70,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -528,6 +528,9 @@ fi
 
 
 %changelog
+* Wed Jul 01 2020 Tim Mullin <tim@cpanel.net> - 1.19.0-4
+- EA-9123: Add cPanel-localhost as a proxy header
+
 * Thu Jun 25 2020 Dan Muey <dan@cpanel.net> - 1.19.0-3
 - ZC-7058: compile in passenger module && configure Application Manager apps
 
