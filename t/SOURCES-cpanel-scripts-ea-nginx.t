@@ -131,8 +131,8 @@ describe "ea-nginx script" => sub {
     around {
         no warnings "redefine", "once";
         local $ENV{"scripts::ea_nginx::bail_die"} = 1;
-        local *scripts::ea_nginx::_write_global_logging = sub { };
-
+        local *scripts::ea_nginx::_write_global_logging   = sub { };
+        local *scripts::ea_nginx::_write_global_passenger = sub { };
         use warnings "redefine", "once";
 
         %mi = %conf;

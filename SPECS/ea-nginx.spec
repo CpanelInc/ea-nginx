@@ -13,6 +13,16 @@ Requires: ea-openssl11 >= %{ea_openssl_ver}
 BuildRequires: ea-openssl11 >= %{ea_openssl_ver}
 BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 
+# 6.0.4-2 is when the source is included w/ the apache module
+# also ensures Apache has it and Application Manager will be available
+BuildRequires: ea-ruby24-mod_passenger >= 6.0.4-2
+BuildRequires: ea-ruby24-rubygem-rake >= 0.8.1
+BuildRequires: ea-ruby24-rubygem-passenger
+BuildRequires: ea-ruby24-ruby-devel
+Requires: ea-ruby24-mod_passenger >= 6.0.4-2
+BuildRequires: ea-libcurl >= 7.68.0-2
+BuildRequires: ea-libcurl-devel >= 7.68.0-2
+
 %if 0%{?rhel} == 6
 %define _group System Environment/Daemons
 Requires(pre): shadow-utils
@@ -51,8 +61,8 @@ BuildRequires: systemd
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
-%define WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include
-%define WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib}
+%define WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/ea-ruby24/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
+%define WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib}
 
 %define BASE_CONFIGURE_ARGS $(echo "--prefix=%{_sysconfdir}/nginx --sbin-path=%{_sbindir}/nginx --modules-path=%{_libdir}/nginx/modules --conf-path=%{_sysconfdir}/nginx/nginx.conf --error-log-path=%{_localstatedir}/log/nginx/error.log --http-log-path=%{_localstatedir}/log/nginx/access.log --pid-path=%{_localstatedir}/run/nginx.pid --lock-path=%{_localstatedir}/run/nginx.lock --http-client-body-temp-path=%{_localstatedir}/cache/nginx/client_temp --http-proxy-temp-path=%{_localstatedir}/cache/nginx/proxy_temp --http-fastcgi-temp-path=%{_localstatedir}/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=%{_localstatedir}/cache/nginx/uwsgi_temp --http-scgi-temp-path=%{_localstatedir}/cache/nginx/scgi_temp --user=%{nginx_user} --group=%{nginx_group} --with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module --with-openssl-opt=enable-tls1_3 --with-openssl-opt=no-nextprotoneg")
 
@@ -60,7 +70,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -125,18 +135,34 @@ cp %{SOURCE20} ngx_http_pipelog_module/ngx_http_pipelog_module.c
 cp %{SOURCE21} ngx_http_pipelog_module/config
 
 %build
+
+export PATH=/opt/cpanel/ea-ruby24/root/usr/bin:/opt/cpanel/libcurl/bin:$PATH
+source /opt/cpanel/ea-ruby24/enable
+ruby -v
+
+rm -rf %{bdir}/_passenger_source_code
+cp -rf /opt/cpanel/ea-ruby24/src/passenger-*/ %{bdir}/_passenger_source_code
+
+export LDFLAGS="$LDFLAGS %{WITH_LD_OPT}"
+export CFLAGS="$CFLAGS %{WITH_CC_OPT}"
+export EXTRA_CFLAGS=$CFLAGS
+export EXTRA_CXXFLAGS=$CFLAGS
+export EXTRA_LDFLAGS=$LDFLAGS
+
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
-    --add-dynamic-module=ngx_http_pipelog_module
+    --add-dynamic-module=ngx_http_pipelog_module \
+    --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx \
     %{bdir}/objs/nginx-debug
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
-    --add-dynamic-module=ngx_http_pipelog_module
+    --add-dynamic-module=ngx_http_pipelog_module \
+    --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 
 cp -f %{SOURCE22} .
@@ -245,6 +271,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{__install} -p %{SOURCE24} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
 %{__install} -p %{SOURCE25} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx.conf
 
+rm -rf %{bdir}/_passenger_source_code
+
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
 
@@ -258,6 +286,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %dir %{_sysconfdir}/nginx/conf.d
 %dir %{_sysconfdir}/nginx/conf.d/modules
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
+%ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/passenger.conf
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
@@ -283,6 +312,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
+%{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
@@ -498,6 +528,9 @@ fi
 
 
 %changelog
+* Thu Jun 25 2020 Dan Muey <dan@cpanel.net> - 1.19.0-3
+- ZC-7058: compile in passenger module && configure Application Manager apps
+
 * Wed May 27 2020 Daniel Muey <dan@cpanel.net> - 1.19.0-2
 - ZC-5534: process logs via logrotate akin to what cpanellogd does w/ Apache
 
@@ -538,7 +571,7 @@ fi
 * Tue Oct 22 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-3
 - ZC-5738: Update template key `sslprotocol_list` to `sslprotocol_list_str`
 
-* Wed Oct 01 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-2
+* Tue Oct 01 2019 Daniel Muey <dan@cpanel.net> - 1.17.4-2
 - ZC-4361: Update ea-openssl requirement to v1.1.1 (ZC-5583)
 
 * Fri Sep 27 2019 Cory McIntire <cory@cpanel.net> - 1.17.4-1
