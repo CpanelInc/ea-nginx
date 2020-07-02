@@ -286,6 +286,7 @@ rm -rf %{bdir}/_passenger_source_code
 %dir %{_sysconfdir}/nginx/conf.d
 %dir %{_sysconfdir}/nginx/conf.d/modules
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
+%ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/passenger.conf
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
