@@ -57,7 +57,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.19.0
+%define main_version 1.19.1
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -70,7 +70,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -528,6 +528,9 @@ fi
 
 
 %changelog
+* Thu Jul 09 2020 Cory McIntire <cory@cpanel.net> - 1.19.1-1
+- EA-9149: Update ea-nginx from v1.19.0 to v1.19.1
+
 * Wed Jul 01 2020 Tim Mullin <tim@cpanel.net> - 1.19.0-4
 - EA-9123: Add cPanel-localhost as a proxy header
 
