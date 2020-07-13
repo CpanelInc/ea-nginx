@@ -70,7 +70,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2 
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -96,7 +96,6 @@ Source14: cpanel.tar.gz
 Source15: cpanel-chksrvd
 Source16: cpanel-scripts-ea-nginx
 Source17: FPM_50x.html
-Source18: Nginx.pm
 Source19: cpanel-scripts-ea-nginx-userdata
 Source20: ngx_http_pipelog_module-ngx_http_pipelog_module.c
 Source21: ngx_http_pipelog_module-config
@@ -260,7 +259,6 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
     $RPM_BUILD_ROOT%{_sbindir}/nginx-debug
 
 %{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services
-%{__install} -m 600 -p %{SOURCE18} $RPM_BUILD_ROOT/var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
 
 %{__mkdir} -p $RPM_BUILD_ROOT/var/cpanel/perl5/lib
 %{__mkdir} -p $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel
@@ -366,8 +364,6 @@ rm -rf %{bdir}/_passenger_source_code
 
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/html
 %attr(644, root, root) %{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
-
-%attr(600, root, root) /var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
 
 %attr(0755, root, root) /var/cpanel/perl5/lib/NginxHooks.pm
 %attr(0644, root, root) /var/cpanel/perl/Cpanel/TaskProcessors/NginxTasks.pm
@@ -528,6 +524,10 @@ fi
 
 
 %changelog
+* Mon Jul 13 2020  Dan Muey <dan@cpanel.net> - 1.19.1-3
+- ZC-6985: fix `undefined status from Cpanel::ServiceManager::Services::Nginx for Server Status`
+-    probably other issues as well
+
 * Thu Jul 09 2020 Dan Muey <dan@cpanel.net> - 1.19.1-2
 - ZC-6105: Add license for ngx_http_pipelog_module sources
 
