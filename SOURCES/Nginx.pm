@@ -13,7 +13,7 @@ use Moo;
 use Cpanel::SafeRun::Simple;
 
 extends 'Cpanel::ServiceManager::Base';
-has '+support_reload' => ( is => 'ro', default => 1 );
+has support_reload => ( is => 'ro', default => 1 );    # can not '+support_reload' v82 and lower
 
 sub restart_gracefully {
     my ( $self, %opts ) = @_;
