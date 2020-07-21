@@ -70,7 +70,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -383,7 +383,12 @@ if [ $cpversion -ge 80 ]; then
     # do not let nginx hooks run during upgrade. Use GTE because it can go higher,
     # but anything 2 or greater is still an upgrade.
     # Also deregister the hooks on this step, as that's the right point to do it
-    if [ $1 -ge 2 ]; then
+
+    # ZC-5816: both pre and preun remove our hooks.
+    # meaning it would happen twice on downgrade/upgrade etc, seeing errors on
+    # the 2nd removal.
+    numhooks=`/usr/local/cpanel/bin/manage_hooks list 2> /dev/null | grep 'hook: NginxHooks::' | wc -l`
+    if [ "$numhooks" -ge 1 ]; then
         /usr/local/cpanel/bin/manage_hooks delete module NginxHooks
     fi
 fi
@@ -483,7 +488,13 @@ fi
 # before version 11.80
 cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
 if [ $cpversion -ge 80 ]; then
-    /usr/local/cpanel/bin/manage_hooks delete module NginxHooks
+    # ZC-5816: both pre and preun remove our hooks.
+    # meaning it would happen twice on downgrade/upgrade etc, seeing errors on
+    # the 2nd removal.
+    numhooks=`/usr/local/cpanel/bin/manage_hooks list 2> /dev/null | grep 'hook: NginxHooks::' | wc -l`
+    if [ "$numhooks" -ge 1 ]; then
+        /usr/local/cpanel/bin/manage_hooks delete module NginxHooks
+    fi
 fi
 
 if [ $1 -eq 0 ]; then
@@ -528,6 +539,19 @@ fi
 
 
 %changelog
+* Mon Jul 20 2020 Dan Muey <dan@cpanel.net> - 1.19.1-4
+- ZC-7191: re-enable graceful restarts
+
+* Mon Jul 13 2020 Julian Brown <julian.brown@cpanel.net> - 1.19.1-4
+- ZC-7129: Removing hooks twice on downgrade
+
+* Mon Jul 13 2020  Dan Muey <dan@cpanel.net> - 1.19.1-3
+- ZC-6985: fix `undefined status from Cpanel::ServiceManager::Services::Nginx for Server Status`
+-    probably other issues as well
+
+* Thu Jul 09 2020 Dan Muey <dan@cpanel.net> - 1.19.1-2
+- ZC-6105: Add license for ngx_http_pipelog_module sources
+
 * Thu Jul 09 2020 Cory McIntire <cory@cpanel.net> - 1.19.1-1
 - EA-9149: Update ea-nginx from v1.19.0 to v1.19.1
 
