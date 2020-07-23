@@ -70,7 +70,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 7
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -539,6 +539,9 @@ fi
 
 
 %changelog
+* Thu Jul 23 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-7
+- ZC-7220: Set `proxy_http_version` to 1.1 so that `Upgrade` works
+
 * Thu Jul 23 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-6
 - ZC-7217: Fix changelog entry
 
