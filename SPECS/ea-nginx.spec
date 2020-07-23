@@ -70,7 +70,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -539,7 +539,10 @@ fi
 
 
 %changelog
-* Mon Jul 20 2020 Dan Muey <dan@cpanel.net> - 1.19.1-4
+* Thu Jul 23 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-6
+- ZC-7217: Fix changelog entry
+
+* Mon Jul 20 2020 Dan Muey <dan@cpanel.net> - 1.19.1-5
 - ZC-7191: re-enable graceful restarts
 
 * Mon Jul 13 2020 Julian Brown <julian.brown@cpanel.net> - 1.19.1-4
