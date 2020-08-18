@@ -23,6 +23,8 @@ Requires: ea-ruby24-mod_passenger >= 6.0.4-2
 BuildRequires: ea-libcurl >= 7.68.0-2
 BuildRequires: ea-libcurl-devel >= 7.68.0-2
 
+BuildRequires: ea-modsec30-connector-nginx
+
 %if 0%{?rhel} == 6
 %define _group System Environment/Daemons
 Requires(pre): shadow-utils
@@ -70,7 +72,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -154,6 +156,7 @@ export EXTRA_LDFLAGS=$LDFLAGS
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
     --add-dynamic-module=ngx_http_pipelog_module \
+    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx \
@@ -162,6 +165,7 @@ make %{?_smp_mflags}
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --add-dynamic-module=ngx_http_pipelog_module \
+    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 
@@ -350,6 +354,7 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(0755,root,root) %dir %{_libdir}/nginx
 %attr(0755,root,root) %dir %{_libdir}/nginx/modules
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_pipelog_module.so
+%attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_modsecurity_module.so
 
 %dir %{_datadir}/nginx
 %dir %{_datadir}/nginx/html
@@ -539,6 +544,9 @@ fi
 
 
 %changelog
+* Tue Aug 18 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-8
+- ZC-7366: Add modsec 3.0 support
+
 * Thu Jul 23 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-7
 - ZC-7220: Set `proxy_http_version` to 1.1 so that `Upgrade` works
 
