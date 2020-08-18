@@ -23,7 +23,9 @@ Requires: ea-ruby24-mod_passenger >= 6.0.4-2
 BuildRequires: ea-libcurl >= 7.68.0-2
 BuildRequires: ea-libcurl-devel >= 7.68.0-2
 
+%if 0%{?rhel} > 6
 BuildRequires: ea-modsec30-connector-nginx
+%endif
 
 %if 0%{?rhel} == 6
 %define _group System Environment/Daemons
@@ -156,7 +158,9 @@ export EXTRA_LDFLAGS=$LDFLAGS
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
     --add-dynamic-module=ngx_http_pipelog_module \
+%if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+%endif
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx \
@@ -165,7 +169,9 @@ make %{?_smp_mflags}
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --add-dynamic-module=ngx_http_pipelog_module \
+%if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+%endif
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 
