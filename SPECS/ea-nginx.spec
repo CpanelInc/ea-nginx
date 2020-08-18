@@ -370,7 +370,9 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(0755,root,root) %dir %{_libdir}/nginx
 %attr(0755,root,root) %dir %{_libdir}/nginx/modules
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_pipelog_module.so
+%if 0%{?rhel} > 6
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_modsecurity_module.so
+%endif
 
 %dir %{_datadir}/nginx
 %dir %{_datadir}/nginx/html
