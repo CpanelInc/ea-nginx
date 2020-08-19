@@ -163,6 +163,11 @@ export EXTRA_CFLAGS=$CFLAGS
 export EXTRA_CXXFLAGS=$CFLAGS
 export EXTRA_LDFLAGS=$LDFLAGS
 
+%if 0%{?rhel} > 6
+export MODSECURITY_LIB=/opt/cpanel/ea-modsec30/lib
+export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
+%endif
+
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
