@@ -120,7 +120,6 @@ Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
 Source26: cpanel-scripts-ea-nginx-logrotate
 Patch1: 0001-Fix-auto-feature-test-C-code-to-not-fail-due-to-its-.patch
-Patch2: dantest.patch
 
 License: 2-clause BSD-like license
 
@@ -152,7 +151,6 @@ cp %{SOURCE21} ngx_http_pipelog_module/config
 
 %if 0%{?rhel} > 6
 %patch1 -p1 -b .fixautofeature
-%patch2 -p1 -b .dantest
 %endif
 
 %build
