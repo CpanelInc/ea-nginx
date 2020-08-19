@@ -23,6 +23,12 @@ Requires: ea-ruby24-mod_passenger >= 6.0.4-2
 BuildRequires: ea-libcurl >= 7.68.0-2
 BuildRequires: ea-libcurl-devel >= 7.68.0-2
 
+%if 0%{?rhel} > 6
+Requires: ea-modsec30
+BuildRequires: ea-modsec30
+BuildRequires: ea-modsec30-connector-nginx
+%endif
+
 %if 0%{?rhel} == 6
 %define _group System Environment/Daemons
 Requires(pre): shadow-utils
@@ -61,8 +67,16 @@ BuildRequires: systemd
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
-%define WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/ea-ruby24/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
-%define WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib}
+%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/ea-ruby24/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
+%define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib}
+
+%if 0%{?rhel} > 6
+%define WITH_CC_OPT $(echo "%{BASE_WITH_CC_OPT} -I/opt/cpanel/ea-modsec30/include")
+%define WITH_LD_OPT $(echo "%{BASE_WITH_LD_OPT} -Wl,-rpath=/opt/cpanel/ea-modsec30/lib")
+%else
+%define WITH_CC_OPT $(echo "%{BASE_WITH_CC_OPT}")
+%define WITH_LD_OPT $(echo "%{BASE_WITH_LD_OPT}")
+%endif
 
 %define BASE_CONFIGURE_ARGS $(echo "--prefix=%{_sysconfdir}/nginx --sbin-path=%{_sbindir}/nginx --modules-path=%{_libdir}/nginx/modules --conf-path=%{_sysconfdir}/nginx/nginx.conf --error-log-path=%{_localstatedir}/log/nginx/error.log --http-log-path=%{_localstatedir}/log/nginx/access.log --pid-path=%{_localstatedir}/run/nginx.pid --lock-path=%{_localstatedir}/run/nginx.lock --http-client-body-temp-path=%{_localstatedir}/cache/nginx/client_temp --http-proxy-temp-path=%{_localstatedir}/cache/nginx/proxy_temp --http-fastcgi-temp-path=%{_localstatedir}/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=%{_localstatedir}/cache/nginx/uwsgi_temp --http-scgi-temp-path=%{_localstatedir}/cache/nginx/scgi_temp --user=%{nginx_user} --group=%{nginx_group} --with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module --with-openssl-opt=enable-tls1_3 --with-openssl-opt=no-nextprotoneg")
 
@@ -70,7 +84,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -105,6 +119,7 @@ Source23: NginxTasks.pm
 Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
 Source26: cpanel-scripts-ea-nginx-logrotate
+Patch1: 0001-Fix-auto-feature-test-C-code-to-not-fail-due-to-its-.patch
 
 License: 2-clause BSD-like license
 
@@ -134,6 +149,10 @@ sed -e 's|%%DEFAULTSTART%%||g' -e 's|%%DEFAULTSTOP%%|0 1 2 3 4 5 6|g' \
 cp %{SOURCE20} ngx_http_pipelog_module/ngx_http_pipelog_module.c
 cp %{SOURCE21} ngx_http_pipelog_module/config
 
+%if 0%{?rhel} > 6
+%patch1 -p1 -b .fixautofeature
+%endif
+
 %build
 
 export PATH=/opt/cpanel/ea-ruby24/root/usr/bin:/opt/cpanel/libcurl/bin:$PATH
@@ -149,11 +168,19 @@ export EXTRA_CFLAGS=$CFLAGS
 export EXTRA_CXXFLAGS=$CFLAGS
 export EXTRA_LDFLAGS=$LDFLAGS
 
+%if 0%{?rhel} > 6
+export MODSECURITY_LIB=/opt/cpanel/ea-modsec30/lib
+export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
+%endif
+
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
     --add-dynamic-module=ngx_http_pipelog_module \
+%if 0%{?rhel} > 6
+    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+%endif
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx \
@@ -162,6 +189,9 @@ make %{?_smp_mflags}
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --add-dynamic-module=ngx_http_pipelog_module \
+%if 0%{?rhel} > 6
+    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+%endif
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module
 make %{?_smp_mflags}
 
@@ -350,6 +380,9 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(0755,root,root) %dir %{_libdir}/nginx
 %attr(0755,root,root) %dir %{_libdir}/nginx/modules
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_pipelog_module.so
+%if 0%{?rhel} > 6
+%attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_modsecurity_module.so
+%endif
 
 %dir %{_datadir}/nginx
 %dir %{_datadir}/nginx/html
@@ -539,6 +572,9 @@ fi
 
 
 %changelog
+* Tue Aug 18 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-8
+- ZC-7366: Add modsec 3.0 support
+
 * Thu Jul 23 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-7
 - ZC-7220: Set `proxy_http_version` to 1.1 so that `Upgrade` works
 
