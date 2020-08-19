@@ -119,6 +119,7 @@ Source23: NginxTasks.pm
 Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
 Source26: cpanel-scripts-ea-nginx-logrotate
+Patch1: 0001-Fix-auto-feature-test-C-code-to-not-fail-due-to-its-.patch
 
 License: 2-clause BSD-like license
 
@@ -147,6 +148,10 @@ sed -e 's|%%DEFAULTSTART%%||g' -e 's|%%DEFAULTSTOP%%|0 1 2 3 4 5 6|g' \
 %{__mkdir} -p ngx_http_pipelog_module/
 cp %{SOURCE20} ngx_http_pipelog_module/ngx_http_pipelog_module.c
 cp %{SOURCE21} ngx_http_pipelog_module/config
+
+%if 0%{?rhel} > 6
+%patch1 -p1 -b .fixautofeature
+%endif
 
 %build
 
