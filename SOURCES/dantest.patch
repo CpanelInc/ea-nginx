@@ -1,0 +1,28 @@
+diff --git a/auto/feature b/auto/feature
+index 972b12c..1ecd4f4 100644
+--- a/auto/feature
++++ b/auto/feature
+@@ -45,8 +45,23 @@ ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS $ngx_feature_inc_path \
+ 
+ ngx_feature_inc_path=
+ 
++echo "DEBUG $ngx_feature";
++echo "DEBUG START $ngx_feature" >> $NGX_AUTOCONF_ERR
+ eval "/bin/sh -c \"$ngx_test\" >> $NGX_AUTOCONF_ERR 2>&1"
++echo "DEBUG END $ngx_feature" >> $NGX_AUTOCONF_ERR
++echo "DEBUG $NGX_AUTOTEST.c"
++cat $NGX_AUTOTEST.c
+ 
++echo "DEBUG compile"
++echo  "/bin/sh -c \"$ngx_test\" >> $NGX_AUTOCONF_ERR 2>&1"
++
++echo "DEBUG out"
++cat $NGX_AUTOCONF_ERR
++
++echo "DEBUG BIN RUN"
++./$NGX_AUTOTEST
++
++echo "DEBUG DONE"
+ 
+ if [ -x $NGX_AUTOTEST ]; then
+ 
