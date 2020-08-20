@@ -84,7 +84,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 8
+%define release_prefix 9
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -572,6 +572,9 @@ fi
 
 
 %changelog
+* Thu Aug 20 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-9
+- ZC-7379: Add global script support for config generation
+
 * Tue Aug 18 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-8
 - ZC-7366: Add modsec 3.0 support
 
