@@ -39,11 +39,14 @@ use App::CmdDispatch ();
 use Test::MockFile   ();
 
 my ( @_write_user_conf, @_reload );
-my $orig__write_user_conf = \&scripts::ea_nginx::_write_user_conf;
-my $orig__reload          = \&scripts::ea_nginx::_reload;
+my $orig__write_user_conf        = \&scripts::ea_nginx::_write_user_conf;
+my $orig__reload                 = \&scripts::ea_nginx::_reload;
+my $orig__do_other_global_config = \&scripts::ea_nginx::_do_other_global_config;
+
 no warnings "redefine";
-*scripts::ea_nginx::_write_user_conf = sub { push @_write_user_conf, [@_] };
-*scripts::ea_nginx::_reload          = sub { push @_reload,          [@_] };
+*scripts::ea_nginx::_write_user_conf        = sub { push @_write_user_conf, [@_] };
+*scripts::ea_nginx::_do_other_global_config = sub { };
+*scripts::ea_nginx::_reload                 = sub { push @_reload, [@_] };
 use warnings "redefine";
 
 shared_examples_for "any circular redirect" => sub {
@@ -177,6 +180,33 @@ describe "ea-nginx script" => sub {
                 local @glob_res = ("/etc/nginx/conf.d/users/iamnomore$$.conf");
                 modulino_run_trap( config => "--all" );
                 ok !-e $mockfile->filename;
+            };
+
+            it "should not do user config given --global" => sub {
+                my $mock     = Test::MockFile->dir( '/etc/nginx/conf.d/users/', ["iamnomore$$.conf"] );
+                my $mockfile = Test::MockFile->file( "/etc/nginx/conf.d/users/iamnomore$$.conf", "i am conf hear me rawr" );
+                modulino_run_trap( config => "--global" );
+                ok -e $mockfile->filename;
+            };
+
+            it "should do /etc/nginx/ea-nginx/config-scripts/global/ given --global" => sub {
+                my $mock     = Test::MockFile->dir( '/etc/nginx/ea-nginx/config-scripts/global/', ["$$.ima.script"] );
+                my $mockfile = Test::MockFile->file( "/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script", "i am script hear me rawr", { mode => 0755 } );
+                local @glob_res = ("/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script");
+                no warnings "redefine";
+                local *scripts::ea_nginx::_do_other_global_config = $orig__do_other_global_config;
+                modulino_run_trap( config => "--global" );
+                like $trap->stdout, qr{Running \(global\) “/etc/nginx/ea-nginx/config-scripts/global/$$\.ima\.script” …};
+            };
+
+            it "should do /etc/nginx/ea-nginx/config-scripts/global/ given --all" => sub {
+                my $mock     = Test::MockFile->dir( '/etc/nginx/ea-nginx/config-scripts/global/', ["$$.ima.script"] );
+                my $mockfile = Test::MockFile->file( "/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script", "i am script hear me rawr", { mode => 0755 } );
+                local @glob_res = ("/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script");
+                no warnings "redefine";
+                local *scripts::ea_nginx::_do_other_global_config = $orig__do_other_global_config;
+                modulino_run_trap( config => "--all" );
+                like $trap->stdout, qr{Running \(global\) “/etc/nginx/ea-nginx/config-scripts/global/$$\.ima\.script” …};
             };
 
             it "should reload nginx (w/ new conf file) if --no-reload is not given (user)" => sub {

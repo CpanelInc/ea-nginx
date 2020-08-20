@@ -35,9 +35,9 @@ my $nginxroot = "/etc/nginx";
 my $cmds = {
     config => {
         code     => \&config,
-        clue     => "config [--all|<user>] [--no-reload]",
+        clue     => "config [--all|--global|<user>] [--no-reload]",
         abstract => 'Build nginx configuration for users',
-        help     => "Build nginx configuration for one or all users",
+        help     => "Build nginx configuration for one or all users.\n\t--global will only rebuild global configurations and executes anything in /etc/nginx/ea-nginx/config-scripts/global/\n\t--all implies --global and re-does configuration for all users",
     },
     reload => {
         code     => \&reload,
@@ -140,14 +140,17 @@ sub remove {
 sub config {
     my ( $app, $user, @args ) = @_;
 
-    if ( $user eq '--all' ) {
+    if ( $user eq '--all' || $user eq '--global' ) {
         _write_global_logging();
         _write_global_passenger();
+        _do_other_global_config();
 
-        mkdir "/etc/nginx/conf.d/users/";
-        unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
-        for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
-            _write_user_conf($usr);
+        if ( $user eq '--all' ) {
+            mkdir "/etc/nginx/conf.d/users/";
+            unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
+            for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
+                _write_user_conf($usr);
+            }
         }
         _reload() unless grep { $_ eq '--no-reload' } @args;
     }
@@ -196,6 +199,19 @@ sub _render_tt_to_file {
     }
 
     return 1;
+}
+
+sub _do_other_global_config {
+
+    # /etc/nginx/ea-nginx/config-scripts/global/* allows for future
+    #  _do_other_config_user($user) via /etc/nginx/ea-nginx/config-scripts/user/*
+
+    for my $script ( File::Glob::bsd_glob("/etc/nginx/ea-nginx/config-scripts/global/*") ) {
+        print "Running (global) “$script” …\n";
+        system($script) && warn "“$script” did not exit clean\n";
+    }
+
+    return;
 }
 
 sub _write_global_passenger {
