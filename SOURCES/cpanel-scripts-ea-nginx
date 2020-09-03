@@ -473,7 +473,7 @@ sub _get_passenger_apps {
     return \@apps;
 }
 
-my %load_userdata_cache;
+our %load_userdata_cache;
 
 sub _get_userdata_for {
     my ( $user, $dom ) = @_;
