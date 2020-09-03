@@ -248,26 +248,51 @@ describe "ea-nginx script" => sub {
 
             describe "cPanel Password protected directories" => sub { it "should be tested" };
 
-            describe "cPanel Domains - Force HTTPS redirects" => sub {
+            describe "cPanel Domains -" => sub {
                 around {
                     no warnings "redefine";
                     local *Cpanel::Config::userdata::Load::load_userdata = sub { $userdata };
                     yield;
                 };
 
-                it "should set `ssl_redirect` to true when enabled in userdata" => sub {
-                    local $userdata = { ssl_redirect => 1 };
-                    ok scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                describe "Force HTTPS redirects" => sub {
+                    it "should set `ssl_redirect` to true when enabled in userdata" => sub {
+                        local $userdata                               = { ssl_redirect => 1 };
+                        local %scripts::ea_nginx::load_userdata_cache = ();
+                        ok scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                    };
+
+                    it "should set `ssl_redirect` to false when disabled in userdata" => sub {
+                        local $userdata                               = { ssl_redirect => 0 };
+                        local %scripts::ea_nginx::load_userdata_cache = ();
+                        ok !scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                    };
+
+                    it "should set `ssl_redirect` to false when does not exist in userdata" => sub {
+                        local $userdata                               = undef;
+                        local %scripts::ea_nginx::load_userdata_cache = ();
+                        ok !scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                    };
                 };
 
-                it "should set `ssl_redirect` to false when disabled in userdata" => sub {
-                    local $userdata = { ssl_redirect => 0 };
-                    ok !scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
-                };
+                describe "Disable Mod Security" => sub {
+                    it "should set `secruleengineoff` to true when enabled in userdata" => sub {
+                        local $userdata                               = { secruleengineoff => 1 };
+                        local %scripts::ea_nginx::load_userdata_cache = ();
+                        ok scripts::ea_nginx::_get_secruleengineoff( "user$$" => ["foo$$.lol"] );
+                    };
 
-                it "should set `ssl_redirect` to false when does not exist in userdata" => sub {
-                    local $userdata = undef;
-                    ok !scripts::ea_nginx::_get_ssl_redirect( "user$$" => ["foo$$.lol"] );
+                    it "should set `secruleengineoff` to false when disabled in userdata" => sub {
+                        local $userdata                               = { secruleengineoff => 0 };
+                        local %scripts::ea_nginx::load_userdata_cache = ();
+                        ok !scripts::ea_nginx::_get_secruleengineoff( "user$$" => ["foo$$.lol"] );
+                    };
+
+                    it "should set `secruleengineoff` to false when does not exist in userdata" => sub {
+                        local $userdata                               = undef;
+                        local %scripts::ea_nginx::load_userdata_cache = ();
+                        ok !scripts::ea_nginx::_get_secruleengineoff( "user$$" => ["foo$$.lol"] );
+                    };
                 };
             };
 
