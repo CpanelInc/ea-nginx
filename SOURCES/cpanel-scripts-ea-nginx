@@ -370,11 +370,12 @@ sub _render_and_append {
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
     my $docroot = $docroots->{$user}{ $domains->[0] };
 
-    my $basic_auth     = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
-    my $redirects      = _get_redirects( $domains, $cpanel_redirects );
-    my $logging_hr     = _get_logging_hr();
-    my $ssl_redirect   = _get_ssl_redirect( $user => $domains );
-    my $passenger_apps = _get_passenger_apps( $user => $domains );
+    my $basic_auth       = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
+    my $redirects        = _get_redirects( $domains, $cpanel_redirects );
+    my $logging_hr       = _get_logging_hr();
+    my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
+    my $secruleengineoff = _get_secruleengineoff( $user => $domains );
+    my $passenger_apps   = _get_passenger_apps( $user => $domains );
 
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
@@ -414,6 +415,7 @@ sub _render_and_append {
             ssl_certificate              => $combined_tls,
             ssl_certificate_key          => $combined_tls,
             ssl_redirect                 => $ssl_redirect,
+            secruleengineoff             => $secruleengineoff,
             domains                      => $domains,
             user                         => $user,
             group                        => $group,
@@ -471,12 +473,35 @@ sub _get_passenger_apps {
     return \@apps;
 }
 
+my %load_userdata_cache;
+
+sub _get_userdata_for {
+    my ( $user, $dom ) = @_;
+
+    if ( !exists $load_userdata_cache{$user}{$dom} ) {
+        $load_userdata_cache{$user}{$dom} = Cpanel::Config::userdata::Load::load_userdata( $user => $dom ) || {};
+    }
+
+    return $load_userdata_cache{$user}{$dom};
+}
+
 sub _get_ssl_redirect {
     my ( $user, $domains ) = @_;
 
     for my $dom ( @{$domains} ) {
-        my $lu = Cpanel::Config::userdata::Load::load_userdata( $user => $dom ) || {};
+        my $lu = _get_userdata_for( $user => $dom );
         return 1 if $lu->{ssl_redirect};
+    }
+
+    return;
+}
+
+sub _get_secruleengineoff {
+    my ( $user, $domains ) = @_;
+
+    for my $dom ( @{$domains} ) {
+        my $lu = _get_userdata_for( $user => $dom );
+        return 1 if $lu->{secruleengineoff};
     }
 
     return;

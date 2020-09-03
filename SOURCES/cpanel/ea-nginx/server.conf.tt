@@ -2,6 +2,10 @@ server {
     server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% END %][% END %];
     listen 80;
 
+    [%- IF secruleengineoff %]
+    modsecurity off;
+    [% END -%]
+
     [%- IF !logging.piped_logs %]
     access_log /var/log/nginx/domains/[% domains.0 %] cp_combined;
     access_log /var/log/nginx/domains/[% domains.0 %]-bytes_log cp_bytes_server;
@@ -153,6 +157,10 @@ server {
     ssl_certificate_key [% ssl_certificate_key %];
 
     server_name [% FOREACH domain IN domains %] [% proxy_subdomain %].[% domain %][% END %];
+
+    [%- IF secruleengineoff %]
+    modsecurity off;
+    [% END -%]
 
     location / {
         [%- IF proxy_subdomain.match('^(?:cpanel|webmail|whm)$') %]
