@@ -24,7 +24,6 @@ BuildRequires: ea-libcurl >= 7.68.0-2
 BuildRequires: ea-libcurl-devel >= 7.68.0-2
 
 %if 0%{?rhel} > 6
-Requires: ea-modsec30
 BuildRequires: ea-modsec30
 BuildRequires: ea-modsec30-connector-nginx
 %endif
