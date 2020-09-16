@@ -36,7 +36,7 @@ sub describe {
     );
     my @modsecurity_category = map {
         {
-            'category' => 'MadSecurity',
+            'category' => 'ModSecurity',
             'event'    => $_,
             'stage'    => 'post',
 
@@ -54,7 +54,7 @@ sub describe {
             'category' => 'scripts',
             'event'    => $_,
             'stage'    => 'post',
-            'hook'     => 'NginxHooks::_doit',
+            'hook'     => 'NginxHooks::_rebuild_global',
             'exectype' => 'module',
         }
     } (
@@ -69,24 +69,15 @@ sub describe {
         'modsec_vendor::enable_configs',
         'modsec_vendor::disable_configs',
     );
-    my @normal_actions = map {
+    my @global_actions = map {
         {
             'category' => 'Whostmgr',
             'event'    => $_,
             'stage'    => 'post',
-            'hook'     => 'NginxHooks::_doit',
+            'hook'     => 'NginxHooks::_rebuild_global',
             'exectype' => 'module',
         }
     } (
-        'Accounts::Create',
-        'Accounts::Modify',
-        'Accounts::Remove',
-        'Accounts::suspendacct',
-        'Accounts::unsuspendacct',
-        'AutoSSL::installssl',
-        'Domain::park',
-        'Domain::unpark',
-        'Hostname::change',
         'ModSecurity::modsec_disable_rule',
         'ModSecurity::modsec_undisable_rule',
         'ModSecurity::modsec_deploy_rule_changes',
@@ -113,6 +104,25 @@ sub describe {
         'ModSecurity::modsec_disable_vendor',
         'ModSecurity::modsec_enable_vendor_updates',
         'ModSecurity::modsec_disable_vendor_updates',
+    );
+    my @normal_actions = map {
+        {
+            'category' => 'Whostmgr',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_rebuild_config_all',
+            'exectype' => 'module',
+        }
+    } (
+        'Accounts::Create',
+        'Accounts::Modify',
+        'Accounts::Remove',
+        'Accounts::suspendacct',
+        'Accounts::unsuspendacct',
+        'AutoSSL::installssl',
+        'Domain::park',
+        'Domain::unpark',
+        'Hostname::change',
         'PipedLogConfiguration',
         'SSL::delssl',
         'SSL::installssl',
@@ -161,6 +171,7 @@ sub describe {
     );
     my $hook_ar = [
         @adminbin_actions,
+        @global_actions,
         @modsecurity_category,
         @modsec_vendor,
         @normal_actions,
@@ -245,12 +256,22 @@ sub _php_fpm_config {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
-sub _doit {
+sub _rebuild_config_all {
     local $@;
     eval {
         require Cpanel::ServerTasks;
 
         Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(0), 'rebuild_config' );
+    };
+    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
+sub _rebuild_global {
+    local $@;
+    eval {
+        require Cpanel::ServerTasks;
+
+        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(0), 'rebuild_global' );
     };
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
@@ -314,6 +335,15 @@ sub rebuild_config {
     return;
 }
 
+sub rebuild_global {
+    my ($logger) = @_;
+
+    $logger->info("rebuild_config") if $logger;
+    system( '/usr/local/cpanel/scripts/ea-nginx', 'config', '--global' );
+
+    return;
+}
+
 1;
 
 __END__
@@ -328,13 +358,17 @@ my $seconds_to_wait = NginxHooks::get_time_to_wait(1);
 
 NginxHooks::_possible_php_fpm();
 
-NginxHooks::_doit();
+NginxHooks::_rebuild_config_all();
+
+NginxHooks::_rebuild_global();
 
 NginxHooks::_do_adminbin();
 
 NginxHooks::rebuild_user( $user, $logger );
 
 NginxHooks::rebuild_config($logger);
+
+NginxHooks::rebuild_global($logger);
 
 =head1 DESCRIPTION
 
@@ -372,11 +406,18 @@ This schedules a rebuild of the Nginx configuration to happen in the
 maximum amount of time, because this event could have turned PHP-FPM
 on.
 
-=head2 _doit
+=head2 _rebuild_config_all
 
 This schedules a rebuild of the Nginx configuration to happen in the
 the amount of time that is necessary depending on whether PHP-FPM
-is defaulted to on.
+is defaulted to on.  This will configure the global options and also
+for all the users.
+
+=head2 _rebuild_global
+
+This schedules a rebuild of the Nginx configuration to happen in the
+the amount of time that is necessary. This will configure the global
+options only.
 
 =head2 _do_adminbin
 
@@ -386,13 +427,18 @@ Nginx configuration.
 
 =head2 rebuild_user
 
-This schedules a rebuild of the Nginx configuration for a cpuser.
-This is called from the admin bin system.
+Action from the Task system.
+Rebuilds the ea-nginx config for a user.
 
 =head2 rebuild_config
 
-This schedules a rebuild of the Nginx configuration.
-This is called from the admin bin system.
+Action from the Task system.
+Rebuilds the ea-nginx config for all users.
+
+=head2 rebuild_global
+
+Action from the Task system.
+Rebuilds the ea-nginx global configs only.
 
 =cut
 
