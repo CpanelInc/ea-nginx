@@ -69,6 +69,17 @@ sub describe {
         'modsec_vendor::enable_configs',
         'modsec_vendor::disable_configs',
     );
+    my @build_apache_conf = map {
+        {
+            'category' => 'scripts',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_rebuild_config_all',
+            'exectype' => 'module',
+        }
+    } (
+        'build_apache_conf',
+    );
     my @global_actions = map {
         {
             'category' => 'Whostmgr',
@@ -171,6 +182,7 @@ sub describe {
     );
     my $hook_ar = [
         @adminbin_actions,
+        @build_apache_conf,
         @global_actions,
         @modsecurity_category,
         @modsec_vendor,
