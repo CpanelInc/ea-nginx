@@ -58,7 +58,6 @@ sub describe {
             'exectype' => 'module',
         }
     } (
-        'build_apache_conf',
         'modsec_vendor::add',
         'modsec_vendor::remove',
         'modsec_vendor::update',
