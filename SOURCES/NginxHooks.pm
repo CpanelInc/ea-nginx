@@ -34,6 +34,41 @@ sub describe {
     } (
         'php_fpm_config',
     );
+    my @modsecurity_category = map {
+        {
+            'category' => 'MadSecurity',
+            'event'    => $_,
+            'stage'    => 'post',
+
+            # NOTE: this is an admin bin, but is called on the raised
+            # privileges side
+
+            'hook'     => 'NginxHooks::_modsecurity_user',
+            'exectype' => 'module',
+        }
+    } (
+        'adjust_secruleengineoff',
+    );
+    my @modsec_vendor = map {
+        {
+            'category' => 'scripts',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_doit',
+            'exectype' => 'module',
+        }
+    } (
+        'build_apache_conf',
+        'modsec_vendor::add',
+        'modsec_vendor::remove',
+        'modsec_vendor::update',
+        'modsec_vendor::enable',
+        'modsec_vendor::disable',
+        'modsec_vendor::enable_updates',
+        'modsec_vendor::disable_updates',
+        'modsec_vendor::enable_configs',
+        'modsec_vendor::disable_configs',
+    );
     my @normal_actions = map {
         {
             'category' => 'Whostmgr',
@@ -44,18 +79,44 @@ sub describe {
         }
     } (
         'Accounts::Create',
+        'Accounts::Modify',
         'Accounts::Remove',
         'Accounts::suspendacct',
         'Accounts::unsuspendacct',
-        'Accounts::Modify',
+        'AutoSSL::installssl',
         'Domain::park',
         'Domain::unpark',
-        'SSL::installssl',
-        'AutoSSL::installssl',
-        'SSL::delssl',
-        'TweakSettings::Basic',
         'Hostname::change',
+        'ModSecurity::modsec_disable_rule',
+        'ModSecurity::modsec_undisable_rule',
+        'ModSecurity::modsec_deploy_rule_changes',
+        'ModSecurity::modsec_deploy_all_rule_changes',
+        'ModSecurity::modsec_discard_rule_changes',
+        'ModSecurity::modsec_add_rule',
+        'ModSecurity::modsec_remove_rule',
+        'ModSecurity::modsec_edit_rule',
+        'ModSecurity::modsec_clone_rule',
+        'ModSecurity::modsec_make_config_active',
+        'ModSecurity::modsec_make_config_inactive',
+        'ModSecurity::modsec_set_config_text',
+        'ModSecurity::modsec_assemble_config_text',
+        'ModSecurity::modsec_set_setting',
+        'ModSecurity::modsec_remove_setting',
+        'ModSecurity::modsec_batch_settings',
+        'ModSecurity::modsec_deploy_settings_changes',
+        'ModSecurity::modsec_add_vendor',
+        'ModSecurity::modsec_update_vendor',
+        'ModSecurity::modsec_remove_vendor',
+        'ModSecurity::modsec_enable_vendor_configs',
+        'ModSecurity::modsec_disable_vendor_configs',
+        'ModSecurity::modsec_enable_vendor',
+        'ModSecurity::modsec_disable_vendor',
+        'ModSecurity::modsec_enable_vendor_updates',
+        'ModSecurity::modsec_disable_vendor_updates',
         'PipedLogConfiguration',
+        'SSL::delssl',
+        'SSL::installssl',
+        'TweakSettings::Basic',
     );
     my @adminbin_actions = map {
         {
@@ -66,26 +127,26 @@ sub describe {
             'exectype' => 'module',
         }
     } (
-        'UAPI::SSL::delete_ssl',
-        'UAPI::SSL::install_ssl',
-        'UAPI::LangPHP::php_set_vhost_versions',
-        'UAPI::WordPressInstanceManager::start_scan',
-        'UAPI::SubDomain::addsubdomain',    # I do not see a delsubdomain
-        'UAPI::Mime::add_redirect',
-        'UAPI::Mime::delete_redirect',
-        'UAPI::SSL::toggle_ssl_redirect_for_domains',
-        'Api2::SubDomain::addsubdomain',
-        'Api2::AddonDomain::addaddondomain',
-        'Api2::Park::park',
-        'Api1::Park::park',
-        'Api2::SubDomain::delsubdomain',
-        'Api2::AddonDomain::deladdondomain',
-        'Api2::Park::unpark',
-        'Api1::Park::unpark',
         'Api1::Htaccess::del_user',
+        'Api1::Htaccess::set_index',
         'Api1::Htaccess::set_pass',
         'Api1::Htaccess::set_protect',
-        'Api1::Htaccess::set_index',
+        'Api1::Park::park',
+        'Api1::Park::unpark',
+        'Api2::AddonDomain::addaddondomain',
+        'Api2::AddonDomain::deladdondomain',
+        'Api2::Park::park',
+        'Api2::Park::unpark',
+        'Api2::SubDomain::addsubdomain',
+        'Api2::SubDomain::delsubdomain',
+        'UAPI::LangPHP::php_set_vhost_versions',
+        'UAPI::Mime::add_redirect',
+        'UAPI::Mime::delete_redirect',
+        'UAPI::SSL::delete_ssl',
+        'UAPI::SSL::install_ssl',
+        'UAPI::SSL::toggle_ssl_redirect_for_domains',
+        'UAPI::SubDomain::addsubdomain',    # I do not see a delsubdomain
+        'UAPI::WordPressInstanceManager::start_scan',
     );
     my @wordpress_actions = map {
         {
@@ -99,10 +160,12 @@ sub describe {
         'Api1::cPAddons::mainpg',
     );
     my $hook_ar = [
-        @script_php_fpm_config_actions,
-        @phpfpm_actions,
-        @normal_actions,
         @adminbin_actions,
+        @modsecurity_category,
+        @modsec_vendor,
+        @normal_actions,
+        @phpfpm_actions,
+        @script_php_fpm_config_actions,
         @wordpress_actions,
     ];
 
@@ -136,6 +199,24 @@ sub _possible_php_fpm {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
+sub _modsecurity_user {
+    my ( $hook, $event ) = @_;
+
+    local $@;
+
+    if ( exists $event->{adjust_secruleengineoff} ) {
+        my $cpuser = $event->{adjust_secruleengineoff}->{user};
+
+        Cpanel::Debug::log_info("_modsecurity_user: adjust_secruleengineoff :$cpuser:");
+        eval {
+            require Cpanel::ServerTasks;
+            Cpanel::ServerTasks::schedule_task( ['NginxTasks'], NginxHooks::get_time_to_wait(0), "rebuild_user $cpuser" );
+        };
+    }
+
+    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
 sub _php_fpm_config {
     my ( $hook, $event ) = @_;
 
@@ -145,7 +226,7 @@ sub _php_fpm_config {
         require Cpanel::PHP::Config;
 
         my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [ $event->{rebuild} ] );
-        my $cpuser = $php_config_ref->{ $event->{rebuild} }->{username};
+        my $cpuser         = $php_config_ref->{ $event->{rebuild} }->{username};
 
         Cpanel::Debug::log_info("_php_fpm_config: rebuild :$cpuser:");
         eval {
