@@ -226,8 +226,8 @@ sub _modsecurity_user {
 
     local $@;
 
-    if ( exists $event->{adjust_secruleengineoff} ) {
-        my $cpuser = $event->{adjust_secruleengineoff}->{user};
+    if ( exists $event->{user} ) {
+        my $cpuser = $event->{user};
 
         Cpanel::Debug::log_info("_modsecurity_user: adjust_secruleengineoff :$cpuser:");
         eval {
