@@ -1,4 +1,4 @@
-From 51f100304424f5bc3d0dd8300f7917688b2227cb Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Daniel Muey <dan@cpanel.net>
 Date: Wed, 19 Aug 2020 11:49:47 -0500
 Subject: [PATCH] Fix auto/feature test C code to not fail due to its use of
@@ -20,6 +20,3 @@ index 3561f59..972b12c 100644
  #include <sys/types.h>
  $NGX_INCLUDE_UNISTD_H
  $ngx_feature_incs
--- 
-2.25.1
-
