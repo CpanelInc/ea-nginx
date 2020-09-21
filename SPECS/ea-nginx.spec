@@ -62,7 +62,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.19.1
+%define main_version 1.19.2
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -83,7 +83,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 10
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -571,6 +571,9 @@ fi
 
 
 %changelog
+* Fri Sep 18 2020 Cory McIntire <cory@cpanel.net> - 1.19.2-1
+- EA-9309: Update ea-nginx from v1.19.1 to v1.19.2
+
 * Thu Sep 03 2020 Daniel Muey <dan@cpanel.net> - 1.19.1-10
 - ZC-7493: Factor userdata `secruleengineoff` into user configuration
 
