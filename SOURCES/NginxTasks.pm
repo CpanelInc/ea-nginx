@@ -65,6 +65,30 @@ Cpanel::TaskProcessors::NginxTasks
 
 }
 
+{
+
+    package Cpanel::TaskProcessors::NginxTasks::rebuild_global;
+    use parent 'Cpanel::TaskQueue::FastSpawn';
+
+    sub is_valid_args {
+        my ( $self, $task ) = @_;
+        return 0 == $task->args;
+    }
+
+    sub _do_child_task {
+        my ( $self, $task, $logger ) = @_;
+
+        local @INC = ( '/var/cpanel/perl5/lib', @INC );
+        require NginxHooks;
+        local $@;
+        eval { NginxHooks::rebuild_global($logger); };
+        print STDERR "NginxTasks::rebuild_global: $@" if $@;
+
+        return;
+    }
+
+}
+
 =head2 to_register
 
 rebuild_user - Rebuilds the Nginx config for a user
@@ -77,6 +101,7 @@ sub to_register {
     return (
         [ 'rebuild_user',   Cpanel::TaskProcessors::NginxTasks::rebuild_user->new() ],
         [ 'rebuild_config', Cpanel::TaskProcessors::NginxTasks::rebuild_config->new() ],
+        [ 'rebuild_global', Cpanel::TaskProcessors::NginxTasks::rebuild_global->new() ],
     );
 }
 

@@ -34,28 +34,110 @@ sub describe {
     } (
         'php_fpm_config',
     );
+    my @modsecurity_category = map {
+        {
+            'category' => 'ModSecurity',
+            'event'    => $_,
+            'stage'    => 'post',
+
+            # NOTE: this is an admin bin, but is called on the raised
+            # privileges side
+
+            'hook'     => 'NginxHooks::_modsecurity_user',
+            'exectype' => 'module',
+        }
+    } (
+        'adjust_secruleengineoff',
+    );
+    my @modsec_vendor = map {
+        {
+            'category' => 'scripts',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_rebuild_global',
+            'exectype' => 'module',
+        }
+    } (
+        'modsec_vendor::add',
+        'modsec_vendor::remove',
+        'modsec_vendor::update',
+        'modsec_vendor::enable',
+        'modsec_vendor::disable',
+        'modsec_vendor::enable_updates',
+        'modsec_vendor::disable_updates',
+        'modsec_vendor::enable_configs',
+        'modsec_vendor::disable_configs',
+    );
+    my @build_apache_conf = map {
+        {
+            'category' => 'scripts',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_rebuild_config_all',
+            'exectype' => 'module',
+        }
+    } (
+        'build_apache_conf',
+    );
+    my @global_actions = map {
+        {
+            'category' => 'Whostmgr',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_rebuild_global',
+            'exectype' => 'module',
+        }
+    } (
+        'ModSecurity::modsec_add_rule',
+        'ModSecurity::modsec_add_vendor',
+        'ModSecurity::modsec_assemble_config_text',
+        'ModSecurity::modsec_batch_settings',
+        'ModSecurity::modsec_clone_rule',
+        'ModSecurity::ModsecCpanelConf::manipulate',
+        'ModSecurity::modsec_deploy_all_rule_changes',
+        'ModSecurity::modsec_deploy_rule_changes',
+        'ModSecurity::modsec_deploy_settings_changes',
+        'ModSecurity::modsec_disable_rule',
+        'ModSecurity::modsec_disable_vendor',
+        'ModSecurity::modsec_disable_vendor_configs',
+        'ModSecurity::modsec_disable_vendor_updates',
+        'ModSecurity::modsec_discard_rule_changes',
+        'ModSecurity::modsec_edit_rule',
+        'ModSecurity::modsec_enable_vendor',
+        'ModSecurity::modsec_enable_vendor_configs',
+        'ModSecurity::modsec_enable_vendor_updates',
+        'ModSecurity::modsec_make_config_active',
+        'ModSecurity::modsec_make_config_inactive',
+        'ModSecurity::modsec_remove_rule',
+        'ModSecurity::modsec_remove_setting',
+        'ModSecurity::modsec_remove_vendor',
+        'ModSecurity::modsec_set_config_text',
+        'ModSecurity::modsec_set_setting',
+        'ModSecurity::modsec_undisable_rule',
+        'ModSecurity::modsec_update_vendor',
+    );
     my @normal_actions = map {
         {
             'category' => 'Whostmgr',
             'event'    => $_,
             'stage'    => 'post',
-            'hook'     => 'NginxHooks::_doit',
+            'hook'     => 'NginxHooks::_rebuild_config_all',
             'exectype' => 'module',
         }
     } (
         'Accounts::Create',
+        'Accounts::Modify',
         'Accounts::Remove',
         'Accounts::suspendacct',
         'Accounts::unsuspendacct',
-        'Accounts::Modify',
+        'AutoSSL::installssl',
         'Domain::park',
         'Domain::unpark',
-        'SSL::installssl',
-        'AutoSSL::installssl',
-        'SSL::delssl',
-        'TweakSettings::Basic',
         'Hostname::change',
         'PipedLogConfiguration',
+        'SSL::delssl',
+        'SSL::installssl',
+        'TweakSettings::Basic',
     );
     my @adminbin_actions = map {
         {
@@ -66,26 +148,26 @@ sub describe {
             'exectype' => 'module',
         }
     } (
-        'UAPI::SSL::delete_ssl',
-        'UAPI::SSL::install_ssl',
-        'UAPI::LangPHP::php_set_vhost_versions',
-        'UAPI::WordPressInstanceManager::start_scan',
-        'UAPI::SubDomain::addsubdomain',    # I do not see a delsubdomain
-        'UAPI::Mime::add_redirect',
-        'UAPI::Mime::delete_redirect',
-        'UAPI::SSL::toggle_ssl_redirect_for_domains',
-        'Api2::SubDomain::addsubdomain',
-        'Api2::AddonDomain::addaddondomain',
-        'Api2::Park::park',
-        'Api1::Park::park',
-        'Api2::SubDomain::delsubdomain',
-        'Api2::AddonDomain::deladdondomain',
-        'Api2::Park::unpark',
-        'Api1::Park::unpark',
         'Api1::Htaccess::del_user',
+        'Api1::Htaccess::set_index',
         'Api1::Htaccess::set_pass',
         'Api1::Htaccess::set_protect',
-        'Api1::Htaccess::set_index',
+        'Api1::Park::park',
+        'Api1::Park::unpark',
+        'Api2::AddonDomain::addaddondomain',
+        'Api2::AddonDomain::deladdondomain',
+        'Api2::Park::park',
+        'Api2::Park::unpark',
+        'Api2::SubDomain::addsubdomain',
+        'Api2::SubDomain::delsubdomain',
+        'UAPI::LangPHP::php_set_vhost_versions',
+        'UAPI::Mime::add_redirect',
+        'UAPI::Mime::delete_redirect',
+        'UAPI::SSL::delete_ssl',
+        'UAPI::SSL::install_ssl',
+        'UAPI::SSL::toggle_ssl_redirect_for_domains',
+        'UAPI::SubDomain::addsubdomain',    # I do not see a delsubdomain
+        'UAPI::WordPressInstanceManager::start_scan',
     );
     my @wordpress_actions = map {
         {
@@ -99,10 +181,14 @@ sub describe {
         'Api1::cPAddons::mainpg',
     );
     my $hook_ar = [
-        @script_php_fpm_config_actions,
-        @phpfpm_actions,
-        @normal_actions,
         @adminbin_actions,
+        @build_apache_conf,
+        @global_actions,
+        @modsecurity_category,
+        @modsec_vendor,
+        @normal_actions,
+        @phpfpm_actions,
+        @script_php_fpm_config_actions,
         @wordpress_actions,
     ];
 
@@ -136,6 +222,24 @@ sub _possible_php_fpm {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
+sub _modsecurity_user {
+    my ( $hook, $event ) = @_;
+
+    local $@;
+
+    if ( exists $event->{user} ) {
+        my $cpuser = $event->{user};
+
+        Cpanel::Debug::log_info("_modsecurity_user: adjust_secruleengineoff :$cpuser:");
+        eval {
+            require Cpanel::ServerTasks;
+            Cpanel::ServerTasks::schedule_task( ['NginxTasks'], NginxHooks::get_time_to_wait(0), "rebuild_user $cpuser" );
+        };
+    }
+
+    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
 sub _php_fpm_config {
     my ( $hook, $event ) = @_;
 
@@ -145,7 +249,7 @@ sub _php_fpm_config {
         require Cpanel::PHP::Config;
 
         my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [ $event->{rebuild} ] );
-        my $cpuser = $php_config_ref->{ $event->{rebuild} }->{username};
+        my $cpuser         = $php_config_ref->{ $event->{rebuild} }->{username};
 
         Cpanel::Debug::log_info("_php_fpm_config: rebuild :$cpuser:");
         eval {
@@ -164,12 +268,22 @@ sub _php_fpm_config {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
-sub _doit {
+sub _rebuild_config_all {
     local $@;
     eval {
         require Cpanel::ServerTasks;
 
         Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(0), 'rebuild_config' );
+    };
+    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
+sub _rebuild_global {
+    local $@;
+    eval {
+        require Cpanel::ServerTasks;
+
+        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(0), 'rebuild_global' );
     };
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
@@ -233,6 +347,15 @@ sub rebuild_config {
     return;
 }
 
+sub rebuild_global {
+    my ($logger) = @_;
+
+    $logger->info("rebuild_config") if $logger;
+    system( '/usr/local/cpanel/scripts/ea-nginx', 'config', '--global' );
+
+    return;
+}
+
 1;
 
 __END__
@@ -247,13 +370,17 @@ my $seconds_to_wait = NginxHooks::get_time_to_wait(1);
 
 NginxHooks::_possible_php_fpm();
 
-NginxHooks::_doit();
+NginxHooks::_rebuild_config_all();
+
+NginxHooks::_rebuild_global();
 
 NginxHooks::_do_adminbin();
 
 NginxHooks::rebuild_user( $user, $logger );
 
 NginxHooks::rebuild_config($logger);
+
+NginxHooks::rebuild_global($logger);
 
 =head1 DESCRIPTION
 
@@ -291,11 +418,18 @@ This schedules a rebuild of the Nginx configuration to happen in the
 maximum amount of time, because this event could have turned PHP-FPM
 on.
 
-=head2 _doit
+=head2 _rebuild_config_all
 
 This schedules a rebuild of the Nginx configuration to happen in the
 the amount of time that is necessary depending on whether PHP-FPM
-is defaulted to on.
+is defaulted to on.  This will configure the global options and also
+for all the users.
+
+=head2 _rebuild_global
+
+This schedules a rebuild of the Nginx configuration to happen in the
+the amount of time that is necessary. This will configure the global
+options only.
 
 =head2 _do_adminbin
 
@@ -305,13 +439,18 @@ Nginx configuration.
 
 =head2 rebuild_user
 
-This schedules a rebuild of the Nginx configuration for a cpuser.
-This is called from the admin bin system.
+Action from the Task system.
+Rebuilds the ea-nginx config for a user.
 
 =head2 rebuild_config
 
-This schedules a rebuild of the Nginx configuration.
-This is called from the admin bin system.
+Action from the Task system.
+Rebuilds the ea-nginx config for all users.
+
+=head2 rebuild_global
+
+Action from the Task system.
+Rebuilds the ea-nginx global configs only.
 
 =cut
 
