@@ -257,7 +257,6 @@ sub dontcare {
 
 1;
 
-__END__
 };
 
     close $fh;
@@ -265,22 +264,12 @@ __END__
 }
 
 describe "to_register" => sub {
-    it "should return 2 items in an array" => sub {
-        my @array = Cpanel::TaskProcessors::NginxTasks::to_register();
-        is( @array, 2 );
-    };
-
     it "should an array ref as we expect" => sub {
         my @array = Cpanel::TaskProcessors::NginxTasks::to_register();
-
-        use Data::Dumper;
-        print Dumper ( \@array ) . "\n";
 
         foreach my $record (@array) {
             $record->[1] = ref( $record->[1] );
         }
-
-        print Dumper ( \@array ) . "\n";
 
         my $expected = [
             [
@@ -290,7 +279,12 @@ describe "to_register" => sub {
             [
                 'rebuild_config',
                 'Cpanel::TaskProcessors::NginxTasks::rebuild_config'
-            ]
+            ],
+            [
+                'rebuild_global',
+                'Cpanel::TaskProcessors::NginxTasks::rebuild_global'
+            ],
+
         ];
 
         is_deeply( \@array, $expected );
