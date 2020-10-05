@@ -83,7 +83,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -118,6 +118,8 @@ Source23: NginxTasks.pm
 Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
 Source26: cpanel-scripts-ea-nginx-logrotate
+Source27: 007-restartsrv_nginx
+
 Patch1: 0001-Fix-auto-feature-test-C-code-to-not-fail-due-to-its-.patch
 
 License: 2-clause BSD-like license
@@ -300,6 +302,14 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{__install} -p %{SOURCE24} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
 %{__install} -p %{SOURCE25} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx.conf
 
+%if 0%{?rhel} >= 8
+mkdir -p $RPM_BUILD_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__
+%{__install} -p %{SOURCE27} $RPM_BUILD_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
+%else
+mkdir -p $RPM_BUILD_ROOT/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__
+%{__install} -p %{SOURCE27} $RPM_BUILD_ROOT/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
+%endif
+
 rm -rf %{bdir}/_passenger_source_code
 
 %clean
@@ -347,6 +357,11 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-userdata
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-logrotate
+%if 0%{?rhel} >= 8
+%attr(755, root, root) /etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
+%else
+%attr(755, root, root) /etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
+%endif
 
 /usr/local/cpanel/scripts/restartsrv_nginx
 /etc/chkserv.d/nginx
@@ -515,6 +530,13 @@ if [ $cpversion -ge 80 ]; then
     /usr/local/cpanel/bin/manage_hooks add module NginxHooks
 fi
 
+# hook is not run for the transaction that installs it, so for good measure (ZC-7669)
+%if 0%{?rhel} >= 8
+    /etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
+%else
+    /etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
+%endif
+
 %preun
 # we need to know the version of cPanel, the hooks cannot be deployed
 # before version 11.80
@@ -571,6 +593,9 @@ fi
 
 
 %changelog
+* Mon Oct 05 2020 Daniel Muey <dan@cpanel.net> - 1.19.3-2
+- ZC-7669: Add universal hook to hard restart nginx for any transaction involving any nginc related package
+
 * Thu Oct 01 2020 Daniel Muey <dan@cpanel.net> - 1.19.3-1
 - EA-9334: Update ea-nginx from v1.19.2 to v1.19.3
 
