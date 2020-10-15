@@ -132,7 +132,7 @@ server {
 
     include conf.d/server-includes/*.conf;
     include conf.d/users/[% user %]/*.conf;
-    include conf.d/users/[% user %]/[% domains.0 %]/*.conf;
+    include conf.d/users/[% user %]/[% domains.0.replace('^\*\.', '_wildcard_.') %]/*.conf;
 
     [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
     include conf.d/includes-optional/cpanel-cgi-location.conf;
