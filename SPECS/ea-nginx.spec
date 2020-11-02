@@ -67,7 +67,7 @@ BuildRequires: systemd
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
 %define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/ea-ruby24/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
-%define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib}
+%define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 
 %if 0%{?rhel} > 6
 %define WITH_CC_OPT $(echo "%{BASE_WITH_CC_OPT} -I/opt/cpanel/ea-modsec30/include")
@@ -83,7 +83,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -593,6 +593,9 @@ fi
 
 
 %changelog
+* Tue Oct 27 2020 Tim Mullin <tim@cpanel.net> - 1.19.3-4
+- EA-9390: Fix build with latest ea-brotli (v1.0.9)
+
 * Thu Oct 15 2020 Daniel Muey <dan@cpanel.net> - 1.19.3-3
 - ZC-7761: Handle wildcard domains
 
