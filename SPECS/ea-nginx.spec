@@ -9,19 +9,39 @@
 %define use_systemd (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7) || (0%{?suse_version} >= 1315)
 
 %define ea_openssl_ver 1.1.1d-1
+
+%if 0%{?rhel} < 8
+%define ruby_version ea-ruby24
+%else
+%define ruby_version ea-ruby27
+%endif
+
+%if 0%{?rhel} >= 8
+# In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
+BuildRequires: openssl, openssl-devel
+Requires: openssl
+%else
 Requires: ea-openssl11 >= %{ea_openssl_ver}
 BuildRequires: ea-openssl11 >= %{ea_openssl_ver}
 BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
+%endif
 
 # 6.0.4-2 is when the source is included w/ the apache module
 # also ensures Apache has it and Application Manager will be available
-BuildRequires: ea-ruby24-mod_passenger >= 6.0.4-2
-BuildRequires: ea-ruby24-rubygem-rake >= 0.8.1
-BuildRequires: ea-ruby24-rubygem-passenger
-BuildRequires: ea-ruby24-ruby-devel
-Requires: ea-ruby24-mod_passenger >= 6.0.4-2
+BuildRequires: %{ruby_version}-mod_passenger >= 6.0.4-2
+BuildRequires: %{ruby_version}-rubygem-rake >= 0.8.1
+BuildRequires: %{ruby_version}-rubygem-passenger
+BuildRequires: %{ruby_version}-ruby-devel
+Requires: %{ruby_version}-mod_passenger >= 6.0.4-2
+
+%if 0%{?rhel} >= 8
+# In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
+BuildRequires: libcurl
+BuildRequires: libcurl-devel
+%else
 BuildRequires: ea-libcurl >= 7.68.0-2
 BuildRequires: ea-libcurl-devel >= 7.68.0-2
+%endif
 
 %if 0%{?rhel} > 6
 BuildRequires: ea-modsec30
@@ -51,6 +71,16 @@ BuildRequires: systemd
 %endif
 %endif
 
+%if 0%{?rhel} == 8
+%define _group System Environment/Daemons
+%define epoch 1
+Epoch: %{epoch}
+Requires(pre): shadow-utils
+Requires: systemd
+BuildRequires: systemd
+%define dist .el8
+%endif
+
 %if 0%{?suse_version} >= 1315
 %define _group Productivity/Networking/Web/Servers
 %define nginx_loggroup trusted
@@ -66,8 +96,13 @@ BuildRequires: systemd
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
-%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/ea-ruby24/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
+%if 0%{?rhel} < 8
+%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/ea-brotli/lib
+%else
+%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
+%define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl -Wl,-rpath=/opt/cpanel/ea-brotli/lib
+%endif
 
 %if 0%{?rhel} > 6
 %define WITH_CC_OPT $(echo "%{BASE_WITH_CC_OPT} -I/opt/cpanel/ea-modsec30/include")
@@ -83,7 +118,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -156,12 +191,11 @@ cp %{SOURCE21} ngx_http_pipelog_module/config
 
 %build
 
-export PATH=/opt/cpanel/ea-ruby24/root/usr/bin:/opt/cpanel/libcurl/bin:$PATH
-source /opt/cpanel/ea-ruby24/enable
+export PATH=/opt/cpanel/%{ruby_version}/root/usr/bin:/opt/cpanel/libcurl/bin:$PATH
+source /opt/cpanel/%{ruby_version}/enable
 ruby -v
-
 rm -rf %{bdir}/_passenger_source_code
-cp -rf /opt/cpanel/ea-ruby24/src/passenger-*/ %{bdir}/_passenger_source_code
+cp -rf /opt/cpanel/%{ruby_version}/src/passenger-*/ %{bdir}/_passenger_source_code
 
 export LDFLAGS="$LDFLAGS %{WITH_LD_OPT}"
 export CFLAGS="$CFLAGS %{WITH_CC_OPT}"
@@ -178,22 +212,22 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
-    --add-dynamic-module=ngx_http_pipelog_module \
+    --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
 %endif
-    --add-module=%{bdir}/_passenger_source_code/src/nginx_module
+    --add-dynamic-module=ngx_http_pipelog_module
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx \
     %{bdir}/objs/nginx-debug
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
-    --add-dynamic-module=ngx_http_pipelog_module \
+    --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
 %endif
-    --add-module=%{bdir}/_passenger_source_code/src/nginx_module
+    --add-dynamic-module=ngx_http_pipelog_module
 make %{?_smp_mflags}
 
 cp -f %{SOURCE22} .
@@ -593,6 +627,9 @@ fi
 
 
 %changelog
+* Fri Dec 04 2020 Travis Holloway <t.holloway@cpanel.net> - 1.19.3-5
+- ZC-8061: Build on C8
+
 * Tue Oct 27 2020 Tim Mullin <tim@cpanel.net> - 1.19.3-4
 - EA-9390: Fix build with latest ea-brotli (v1.0.9)
 
