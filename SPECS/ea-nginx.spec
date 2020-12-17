@@ -10,7 +10,7 @@
 
 %define ea_openssl_ver 1.1.1d-1
 
-%if 0%{?rhel} < 8
+%if 0%{?rhel} < 7
 %define ruby_version ea-ruby24
 %else
 %define ruby_version ea-ruby27
@@ -32,7 +32,11 @@ BuildRequires: %{ruby_version}-mod_passenger >= 6.0.4-2
 BuildRequires: %{ruby_version}-rubygem-rake >= 0.8.1
 BuildRequires: %{ruby_version}-rubygem-passenger
 BuildRequires: %{ruby_version}-ruby-devel
-Requires: %{ruby_version}-mod_passenger >= 6.0.4-2
+
+# ea-ruby24-mod_passenger conflicts with ea-ruby27-mod_passenger
+# because they both provide and conflict with apache24-passenger
+Requires: %{ruby_version}
+Requires: apache24-passenger
 
 %if 0%{?rhel} >= 8
 # In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
@@ -118,7 +122,7 @@ Summary: High performance web server
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -627,6 +631,9 @@ fi
 
 
 %changelog
+* Thu Dec 10 2020 Travis Holloway <t.holloway@cpanel.net> - 1.19.3-6
+- ZC-8061: Build C7 against ea-ruby27
+
 * Fri Dec 04 2020 Travis Holloway <t.holloway@cpanel.net> - 1.19.3-5
 - ZC-8061: Build on C8
 
