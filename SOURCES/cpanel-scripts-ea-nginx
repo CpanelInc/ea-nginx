@@ -344,7 +344,8 @@ sub _write_user_conf {
     }
     scripts::ea_nginx_userdata::run($user);
 
-    path($userconf)->spew("#### main domain for $user ##\n");
+    my $preserver = !-e "/etc/nginx/ea-nginx/enable.standalone" ? "proxy_cache_path /etc/nginx/cache/proxy/$user keys_zone=$user:10m inactive=60m;\n\n" : "";
+    path($userconf)->spew( $preserver . "#### main domain for $user ##\n" );
     _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
 
     if (@actual_subdomains) {
@@ -482,6 +483,10 @@ sub _render_and_append {
             ea4conf    => $ea4_conf_hr,
             passenger  => {
                 apps => $passenger_apps,
+            },
+            behavior => {
+                standalone => ( -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0 ),
+                caching    => ( -e "/etc/nginx/ea-nginx/enable.caching"    ? 1 : 0 ),
             },
         },
         sub {

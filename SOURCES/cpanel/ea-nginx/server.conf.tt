@@ -14,12 +14,14 @@ server {
     set $CPANEL_APACHE_PROXY_IP [% ip %];
 
     [%- IF ssl_certificate && ssl_certificate_key %]
+    [%- IF behavior.standalone %]
     [%- IF ssl_redirect %]
     location ~ ^/(?!(?:\.well-known/(?:pki-validation|cpanel-dcv))) {
         if ($scheme = http) {
             return 301 https://$host$request_uri;
         }
     }
+    [% END -%]
     [% END -%]
 
     listen 443 ssl;
@@ -34,6 +36,19 @@ server {
         [% END -%]
     [% END -%]
 
+    [%- IF !behavior.standalone %]
+    location / {
+        [%- IF behavior.caching %]
+        proxy_cache [% user %];
+        proxy_cache_valid 200 302 60m;
+        proxy_cache_valid 404 1m;
+        add_header X-Cache $upstream_cache_status;
+
+        [%- END %]
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass http://$CPANEL_APACHE_PROXY_IP:$CPANEL_APACHE_PROXY_PORT;
+    }
+    [% ELSE -%]
     [%- FOREACH redirect IN redirects %]
     rewrite [% redirect.regex %] [% redirect.replacement %] [% redirect.flag %];
     [%- END %]
@@ -131,14 +146,19 @@ server {
     [% END -%]
 
     include conf.d/server-includes/*.conf;
+    [% END -%]
+
     include conf.d/users/[% user %]/*.conf;
     include conf.d/users/[% user %]/[% domains.0.replace('^\*\.', '_wildcard_.') %]/*.conf;
 
+    [%- IF behaviors.standalone %]
     [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
     include conf.d/includes-optional/cpanel-cgi-location.conf;
     include conf.d/includes-optional/cpanel-server-parsed-location.conf;
+    [% END -%]
 }
 
+[%- IF behavior.standalone %]
 # nginx does not support a subdomain of a wildcard domain
 # Example:  whm.*.mydomain.tld would not be allowed
 [%- SET domains = domains.grep('^[^\*]') %]
@@ -179,7 +199,6 @@ server {
         #   the headers below to handle the websockets over `http`.
         proxy_set_header Upgrade $upgrade_value; # the header will be only sent if $upgrade_value is not empty
         proxy_set_header Connection $connection_value; # the header will be only sent if $connection_value is not empty
-        proxy_http_version 1.1;
         [%- END %]
         include conf.d/includes-optional/cpanel-proxy.conf;
         proxy_pass http://127.0.0.1:[% subdom_map.$proxy_subdomain %];
@@ -187,4 +206,5 @@ server {
 }
 
     [%- END -%]
+[%- END -%]
 [%- END -%]
