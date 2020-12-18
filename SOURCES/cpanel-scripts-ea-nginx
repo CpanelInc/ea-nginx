@@ -224,21 +224,21 @@ sub _get_application_paths {
 
     # This is copied out of ulc as a fallback for older versions that do not have the above yet
     # TODO: remove the fallback once only 94 and newer are supported
-    my $new = 0;
-    my %pre_multi_binaries = ( 
+    my $new                = 0;
+    my %pre_multi_binaries = (
         ruby   => "/opt/cpanel/ea-ruby24/root/usr/libexec/passenger-ruby24",
         nodejs => "/opt/cpanel/ea-nodejs10/bin/node",
         python => "/usr/bin/python3",
-    );  
+    );
 
-    for my $type ( keys %pre_multi_binaries ) { 
+    for my $type ( keys %pre_multi_binaries ) {
         if ( !exists $app->{$type} ) {    # this and !$new means they have pre-94/pre_multi_binary-only …
             my $pre_multi_binary = $pre_multi_binaries{$type};
             if ( !$new && -x $pre_multi_binary ) {    # … so set them to that explicitly in case passeneger moves on to a newer version
                 $app->{$type} = $pre_multi_binary;
             }
-            elsif ( my $current_default = Cpanel::LoadFile::load_if_exists("/etc/cpanel/ea4/passenger.$type") ) { 
-                if ( !$new ) { 
+            elsif ( my $current_default = Cpanel::LoadFile::load_if_exists("/etc/cpanel/ea4/passenger.$type") ) {
+                if ( !$new ) {
                     warn "The “\$app->{name}” application‘s “\$type” value ($pre_multi_binary) is not executable/does not exist.\n";
                     warn "The current default, $current_default, will be in effect for the “\$app->{name}” application.\n";
                 }
