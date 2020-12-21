@@ -38,11 +38,14 @@ server {
 
     [%- IF !behavior.standalone %]
     location / {
-        [%- IF behavior.caching %]
+        [%- IF behavior.caching.enabled %]
         proxy_cache [% user %];
-        proxy_cache_valid 200 302 60m;
-        proxy_cache_valid 404 1m;
+        [%- FOREACH cache_valid IN behavior.caching.proxy_cache_valid.keys %]
+        proxy_cache_valid [% cache_valid %] [% behavior.caching.proxy_cache_valid.$cache_valid %];
+        [%- END %]
+            [%- IF behavior.caching.x_cache_header %]
         add_header X-Cache $upstream_cache_status;
+            [%- END %]
 
         [%- END %]
         include conf.d/includes-optional/cpanel-proxy.conf;
@@ -151,7 +154,7 @@ server {
     include conf.d/users/[% user %]/*.conf;
     include conf.d/users/[% user %]/[% domains.0.replace('^\*\.', '_wildcard_.') %]/*.conf;
 
-    [%- IF behaviors.standalone %]
+    [%- IF behavior.standalone %]
     [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
     include conf.d/includes-optional/cpanel-cgi-location.conf;
     include conf.d/includes-optional/cpanel-server-parsed-location.conf;

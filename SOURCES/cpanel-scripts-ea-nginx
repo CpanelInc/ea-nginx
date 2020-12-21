@@ -344,8 +344,13 @@ sub _write_user_conf {
     }
     scripts::ea_nginx_userdata::run($user);
 
-    my $preserver = !-e "/etc/nginx/ea-nginx/enable.standalone" ? "proxy_cache_path /etc/nginx/cache/proxy/$user keys_zone=$user:10m inactive=60m;\n\n" : "";
-    path($userconf)->spew( $preserver . "#### main domain for $user ##\n" );
+    my $caching_hr = _get_caching_hr($user);
+    my $pre_server = "";
+    if ( $caching_hr->{enabled} ) {
+        $pre_server = "proxy_cache_path /etc/nginx/cache/proxy/$user keys_zone=$user:$caching_hr->{zone_size} inactive=$caching_hr->{inactive_time};\n\n";
+    }
+
+    path($userconf)->spew( $pre_server . "#### main domain for $user ##\n" );
     _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
 
     if (@actual_subdomains) {
@@ -366,7 +371,35 @@ sub _write_user_conf {
     return 1;
 }
 
-my ( $server_tt, $docroots, $logging_hr );
+my ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
+
+sub _get_caching_hr {
+    my ($user) = @_;
+
+    if ( !exists $caching_cache->{$user} ) {
+
+        # at this point that file should exist; if it does not we want this to barf so we know about it
+        $global_caching //= Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+
+        my $user_caching = eval { Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/nginx-cache.json") } || {};
+        $caching_cache->{$user} = {
+
+            # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/cache.json
+            enabled           => 1,
+            x_cache_header    => 0,
+            zone_size         => "10m",
+            inactive_time     => "60m",
+            proxy_cache_valid => {
+                "200 302" => "60m",
+                "404"     => "1m",
+            },
+            %{$global_caching},
+            %{$user_caching},
+        };
+    }
+
+    return $caching_cache->{$user};
+}
 
 sub _get_logging_hr {
     return $logging_hr if $logging_hr;
@@ -427,6 +460,7 @@ sub _render_and_append {
     my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
     my $secruleengineoff = _get_secruleengineoff( $user => $domains );
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
+    my $caching_hr       = _get_caching_hr($user);
 
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
@@ -486,7 +520,7 @@ sub _render_and_append {
             },
             behavior => {
                 standalone => ( -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0 ),
-                caching    => ( -e "/etc/nginx/ea-nginx/enable.caching"    ? 1 : 0 ),
+                caching    => $caching_hr,
             },
         },
         sub {
