@@ -14,15 +14,17 @@ To customize a specific server block you can create include files (suitable for 
 
 * the main domain for the server block with the main domain and its parked domains
 * the subdomain for the server blocks for non-addon subdomains
-* the subdomain for the server blocks for addon domains and theri subdomains
+* the subdomain for the server blocks for addon domains and their subdomains
 
-Reusable `.conf` files should go in `/etc/nginx/conf.d/server-includes-optional/`. Dependiong on what they are for you could make those symlinks/hardlinks in `…/users/<USER>/*.conf` or `…users/<USER>/<FQDN>/` or `include` them as part files that you put there.
+Reusable `.conf` files should go in `/etc/nginx/conf.d/server-includes-optional/`. Depending on what they are for, you could make those symlinks/hardlinks in `…/users/<USER>/*.conf` or `…users/<USER>/<FQDN>/` or `include` them as part files that you put there.
 
 # Global Configuration
 
 Should go in `/etc/nginx/conf.d/*.conf` just be sure not to over write a file the RPM controls or it will get blown away.
 
 If your intent is to adjust every server block you can add a `.conf` file to `/etc/nginx/conf.d/server-includes/` just be sure not to over write a file the RPM controls or it will get blown away.
+
+To have a global configuration file regenerated have your package drop a script into `/etc/nginx/ea-nginx/config-scripts/global/`. These will be executed by `/usr/local/cpanel/scripts/ea-nginx config` with `--all` or `--global`.
 
 # dev notes
 
