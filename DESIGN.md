@@ -11,7 +11,7 @@
 
 NGINX is the most popular feature on the feature site, specifically speeding up website by using it as a caching proxy.
 
-Some also want it to server static content instead of proxying that also.
+Some also want it to serve static content instead of proxying that also.
 
 ## Overall Intent
 
@@ -24,7 +24,7 @@ Estimate:
 1. how much time and resources will be needed to maintain the feature in the future
 2. how frequently maintenance will need to happen
 
-Once in place very little of either. Anytime we add another “behavior” type it will involve determining what configuration we need, creating a package that will enable that configuration, and probably updating ea-nginx configuratiosn to factor that in.
+Once in place very little of either. Anytime we add another “behavior” type it will involve determining what configuration we need, creating a package that will enable that configuration, and probably updating ea-nginx configurations to factor that in.
 
 ## Options/Decisions
 
