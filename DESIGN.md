@@ -9,7 +9,7 @@
 
 ## Detailed Summary
 
-NGINX is the most popular feature on the feature site, specifically speeding up website by using it as a caching proxy.
+NGINX is the most popular feature on the feature site, specifically speeding up website by using it as a caching reverse proxy.
 
 Some also want it to serve static content instead of proxying that also.
 
@@ -33,10 +33,10 @@ Note: “standalone” is how it works in the initial experimental `ea-nginx`: s
 | Approach | Pro | Con |
 | ---------| ----| ----|
 | leave it as standalone | No Effort | Not what most people want, has security issues so would be longer to get out of experimental |
-| change it to proxy everything to Apache and cache | This is what most people want | That leaves the rest by the wayside |
-| change it to proxy everything to Apache and cache by default; with a way to switch to standalone (and any other “Behavior Modes” that come up) | Everyone can get what they want, ea-nginx can go to production while standalone stays experimental (security issues), can add new modes relatively easy | None |
+| change it to reverse proxy everything to Apache and cache | This is what most people want | That leaves the rest by the wayside |
+| change it to reverse proxy everything to Apache and cache by default; with a way to switch to standalone (and any other “Behavior Modes” that come up) | Everyone can get what they want, ea-nginx can go to production while standalone stays experimental (security issues), can add new modes relatively easy | None |
 
-### Conclusion: all-proxy w/ caching by default, “standalone” via new `ea-nginx-standalone`
+### Conclusion: reverse proxy to Apache w/ caching by default, “standalone” via new `ea-nginx-standalone`
 
 ## SEE ALSO
 
