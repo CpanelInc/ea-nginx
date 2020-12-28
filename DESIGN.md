@@ -38,6 +38,10 @@ Note: “standalone” is how it works in the initial experimental `ea-nginx`: s
 
 ### Conclusion: reverse proxy to Apache w/ caching by default, “standalone” via new `ea-nginx-standalone`
 
+Caching is done per user in `/etc/nginx/cache/<type>/<user>`. `<type>` is `proxy` for `proxy_pass`. When caching is added to standalone (ZC-8173), there will also be `fastcgi` for `fastcgi_pass`.
+
+**Note**: The cache directories are `700` `nobody/root` which means users can not see them unless the server is already exploitable (e.g. Apache running PHP as `nobody`).
+
 ## SEE ALSO
 
 The [README.md](README.md) contains information on how the configuration is laid out as well as other things to take into consideration.
