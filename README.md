@@ -40,6 +40,30 @@ Since `SOURCES/` must be flat it is cleaner to generate a tarball as a single so
 
 Just run: `cd SOURCES/cpanel && rm -f ../cpanel.tar.gz && tar czf ../cpanel.tar.gz conf.d ea-nginx && cd ../.. && git add SOURCES/cpanel.tar.gz`
 
+## Make sure any `proxy_pass` directives do not introduce XSS vulnerability
+
+TL;DR: simply ensure it does not end in a `/`
+
+NGINX as a reverse proxy does not re-URI encode the path that it sends to the back end when `proxy_pass`’s value ends with a `/`.
+
+For example:
+
+Given this URL `https://example.com/%3C%22your XSS goes here%22%3E/` …
+
+```
+proxy_pass https://backend/foo/;
+```
+
+… will get sent to the backend as `https://example.com/<"your XSS goes here">/`.
+
+Remove the trailing slash …
+
+```
+proxy_pass https://backend/foo;
+```
+
+… and will get sent to the backend as `https://example.com/%3C%22your XSS goes here%22%3E/`.
+
 ## Make sure any `alias` directives do not introduce path traversal exploit
 
 TL;DR: simply ensure the `location` it belongs to ends in a `/`
