@@ -26,6 +26,10 @@ If your intent is to adjust every server block you can add a `.conf` file to `/e
 
 To have a global configuration file regenerated have your package drop a script into `/etc/nginx/ea-nginx/config-scripts/global/`. These will be executed by `/usr/local/cpanel/scripts/ea-nginx config` with `--all` or `--global`.
 
+## 3rdparty Vendor Proxy Configuration
+
+If an external package needs some specific proxy configuration beyond what `cpanel-proxy.conf` provides they can drop config files in `conf.d/includes-optional/cpanel-proxy-vendors/*.conf`.
+
 # dev notes
 
 ## Re-create SOURCES/cpanel.tar.gz before building!
