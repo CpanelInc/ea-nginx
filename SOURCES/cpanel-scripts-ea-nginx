@@ -347,7 +347,7 @@ sub _write_user_conf {
     my $caching_hr = _get_caching_hr($user);
     my $pre_server = "";
     if ( $caching_hr->{enabled} ) {
-        $pre_server = "proxy_cache_path /etc/nginx/cache/proxy/$user keys_zone=$user:$caching_hr->{zone_size} inactive=$caching_hr->{inactive_time};\n\n";
+        $pre_server = "proxy_cache_path /etc/nginx/cache/proxy/$user levels=$caching_hr->{levels} keys_zone=$user:$caching_hr->{zone_size} inactive=$caching_hr->{inactive_time};\n\n";
     }
 
     path($userconf)->spew( $pre_server . "#### main domain for $user ##\n" );
@@ -389,6 +389,7 @@ sub _get_caching_hr {
             x_cache_header    => 0,
             zone_size         => "10m",
             inactive_time     => "60m",
+            levels            => "1:2",
             proxy_cache_valid => {
                 "200 302" => "60m",
                 "404"     => "1m",
