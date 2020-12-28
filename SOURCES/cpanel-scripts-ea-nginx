@@ -415,6 +415,9 @@ sub _get_logging_hr {
     $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
     $logging_hr->{loglevel}            = "warn";
 
+    $global_caching //= Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+    $logging_hr->{enable_cache_log} = $global_caching->{logging};
+
     if ( $logging_hr->{default_format_name} ne "combined" && $logging_hr->{default_format_name} ne "common" ) {
         warn "Invalid “LOGSTYLE”, using `combined`\n";
         $logging_hr->{default_format_name} = "combined";

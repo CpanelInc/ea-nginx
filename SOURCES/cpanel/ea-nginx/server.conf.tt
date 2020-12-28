@@ -60,10 +60,6 @@ server {
         proxy_cache_revalidate [% behavior.caching.proxy_cache_revalidate %];
         proxy_cache_min_uses [% behavior.caching.proxy_cache_min_uses %];
         proxy_cache_lock [% behavior.caching.proxy_cache_lock %];
-            [%- IF behavior.caching.logging %]
-        log_format custom_cache_log '[$time_local] [Cache:$upstream_cache_status] [$host] [Remote_Addr: $remote_addr] - $remote_user - $server_name to: $upstream_addr: "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"';
-        access_log /var/log/nginx/cache.log custom_cache_log;
-            [%- END %]
             [%- IF behavior.caching.x_cache_header %]
         add_header X-Cache $upstream_cache_status;
             [%- END %]
