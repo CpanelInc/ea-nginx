@@ -239,7 +239,7 @@ sub _get_application_paths {
             }
             elsif ( my $current_default = Cpanel::LoadFile::load_if_exists("/etc/cpanel/ea4/passenger.$type") ) {
                 if ( !$new ) {
-                    warn "The “\$app->{name}” application‘s “\$type” value ($pre_multi_binary) is not executable/does not exist.\n";
+                    warn "The “$app->{name}” application‘s “$type” value ($pre_multi_binary) is not executable/does not exist.\n";
                     warn "The current default, $current_default, will be in effect for the “\$app->{name}” application.\n";
                 }
                 $app->{$type} = $current_default;
@@ -247,12 +247,12 @@ sub _get_application_paths {
         }
         else {
             if ( !defined $app->{$type} ) {
-                warn "The “\$app->{name}” application has “\$type” but it is not defined, removing …\n";
+                warn "The “$app->{name}” application has “$type” but it is not defined, removing …\n";
                 delete $app->{$type};
                 next;
             }
 
-            warn "The “\$app->{name}” application‘s “\$type” value ($app->{$type}) is not executable/does not exist.\n" if !-x $app->{$type};
+            warn "The “$app->{name}” application’s “$type” value ($app->{$type}) is not executable/does not exist.\n" if !-x $app->{$type};
         }
     }
 
