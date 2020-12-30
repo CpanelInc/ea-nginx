@@ -145,6 +145,7 @@ sub config {
     if ( $user eq '--all' || $user eq '--global' ) {
         _write_global_logging();
         _write_global_passenger();
+        _write_global_ea_nginx();
         _do_other_global_config();
 
         if ( $user eq '--all' ) {
@@ -283,6 +284,12 @@ sub _write_global_passenger {
         },
     );
 
+}
+
+sub _write_global_ea_nginx {
+    my $cur_settings = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/settings.json");
+    my $cont         = path("/etc/nginx/ea-nginx/ea-nginx.conf.tt")->slurp;
+    return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { settings => $cur_settings } );
 }
 
 sub _write_global_logging {
