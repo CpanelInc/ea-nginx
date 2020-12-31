@@ -340,7 +340,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{__install} -p %{SOURCE24} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
 %{__install} -p %{SOURCE25} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx.conf
 
-mkdir -p $RPM_BUILD_ROOT/etc/nginx/cache/proxy
+mkdir -p $RPM_BUILD_ROOT/var/cache/ea-nginx/proxy
 
 %if 0%{?rhel} >= 8
 mkdir -p $RPM_BUILD_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__
@@ -366,7 +366,7 @@ rm -rf %{bdir}/_passenger_source_code
 %dir %{_sysconfdir}/nginx/conf.d/modules
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/passenger.conf
-%attr(700, nobody, root) %{_sysconfdir}/nginx/cache/proxy
+%attr(700, nobody, root) /var/cache/ea-nginx/proxy
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
