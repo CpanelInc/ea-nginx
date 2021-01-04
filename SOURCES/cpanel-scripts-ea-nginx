@@ -475,7 +475,7 @@ sub _render_and_append {
     my $redirects        = _get_redirects( $domains, $cpanel_redirects );
     my $logging_hr       = _get_logging_hr();
     my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
-    my $secruleengineoff = _get_secruleengineoff( $user => $domains );
+    my $secruleengineoff = -e "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf" ? _get_secruleengineoff( $user => $domains ) : 0;
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
 
