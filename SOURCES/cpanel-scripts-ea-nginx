@@ -378,7 +378,7 @@ sub _write_user_conf {
     return 1;
 }
 
-my ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
+our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
 
 sub _get_caching_hr {
     my ($user) = @_;

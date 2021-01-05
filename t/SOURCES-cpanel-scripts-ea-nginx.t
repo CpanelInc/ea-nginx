@@ -49,6 +49,8 @@ no warnings "redefine";
 *scripts::ea_nginx::_reload                 = sub { push @_reload, [@_] };
 use warnings "redefine";
 
+our $cpanel_json_loadfiles_string = "";
+
 shared_examples_for "any circular redirect" => sub {
     share my %ti;
 
@@ -133,7 +135,7 @@ describe "ea-nginx script" => sub {
     share my %mi;
     around {
         no warnings "redefine", "once";
-        local $ENV{"scripts::ea_nginx::bail_die"} = 1;
+        local $ENV{"scripts::ea_nginx::bail_die"}         = 1;
         local *scripts::ea_nginx::_write_global_logging   = sub { };
         local *scripts::ea_nginx::_write_global_passenger = sub { };
         use warnings "redefine", "once";
@@ -155,7 +157,8 @@ describe "ea-nginx script" => sub {
                 local $mi{cmd} = "config";
                 local @glob_res = ();
                 no warnings "redefine";
-                local *File::Glob::bsd_glob = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
+                local *File::Glob::bsd_glob                      = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
+                local *scripts::ea_nginx::_write_global_ea_nginx = sub { };
                 yield;
             };
             it_should_behave_like "any sub command that takes a cpanel user";
@@ -677,6 +680,59 @@ describe "ea-nginx script" => sub {
                         is $trap->exit, undef;
                     };
                 };
+            };
+        };
+    };
+
+    describe "private routines" => sub {
+        describe "_get_caching_hr" => sub {
+            around {
+                local $cpanel_json_loadfiles_string = "";
+
+                local $scripts::ea_nginx::caching_cache  = undef;
+                local $scripts::ea_nginx::global_caching = undef;
+
+                no warnings "redefine";
+                local *Cpanel::JSON::LoadFile = sub {
+                    my ($file) = @_;
+                    $cpanel_json_loadfiles_string .= "$file,";
+                    return {
+                        file => $file,
+                    };
+                };
+
+                yield;
+            };
+
+            it "should get the data from the caching files" => sub {
+                trap {
+                    scripts::ea_nginx::_get_caching_hr("thebilldozer");
+                };
+
+                my $expected_str = "/etc/nginx/ea-nginx/cache.json,/var/cpanel/userdata/thebilldozer/nginx-cache.json,";
+                is( $cpanel_json_loadfiles_string, $expected_str );
+            };
+
+            it "should get the data from the caching_cache, and not load from files" => sub {
+                local $scripts::ea_nginx::caching_cache = { thebilldozer => 1 };
+
+                trap {
+                    scripts::ea_nginx::_get_caching_hr("thebilldozer");
+                };
+
+                my $expected_str = "";
+                is( $cpanel_json_loadfiles_string, $expected_str );
+            };
+
+            it "should not load from cache.json , when caching is present" => sub {
+                local $scripts::ea_nginx::global_caching = { global_caching => 1 };
+
+                trap {
+                    scripts::ea_nginx::_get_caching_hr("thebilldozer");
+                };
+
+                my $expected_str = "/var/cpanel/userdata/thebilldozer/nginx-cache.json,";
+                is( $cpanel_json_loadfiles_string, $expected_str );
             };
         };
     };
