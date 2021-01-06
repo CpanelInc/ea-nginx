@@ -84,6 +84,8 @@ server {
         include conf.d/includes-optional/cpanel-proxy.conf;
         proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
     }
+
+    include conf.d/server-includes/cpanel-static-locations.conf;
         [%- IF basic_auth.locations %]
 
             [%- FOREACH location IN basic_auth.locations.keys.sort %]
