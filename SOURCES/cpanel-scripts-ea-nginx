@@ -262,7 +262,7 @@ sub _get_application_paths {
 
 sub _write_global_passenger {
 
-    my $defaults_hr = {};
+    my $defaults_hr = { name => "global passenger defaults" };
     _get_application_paths($defaults_hr);
 
     my $passenger_root = $defaults_hr->{ruby};
