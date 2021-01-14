@@ -25,3 +25,8 @@ pipelog "/usr/local/cpanel/bin/splitlogs --dir=/var/log/nginx/domains --main=[% 
 # access_log format can be set in WHM under 'Basic WebHost Manager® Setup'
 access_log /var/log/nginx/access.log cp_[% logging.default_format_name %];
 [% END -%]
+
+[%- IF logging.enable_cache_log %]
+log_format cp_cache_log '[$time_local] [Cache:$upstream_cache_status] [$host] [Remote_Addr: $remote_addr] - $remote_user - $server_name to: $upstream_addr: "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"';
+access_log /var/log/nginx/cache.log cp_cache_log;
+[%- END %]

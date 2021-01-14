@@ -145,6 +145,7 @@ sub config {
     if ( $user eq '--all' || $user eq '--global' ) {
         _write_global_logging();
         _write_global_passenger();
+        _write_global_ea_nginx();
         _do_other_global_config();
 
         if ( $user eq '--all' ) {
@@ -239,7 +240,7 @@ sub _get_application_paths {
             }
             elsif ( my $current_default = Cpanel::LoadFile::load_if_exists("/etc/cpanel/ea4/passenger.$type") ) {
                 if ( !$new ) {
-                    warn "The “\$app->{name}” application‘s “\$type” value ($pre_multi_binary) is not executable/does not exist.\n";
+                    warn "The “$app->{name}” application‘s “$type” value ($pre_multi_binary) is not executable/does not exist.\n";
                     warn "The current default, $current_default, will be in effect for the “\$app->{name}” application.\n";
                 }
                 $app->{$type} = $current_default;
@@ -247,12 +248,12 @@ sub _get_application_paths {
         }
         else {
             if ( !defined $app->{$type} ) {
-                warn "The “\$app->{name}” application has “\$type” but it is not defined, removing …\n";
+                warn "The “$app->{name}” application has “$type” but it is not defined, removing …\n";
                 delete $app->{$type};
                 next;
             }
 
-            warn "The “\$app->{name}” application‘s “\$type” value ($app->{$type}) is not executable/does not exist.\n" if !-x $app->{$type};
+            warn "The “$app->{name}” application’s “$type” value ($app->{$type}) is not executable/does not exist.\n" if !-x $app->{$type};
         }
     }
 
@@ -261,7 +262,7 @@ sub _get_application_paths {
 
 sub _write_global_passenger {
 
-    my $defaults_hr = {};
+    my $defaults_hr = { name => "global passenger defaults" };
     _get_application_paths($defaults_hr);
 
     my $passenger_root = $defaults_hr->{ruby};
@@ -283,6 +284,12 @@ sub _write_global_passenger {
         },
     );
 
+}
+
+sub _write_global_ea_nginx {
+    my $cur_settings = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/settings.json");
+    my $cont         = path("/etc/nginx/ea-nginx/ea-nginx.conf.tt")->slurp;
+    return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { settings => $cur_settings } );
 }
 
 sub _write_global_logging {
@@ -344,7 +351,13 @@ sub _write_user_conf {
     }
     scripts::ea_nginx_userdata::run($user);
 
-    path($userconf)->spew("#### main domain for $user ##\n");
+    my $caching_hr = _get_caching_hr($user);
+    my $pre_server = "";
+    if ( $caching_hr->{enabled} ) {
+        $pre_server = "proxy_cache_path /var/cache/ea-nginx/proxy/$user levels=$caching_hr->{levels} keys_zone=$user:$caching_hr->{zone_size} inactive=$caching_hr->{inactive_time};\n\n";
+    }
+
+    path($userconf)->spew( $pre_server . "#### main domain for $user ##\n" );
     _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
 
     if (@actual_subdomains) {
@@ -365,7 +378,42 @@ sub _write_user_conf {
     return 1;
 }
 
-my ( $server_tt, $docroots, $logging_hr );
+our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
+
+sub _get_caching_hr {
+    my ($user) = @_;
+
+    if ( !exists $caching_cache->{$user} ) {
+
+        # at this point that file should exist; if it does not we want this to barf so we know about it
+        $global_caching //= Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+
+        my $user_caching = eval { Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/nginx-cache.json") } || {};
+        $caching_cache->{$user} = {
+
+            # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/cache.json
+            enabled           => 1,
+            logging           => 0,
+            x_cache_header    => 0,
+            zone_size         => "10m",
+            inactive_time     => "60m",
+            levels            => "1:2",
+            proxy_cache_valid => {
+                "200 302" => "60m",
+                "404"     => "1m",
+            },
+            proxy_cache_use_stale         => "error timeout http_429 http_500 http_502 http_503 http_504",
+            proxy_cache_background_update => "on",
+            proxy_cache_revalidate        => "on",
+            proxy_cache_min_uses          => 1,
+            proxy_cache_lock              => "on",
+            %{$global_caching},
+            %{$user_caching},
+        };
+    }
+
+    return $caching_cache->{$user};
+}
 
 sub _get_logging_hr {
     return $logging_hr if $logging_hr;
@@ -373,6 +421,9 @@ sub _get_logging_hr {
     $logging_hr->{piped_logs}          = Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
     $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
     $logging_hr->{loglevel}            = "warn";
+
+    $global_caching //= Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+    $logging_hr->{enable_cache_log} = $global_caching->{logging};
 
     if ( $logging_hr->{default_format_name} ne "combined" && $logging_hr->{default_format_name} ne "common" ) {
         warn "Invalid “LOGSTYLE”, using `combined`\n";
@@ -424,8 +475,9 @@ sub _render_and_append {
     my $redirects        = _get_redirects( $domains, $cpanel_redirects );
     my $logging_hr       = _get_logging_hr();
     my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
-    my $secruleengineoff = _get_secruleengineoff( $user => $domains );
+    my $secruleengineoff = -e "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf" ? _get_secruleengineoff( $user => $domains ) : 0;
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
+    my $caching_hr       = _get_caching_hr($user);
 
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
@@ -482,6 +534,10 @@ sub _render_and_append {
             ea4conf    => $ea4_conf_hr,
             passenger  => {
                 apps => $passenger_apps,
+            },
+            behavior => {
+                standalone => ( -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0 ),
+                caching    => $caching_hr,
             },
         },
         sub {

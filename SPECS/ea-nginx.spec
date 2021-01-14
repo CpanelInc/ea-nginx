@@ -118,11 +118,11 @@ BuildRequires: systemd
 
 %define BASE_CONFIGURE_ARGS $(echo "--prefix=%{_sysconfdir}/nginx --sbin-path=%{_sbindir}/nginx --modules-path=%{_libdir}/nginx/modules --conf-path=%{_sysconfdir}/nginx/nginx.conf --error-log-path=%{_localstatedir}/log/nginx/error.log --http-log-path=%{_localstatedir}/log/nginx/access.log --pid-path=%{_localstatedir}/run/nginx.pid --lock-path=%{_localstatedir}/run/nginx.lock --http-client-body-temp-path=%{_localstatedir}/cache/nginx/client_temp --http-proxy-temp-path=%{_localstatedir}/cache/nginx/proxy_temp --http-fastcgi-temp-path=%{_localstatedir}/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=%{_localstatedir}/cache/nginx/uwsgi_temp --http-scgi-temp-path=%{_localstatedir}/cache/nginx/scgi_temp --user=%{nginx_user} --group=%{nginx_group} --with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module --with-openssl-opt=enable-tls1_3 --with-openssl-opt=no-nextprotoneg")
 
-Summary: High performance web server
+Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 7
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -170,8 +170,10 @@ BuildRequires: pcre-devel
 Provides: webserver
 
 %description
-nginx [engine x] is an HTTP and reverse proxy server, as well as
-a mail proxy server.
+NGINX is a high performance web server that is
+configured as a caching reverse-proxy by default.
+This setup results in faster time to first byte
+and often less load on a busy server.
 
 %if 0%{?suse_version} >= 1315
 %debug_package
@@ -340,6 +342,8 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 %{__install} -p %{SOURCE24} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
 %{__install} -p %{SOURCE25} $RPM_BUILD_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx.conf
 
+mkdir -p $RPM_BUILD_ROOT/var/cache/ea-nginx/proxy
+
 %if 0%{?rhel} >= 8
 mkdir -p $RPM_BUILD_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__
 %{__install} -p %{SOURCE27} $RPM_BUILD_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
@@ -364,6 +368,7 @@ rm -rf %{bdir}/_passenger_source_code
 %dir %{_sysconfdir}/nginx/conf.d/modules
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/passenger.conf
+%attr(700, nobody, root) /var/cache/ea-nginx/proxy
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
@@ -389,6 +394,7 @@ rm -rf %{bdir}/_passenger_source_code
 %{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
+%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/cache.json
 %{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
@@ -631,6 +637,9 @@ fi
 
 
 %changelog
+* Fri Dec 18 2020 Daniel Muey <dan@cpanel.net> - 1.19.3-7
+- ZC-8052: change to all-proxy; detect chaching and standalone and do needful
+
 * Thu Dec 10 2020 Travis Holloway <t.holloway@cpanel.net> - 1.19.3-6
 - ZC-8061: Build C7 against ea-ruby27
 
