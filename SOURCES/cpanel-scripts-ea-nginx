@@ -365,11 +365,15 @@ sub _write_user_conf {
     print "Setting up $userconf …\n";
 
     if ( !defined &scripts::ea_nginx_userdata::run ) {
+        my $prefix = "/usr/local/cpanel/scripts/ea-nginx";
+        if ( $0 =~ m{/SOURCES/} ) {
 
-        # Can’t use FindBin because the script name is different in repo and in RPM
-        require Cwd;
-        my $cur_abs = Cwd::abs_path($0);
-        require "$cur_abs-userdata";
+            # Can’t use FindBin because the script name is different in repo and in RPM
+            require Cwd;
+            $prefix = Cwd::abs_path($0);
+        }
+
+        require "$prefix-userdata";
     }
     scripts::ea_nginx_userdata::run($user);
 
