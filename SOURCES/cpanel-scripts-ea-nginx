@@ -173,6 +173,28 @@ sub reload { _reload() }
 #### helpers ##
 ###############
 
+sub caching_defaults {    # do not want `our %caching_defaults` or a hash reference so that no one can accidentally change it
+
+    # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/cache.json
+    return (
+        enabled           => 1,
+        logging           => 0,
+        x_cache_header    => 0,
+        zone_size         => "10m",
+        inactive_time     => "60m",
+        levels            => "1:2",
+        proxy_cache_valid => {
+            "200 302" => "60m",
+            "404"     => "1m",
+        },
+        proxy_cache_use_stale         => "error timeout http_429 http_500 http_502 http_503 http_504",
+        proxy_cache_background_update => "on",
+        proxy_cache_revalidate        => "on",
+        proxy_cache_min_uses          => 1,
+        proxy_cache_lock              => "on",
+    );
+}
+
 my $tt;
 
 sub _render_tt_to_file {
@@ -390,23 +412,7 @@ sub _get_caching_hr {
 
         my $user_caching = eval { Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/nginx-cache.json") } || {};
         $caching_cache->{$user} = {
-
-            # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/cache.json
-            enabled           => 1,
-            logging           => 0,
-            x_cache_header    => 0,
-            zone_size         => "10m",
-            inactive_time     => "60m",
-            levels            => "1:2",
-            proxy_cache_valid => {
-                "200 302" => "60m",
-                "404"     => "1m",
-            },
-            proxy_cache_use_stale         => "error timeout http_429 http_500 http_502 http_503 http_504",
-            proxy_cache_background_update => "on",
-            proxy_cache_revalidate        => "on",
-            proxy_cache_min_uses          => 1,
-            proxy_cache_lock              => "on",
+            caching_defaults(),
             %{$global_caching},
             %{$user_caching},
         };

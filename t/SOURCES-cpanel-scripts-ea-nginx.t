@@ -684,6 +684,41 @@ describe "ea-nginx script" => sub {
         };
     };
 
+    describe "caching_defaults()" => sub {
+        it "should have hard coded defaults" => sub {
+            my %conf = scripts::ea_nginx::caching_defaults();
+            is_deeply \%conf, {
+                enabled           => 1,
+                logging           => 0,
+                x_cache_header    => 0,
+                zone_size         => "10m",
+                inactive_time     => "60m",
+                levels            => "1:2",
+                proxy_cache_valid => {
+                    "200 302" => "60m",
+                    "404"     => "1m",
+                },
+                proxy_cache_use_stale         => "error timeout http_429 http_500 http_502 http_503 http_504",
+                proxy_cache_background_update => "on",
+                proxy_cache_revalidate        => "on",
+                proxy_cache_min_uses          => 1,
+                proxy_cache_lock              => "on",
+            };
+        };
+
+        it "should matching data in global conf file" => sub {
+            my %conf = scripts::ea_nginx::caching_defaults();
+            my $file = Cpanel::JSON::LoadFile("$FindBin::Bin/../SOURCES/cpanel/ea-nginx/cache.json");
+
+            for my $bool (qw(enabled logging x_cache_header proxy_cache_min_uses)) {
+                $conf{$bool} = $conf{$bool} ? Cpanel::JSON::true : Cpanel::JSON::false;
+                $file->{$bool} = $file->{$bool} ? Cpanel::JSON::true : Cpanel::JSON::false;
+            }
+
+            is_deeply \%conf, $file;
+        };
+    };
+
     describe "private routines" => sub {
         describe "_get_caching_hr" => sub {
             around {
