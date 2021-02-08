@@ -211,7 +211,6 @@ server {
     [% END -%]
 }
 
-[%- IF behavior.standalone %]
 # nginx does not support a subdomain of a wildcard domain
 # Example:  whm.*.mydomain.tld would not be allowed
 [%- SET domains = domains.grep('^[^\*]') %]
@@ -259,5 +258,4 @@ server {
 }
 
     [%- END -%]
-[%- END -%]
 [%- END -%]
