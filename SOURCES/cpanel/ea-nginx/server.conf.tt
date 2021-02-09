@@ -68,7 +68,7 @@ server {
         proxy_cache_bypass $CPANEL_SKIP_PROXY;
             [%- END %]
 
-        [%- FOREACH cache_valid IN behavior.caching.proxy_cache_valid.keys %]
+        [%- FOREACH cache_valid IN behavior.caching.proxy_cache_valid.keys.sort %]
         proxy_cache_valid [% cache_valid %] [% behavior.caching.proxy_cache_valid.$cache_valid %];
         [%- END %]
         proxy_cache_use_stale [% behavior.caching.proxy_cache_use_stale %];
