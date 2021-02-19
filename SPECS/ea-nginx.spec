@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -637,6 +637,9 @@ fi
 
 
 %changelog
+* Wed Feb 10 2021 Tim Mullin <tim@cpanel.net> - 1.19.6-5
+- EA-9562: Fix escaping in nginx.service file to work with CentOS 8
+
 * Mon Feb 08 2021 Daniel Muey <dan@cpanel.net> - 1.19.6-4
 - ZC-8389: Proxy service subdomains directly to cpsrvd under reverse proxy
 
