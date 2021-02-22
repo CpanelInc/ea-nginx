@@ -53,6 +53,11 @@ server {
         [% END -%]
     [% END -%]
 
+    location /cpanelwebcall {
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass http://127.0.0.1:2082/cpanelwebcall;
+    }
+
     [%- IF !behavior.standalone %]
     location / {
         [%- IF behavior.caching.enabled %]
