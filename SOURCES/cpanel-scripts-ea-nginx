@@ -53,6 +53,12 @@ my $cmds = {
         abstract => "remove a given user’s nginx configuration",
         help     => "Remove the given user’s nginx configuration. Only does the generated conf.d/user/<user>.conf, does not touch the user customization directory conf.d/users/<user>/",
     },
+    clear_cache => {
+        code     => \&clear_cache_cmd,
+        clue     => "clear_cache [--all|<user1> <user2> ...]",
+        abstract => 'Clear the cache for a user or all users.',
+        help     => 'Clear the cache for a user or all users.',
+    },
 };
 
 my $hint_blurb = "Usage: `$0 {command} …`.\n\tThis tool supports the following commands:";
@@ -165,6 +171,34 @@ sub config {
     }
 
     return 1;
+}
+
+sub clear_cache_cmd {
+    my ( $app, $user, @args ) = @_;
+
+    if ( $user eq '--all' ) {
+        clear_cache();
+    }
+    else {
+        clear_cache($user);
+    }
+
+    return 1;
+}
+
+our $var_cache_ea_nginx = '/var/cache/ea-nginx';
+
+sub clear_cache {
+    my (@users) = @_;
+
+    if (@users) {
+        foreach my $user (@users) {
+            _delete_glob( $var_cache_ea_nginx . "/*/$user/*" );
+        }
+    }
+    else {
+        _delete_glob( $var_cache_ea_nginx . "/*/*/*" );
+    }
 }
 
 sub reload { _reload() }
@@ -796,6 +830,23 @@ sub _bail {
     warn "$msg\n";
     $app->help();
     exit(1);                                               # there is no return()ing from this lol
+}
+
+sub _delete_glob {
+    my ($glob) = @_;
+
+    for my $item ( File::Glob::csh_glob($glob) ) {
+
+        # File::Path::Tiny::rm does not delete files
+        if ( -l $item || -f _ ) {
+            unlink($item);
+        }
+        elsif ( -d $item ) {
+            File::Path::Tiny::rm($item);
+        }
+    }
+
+    return;
 }
 
 1;
