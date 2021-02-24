@@ -56,8 +56,8 @@ my $cmds = {
     clear_cache => {
         code     => \&clear_cache_cmd,
         clue     => "clear_cache [--all|<user1> <user2> ...]",
-        abstract => 'Clear the cache for a user or all users.',
-        help     => 'Clear the cache for a user or all users.',
+        abstract => 'Clear the cache for a user, some users, or all users.',
+        help     => 'Clear the cache for a user, some users, or all users.',
     },
 };
 
@@ -174,13 +174,13 @@ sub config {
 }
 
 sub clear_cache_cmd {
-    my ( $app, $user, @args ) = @_;
+    my ( $app, @users ) = @_;
 
-    if ( $user eq '--all' ) {
+    if ( @users == 0 || $users[0] eq '--all' ) {
         clear_cache();
     }
     else {
-        clear_cache($user);
+        clear_cache(@users);
     }
 
     return 1;

@@ -130,6 +130,7 @@ sub describe {
         'Accounts::Remove',
         'Accounts::suspendacct',
         'Accounts::unsuspendacct',
+        'Accounts::SiteIP::set',
         'AutoSSL::installssl',
         'Domain::park',
         'Domain::unpark',
@@ -269,12 +270,23 @@ sub _php_fpm_config {
 }
 
 sub _rebuild_config_all {
+    my ( $hook, $event ) = @_;
+
     local $@;
     eval {
         require Cpanel::ServerTasks;
 
         Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(0), 'rebuild_config' );
+
+        if ( $hook->{event} eq 'Accounts::suspendacct' ) {
+            my $user = $event->{args}->{user};
+
+            if ($user) {
+                Cpanel::ServerTasks::schedule_task( ['NginxTasks'], NginxHooks::get_time_to_wait(0) + 10, "clear_user_cache $user" );
+            }
+        }
     };
+
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 

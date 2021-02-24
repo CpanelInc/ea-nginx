@@ -43,6 +43,34 @@ Cpanel::TaskProcessors::NginxTasks
 
 {
 
+    package Cpanel::TaskProcessors::NginxTasks::clear_user_cache;
+    use parent 'Cpanel::TaskQueue::FastSpawn';
+
+    sub is_valid_args {
+        my ( $self, $task ) = @_;
+        return 1 == $task->args;
+    }
+
+    sub _do_child_task {
+        my ( $self, $task, $logger ) = @_;
+
+        my $ea_nginx_script = '/usr/local/cpanel/scripts/ea-nginx';
+        return if !-e $ea_nginx_script;
+
+        require $ea_nginx_script;
+
+        my ($user) = $task->args();
+
+        local $@;
+        eval { scripts::ea_nginx::clear_cache($user); };
+        print STDERR "scripts::ea_nginx::clear_cache: ($user) $@" if $@;
+
+        return;
+    }
+}
+
+{
+
     package Cpanel::TaskProcessors::NginxTasks::rebuild_config;
     use parent 'Cpanel::TaskQueue::FastSpawn';
 
@@ -95,13 +123,18 @@ rebuild_user - Rebuilds the Nginx config for a user
 
 rebuild_config - Rebuilds the Nginx config for all users
 
+rebuild_global - Rebuilds the Nginx global config
+
+clear_user_cache - clears the cache for one user
+
 =cut
 
 sub to_register {
     return (
-        [ 'rebuild_user',   Cpanel::TaskProcessors::NginxTasks::rebuild_user->new() ],
-        [ 'rebuild_config', Cpanel::TaskProcessors::NginxTasks::rebuild_config->new() ],
-        [ 'rebuild_global', Cpanel::TaskProcessors::NginxTasks::rebuild_global->new() ],
+        [ 'rebuild_user',     Cpanel::TaskProcessors::NginxTasks::rebuild_user->new() ],
+        [ 'rebuild_config',   Cpanel::TaskProcessors::NginxTasks::rebuild_config->new() ],
+        [ 'rebuild_global',   Cpanel::TaskProcessors::NginxTasks::rebuild_global->new() ],
+        [ 'clear_user_cache', Cpanel::TaskProcessors::NginxTasks::clear_user_cache->new() ],
     );
 }
 
