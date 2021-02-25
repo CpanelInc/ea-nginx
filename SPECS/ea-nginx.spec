@@ -377,6 +377,7 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-non-www.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-www.conf
+%config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cloudflare.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
@@ -386,6 +387,7 @@ rm -rf %{bdir}/_passenger_source_code
 
 %dir %{_sysconfdir}/nginx/ea-nginx
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/meta/apache
+%attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/config-scripts/global/config-scripts-global-cloudflare
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
 %config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
@@ -640,6 +642,7 @@ fi
 * Wed Feb 24 2021 Julian Brown <julian.brown@cpanel.net> - 1.19.7-3
 - ZC-8436: Hooks for suspend/unsuspend acct, changing ip, and refactor clear-cache for API
 - ZC-8433: handle localhost/127.0.0.1/machines's hostname consistently
+- ZC-8194: Add cloudflare config
 
 * Mon Feb 22 2021 Daniel Muey <dan@cpanel.net> - 1.19.7-2
 - ZC-8461: Support `cpanelwebcall` URI
