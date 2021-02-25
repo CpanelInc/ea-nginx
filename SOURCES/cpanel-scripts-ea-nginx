@@ -59,7 +59,7 @@ my $cmds = {
         code     => \&clear_cache_cmd,
         clue     => "clear_cache [--all|<user1> <user2> ...]",
         abstract => 'Clear the cache for a user, some users, or all users.',
-        help     => 'Clear the cache for a user, some users, or all users.',
+        help     => 'Clears a cache or caches. Pass the users you want to clear or none for all users.',
     },
 };
 

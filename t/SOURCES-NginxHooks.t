@@ -298,6 +298,68 @@ describe "NginxHooks" => sub {
         };
     };
 
+    describe "_rebuild_config_all" => sub {
+        share my %mi;
+        around {
+            %mi = %conf;
+
+            local $mi{mocks} = {};
+
+            $mi{mocks}->{servertasks}           = Test::MockModule->new('Cpanel::ServerTasks');
+            $mi{mocks}->{servertasks_tasks}     = [];
+            $mi{mocks}->{servertasks_shoulddie} = 0;
+            $mi{mocks}->{servertasks}->redefine(
+                schedule_task => sub {
+                    my ( $ar, $time_to_wait, $task ) = @_;
+                    my $str = join( ',', @{$ar}, $time_to_wait, $task );
+                    push( @{ $mi{mocks}->{servertasks_tasks} }, $str );
+                    die "a horrible death" if ( $mi{mocks}->{servertasks_shoulddie} );
+                    return;
+                }
+            );
+
+            yield;
+        };
+
+        it "should not schedule a clear_cache if not suspendacct" => sub {
+            my $hook  = { event => 'some::other' };
+            my $event = { args  => { user => 'rickybobby' } };
+
+            my ( $ret, $msg ) = NginxHooks::_rebuild_config_all( $hook, $event );
+
+            my $expected_ar = ['NginxTasks,5,rebuild_config'];
+
+            is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
+        };
+
+        it "should schedule a clear_cache if suspendacct" => sub {
+            my $hook  = { event => 'Accounts::suspendacct' };
+            my $event = { args  => { user => 'rickybobby' } };
+
+            my ( $ret, $msg ) = NginxHooks::_rebuild_config_all( $hook, $event );
+
+            my $expected_ar = [
+                'NginxTasks,5,rebuild_config',
+                'NginxTasks,15,clear_user_cache rickybobby',
+            ];
+
+            is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
+        };
+
+        it "should not schedule a clear_cache if suspendacct and no user" => sub {
+            my $hook  = { event => 'Accounts::suspendacct' };
+            my $event = { args  => {} };
+
+            my ( $ret, $msg ) = NginxHooks::_rebuild_config_all( $hook, $event );
+
+            my $expected_ar = [
+                'NginxTasks,5,rebuild_config',
+            ];
+
+            is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
+        };
+    };
+
     describe "rebuild_user" => sub {
         share my %mi;
         around {
