@@ -46,6 +46,8 @@ Cpanel::TaskProcessors::NginxTasks
     package Cpanel::TaskProcessors::NginxTasks::clear_user_cache;
     use parent 'Cpanel::TaskQueue::FastSpawn';
 
+    our $ea_nginx_script = '/usr/local/cpanel/scripts/ea-nginx';
+
     sub is_valid_args {
         my ( $self, $task ) = @_;
         return 1 == $task->args;
@@ -54,9 +56,7 @@ Cpanel::TaskProcessors::NginxTasks
     sub _do_child_task {
         my ( $self, $task, $logger ) = @_;
 
-        my $ea_nginx_script = '/usr/local/cpanel/scripts/ea-nginx';
         return if !-e $ea_nginx_script;
-
         require $ea_nginx_script;
 
         my ($user) = $task->args();
