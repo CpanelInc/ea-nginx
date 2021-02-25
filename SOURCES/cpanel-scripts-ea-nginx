@@ -9,28 +9,30 @@ use warnings;
 
 package scripts::ea_nginx;
 
-use Cpanel::JSON                    ();
-use Cpanel::SafeRun::Object         ();
-use Cpanel::Config::userdata        ();
-use Cpanel::Config::LoadUserDomains ();
-use Cpanel::DomainIp                ();
-use Cpanel::DomainLookup::DocRoot   ();
-use Cpanel::Hostname                ();
-use Cpanel::PHP::Config             ();
-use Cpanel::PHPFPM::Get             ();
-use Cpanel::Validate::Username      ();
-use Cpanel::Apache::TLS             ();
-use Cpanel::FileUtils::TouchFile    ();
-use Cpanel::PwCache                 ();
-use Cpanel::Sys::OS                 ();
-use Cpanel::Validate::URL           ();
-use Whostmgr::TweakSettings         ();
-use Cpanel::Config::LoadWwwAcctConf ();
-use Template                        ();
-use File::Glob                      ();
-use Path::Tiny;
-use String::UnicodeUTF8                     ();
+use Cpanel::Apache::TLS                     ();
+use Cpanel::Config::LoadUserDomains         ();
+use Cpanel::Config::LoadWwwAcctConf         ();
+use Cpanel::Config::userdata                ();
 use Cpanel::Config::userdata::PassengerApps ();
+use Cpanel::DomainIp                        ();
+use Cpanel::DomainLookup::DocRoot           ();
+use Cpanel::FileUtils::TouchFile            ();
+use Cpanel::Hostname                        ();
+use Cpanel::JSON                            ();
+use Cpanel::PHP::Config                     ();
+use Cpanel::PHPFPM::Get                     ();
+use Cpanel::PwCache                         ();
+use Cpanel::SafeRun::Object                 ();
+use Cpanel::Sys::OS                         ();
+use Cpanel::Validate::URL                   ();
+use Cpanel::Validate::Username              ();
+use File::Glob                              ();
+use File::Path::Tiny                        ();
+use String::UnicodeUTF8                     ();
+use Template                                ();
+use Whostmgr::TweakSettings                 ();
+
+use Path::Tiny;
 
 my $nginxroot = "/etc/nginx";
 
