@@ -643,6 +643,7 @@ fi
 - ZC-8436: Hooks for suspend/unsuspend acct, changing ip, and refactor clear-cache for API
 - ZC-8433: handle localhost/127.0.0.1/machines's hostname consistently
 - ZC-8194: Add cloudflare config
+- ZC-8510: do bandwidth notices and exceeding
 
 * Mon Feb 22 2021 Daniel Muey <dan@cpanel.net> - 1.19.7-2
 - ZC-8461: Support `cpanelwebcall` URI
