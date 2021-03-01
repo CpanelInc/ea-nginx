@@ -34,6 +34,8 @@ use Whostmgr::TweakSettings                 ();
 
 use Path::Tiny;
 
+our $var_cache_ea_nginx = '/var/cache/ea-nginx';
+
 my $nginxroot = "/etc/nginx";
 
 my $cmds = {
@@ -187,8 +189,6 @@ sub clear_cache_cmd {
 
     return 1;
 }
-
-our $var_cache_ea_nginx = '/var/cache/ea-nginx';
 
 sub clear_cache {
     my (@users) = @_;
