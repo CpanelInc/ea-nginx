@@ -6,6 +6,7 @@
 
 use strict;
 use warnings;
+use FindBin;
 
 package scripts::ea_nginx::logrotate;
 
@@ -554,6 +555,9 @@ sub _load_logrotate_class {
         else {
             Cpanel::BandwidthMgr::disablebwlimit( $user, $safe_domain, $bwlimit, $totalthismonth, $cpconf->{emailusersbandwidthexceed}, $cpuser->{DOMAINS} );
         }
+
+        require "$FindBin::Bin/ea-nginx";
+        scripts::ea_nginx::clear_cache($user);
 
         return;
     }
