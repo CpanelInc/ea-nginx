@@ -499,7 +499,9 @@ sub _load_logrotate_class {
         require Cpanel::Config::LoadCpConf;
         my $cpuser  = Cpanel::Config::LoadCpUserFile::loadcpuserfile($user);
         my $bwlimit = $cpuser->{BWLIMIT} || 0;
-        my $cpconf  = Cpanel::Config::LoadCpConf::loadcpconf();
+        $bwlimit = 0 if $bwlimit eq "unlimited";
+
+        my $cpconf = Cpanel::Config::LoadCpConf::loadcpconf();
 
         $self->logger->info("[bytes] $user - limit: $bwlimit (total: $totalthismonth)");
 
