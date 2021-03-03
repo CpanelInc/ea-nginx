@@ -9,28 +9,33 @@ use warnings;
 
 package scripts::ea_nginx;
 
-use Cpanel::JSON                    ();
-use Cpanel::SafeRun::Object         ();
-use Cpanel::Config::userdata        ();
-use Cpanel::Config::LoadUserDomains ();
-use Cpanel::DomainIp                ();
-use Cpanel::DomainLookup::DocRoot   ();
-use Cpanel::Hostname                ();
-use Cpanel::PHP::Config             ();
-use Cpanel::PHPFPM::Get             ();
-use Cpanel::Validate::Username      ();
-use Cpanel::Apache::TLS             ();
-use Cpanel::FileUtils::TouchFile    ();
-use Cpanel::PwCache                 ();
-use Cpanel::Sys::OS                 ();
-use Cpanel::Validate::URL           ();
-use Whostmgr::TweakSettings         ();
-use Cpanel::Config::LoadWwwAcctConf ();
-use Template                        ();
-use File::Glob                      ();
-use Path::Tiny;
-use String::UnicodeUTF8                     ();
+use Cpanel::Apache::TLS                     ();
+use Cpanel::Config::LoadUserDomains         ();
+use Cpanel::Config::LoadWwwAcctConf         ();
+use Cpanel::Config::userdata                ();
 use Cpanel::Config::userdata::PassengerApps ();
+use Cpanel::DomainIp                        ();
+use Cpanel::DomainLookup::DocRoot           ();
+use Cpanel::FileUtils::TouchFile            ();
+use Cpanel::HTTP::Client                    ();
+use Cpanel::Hostname                        ();
+use Cpanel::JSON                            ();
+use Cpanel::PHP::Config                     ();
+use Cpanel::PHPFPM::Get                     ();
+use Cpanel::PwCache                         ();
+use Cpanel::SafeRun::Object                 ();
+use Cpanel::Sys::OS                         ();
+use Cpanel::Validate::URL                   ();
+use Cpanel::Validate::Username              ();
+use File::Glob                              ();
+use File::Path::Tiny                        ();
+use String::UnicodeUTF8                     ();
+use Template                                ();
+use Whostmgr::TweakSettings                 ();
+
+use Path::Tiny;
+
+our $var_cache_ea_nginx = '/var/cache/ea-nginx';
 
 my $nginxroot = "/etc/nginx";
 
@@ -52,6 +57,12 @@ my $cmds = {
         clue     => "remove <user> [--no-reload]",
         abstract => "remove a given user’s nginx configuration",
         help     => "Remove the given user’s nginx configuration. Only does the generated conf.d/user/<user>.conf, does not touch the user customization directory conf.d/users/<user>/",
+    },
+    clear_cache => {
+        code     => \&clear_cache_cmd,
+        clue     => "clear_cache [--all|<user1> <user2> ...]",
+        abstract => 'Clear the cache for a user, some users, or all users.',
+        help     => 'Clears a cache or caches. Pass the users you want to clear or none for all users.',
     },
 };
 
@@ -165,6 +176,32 @@ sub config {
     }
 
     return 1;
+}
+
+sub clear_cache_cmd {
+    my ( $app, @users ) = @_;
+
+    if ( @users == 0 || $users[0] eq '--all' ) {
+        clear_cache();
+    }
+    else {
+        clear_cache(@users);
+    }
+
+    return 1;
+}
+
+sub clear_cache {
+    my (@users) = @_;
+
+    if (@users) {
+        foreach my $user (@users) {
+            _delete_glob( $var_cache_ea_nginx . "/*/$user/*" );
+        }
+    }
+    else {
+        _delete_glob( $var_cache_ea_nginx . "/*/*/*" );
+    }
 }
 
 sub reload { _reload() }
@@ -486,6 +523,7 @@ sub _render_and_append {
     my $logging_hr       = _get_logging_hr();
     my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
     my $secruleengineoff = -e "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf" ? _get_secruleengineoff( $user => $domains ) : 0;
+    my $cloudflare       = _is_cloudflare( $domains->[0] );
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
 
@@ -528,6 +566,7 @@ sub _render_and_append {
             ssl_certificate_key          => $combined_tls,
             ssl_redirect                 => $ssl_redirect,
             secruleengineoff             => $secruleengineoff,
+            cloudflare                   => $cloudflare,
             domains                      => $domains,
             user                         => $user,
             group                        => $group,
@@ -563,6 +602,20 @@ sub _render_and_append {
     }
 
     return 1;
+}
+
+my $http;
+
+sub _is_cloudflare {
+    my ($domain) = @_;
+
+    $http //= Cpanel::HTTP::Client->new();
+    my $res = eval { $http->get("https://$domain/cdn-cgi/trace") };    # dies on SSL error whch means its not cloudflare
+    return 0 if $@ || $res->{status} eq "404";
+    return 1 if $res->{status} eq "200";                               # ¿ && content has a line: "h=$domain\n" - YAGNI ?
+
+    warn "Could not verify if $domain is cloudflare or not ($res->{status} $res->{reason})\n";
+    return;
 }
 
 sub _get_homedir {
@@ -796,6 +849,23 @@ sub _bail {
     warn "$msg\n";
     $app->help();
     exit(1);                                               # there is no return()ing from this lol
+}
+
+sub _delete_glob {
+    my ($glob) = @_;
+
+    for my $item ( File::Glob::csh_glob($glob) ) {
+
+        # File::Path::Tiny::rm does not delete files
+        if ( -l $item || -f _ ) {
+            unlink($item);
+        }
+        elsif ( -d $item ) {
+            File::Path::Tiny::rm($item);
+        }
+    }
+
+    return;
 }
 
 1;

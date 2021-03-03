@@ -298,6 +298,56 @@ describe "NginxHooks" => sub {
         };
     };
 
+    describe "just_clear_cache" => sub {
+        share my %mi;
+        around {
+            %mi = %conf;
+
+            local $mi{mocks} = {};
+
+            $mi{mocks}->{servertasks}           = Test::MockModule->new('Cpanel::ServerTasks');
+            $mi{mocks}->{servertasks_tasks}     = [];
+            $mi{mocks}->{servertasks_shoulddie} = 0;
+            $mi{mocks}->{servertasks}->redefine(
+                schedule_task => sub {
+                    my ( $ar, $time_to_wait, $task ) = @_;
+                    my $str = join( ',', @{$ar}, $time_to_wait, $task );
+                    push( @{ $mi{mocks}->{servertasks_tasks} }, $str );
+                    die "a horrible death" if ( $mi{mocks}->{servertasks_shoulddie} );
+                    return;
+                }
+            );
+
+            yield;
+        };
+
+        it "should schedule a clear_cache" => sub {
+            my $hook  = { event => 'Accounts::suspendacct' };
+            my $event = { args  => { user => 'rickybobby' } };
+
+            my ( $ret, $msg ) = NginxHooks::_just_clear_user_cache( $hook, $event );
+
+            my $expected_ar = [
+                'NginxTasks,2,clear_user_cache rickybobby',
+            ];
+
+            is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
+        };
+
+        it "should schedule a clear_cache" => sub {
+            my $hook  = { event => 'Accounts::unsuspendacct' };
+            my $event = { args  => { user => 'rickybobby' } };
+
+            my ( $ret, $msg ) = NginxHooks::_just_clear_user_cache( $hook, $event );
+
+            my $expected_ar = [
+                'NginxTasks,2,clear_user_cache rickybobby',
+            ];
+
+            is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
+        };
+    };
+
     describe "rebuild_user" => sub {
         share my %mi;
         around {

@@ -6,6 +6,7 @@
 
 use strict;
 use warnings;
+use FindBin;
 
 package scripts::ea_nginx::logrotate;
 
@@ -240,7 +241,7 @@ sub _load_logrotate_class {
 
                 foreach my $key ( sort keys %{$u_conf_hr} ) {
                     my ( $app, $dom ) = split( /-/, $key, 2 );
-                    $apps{$app}{$dom}++ if lc $u_conf_hr->{$key} eq 'yes';
+                    $apps{$app}{$dom}++       if lc $u_conf_hr->{$key} eq 'yes';
                     $apps{$app}{"www.$dom"}++ if $apps{$app}{$dom};
                 }
             }
@@ -459,9 +460,9 @@ sub _load_logrotate_class {
             grouping  => [],
         );
 
-        my $total_num = $total_ar->[0][0] || 0;
+        my $totalthismonth = $total_ar->[0][0] || 0;
 
-        $self->logger->info( "[bandwidth] User: $user - FQDN: $domain (total bytes from " . $self->server . " `$protocol` $thisyear-$thismonth: $total_num)" );
+        $self->logger->info( "[bandwidth] User: $user - FQDN: $domain (total bytes from " . $self->server . " `$protocol` $thisyear-$thismonth: $totalthismonth)" );
 
         my $user_id   = $root_bw_cache->get_or_create_id_for_user($user);
         my $domain_id = $root_bw_cache->get_or_create_id_for_domain($domain);
@@ -472,10 +473,93 @@ sub _load_logrotate_class {
                 $domain_id,
                 $thisyear,
                 $thismonth,
-                $total_num,
+                $totalthismonth,
             );
         };
         warn $@ if $@;
+
+        require Cpanel::Bandwidth::Remote;
+        my $remote_usage_bytes = Cpanel::Bandwidth::Remote::fetch_remote_user_bandwidth(
+            $user,
+            $thismonth,
+            $thisyear,
+        );
+
+        $totalthismonth += $remote_usage_bytes;
+
+        try {
+            require Cpanel::BandwidthDB::UserCache;
+            Cpanel::BandwidthDB::UserCache::write( $user, $totalthismonth );
+        }
+        catch {
+            warn $_;
+        };
+
+        require Cpanel::Config::LoadCpUserFile;
+        require Cpanel::Config::LoadCpConf;
+        my $cpuser  = Cpanel::Config::LoadCpUserFile::loadcpuserfile($user);
+        my $bwlimit = $cpuser->{BWLIMIT} || 0;
+        $bwlimit = 0 if $bwlimit eq "unlimited";
+
+        my $cpconf = Cpanel::Config::LoadCpConf::loadcpconf();
+
+        $self->logger->info("[bytes] $user - limit: $bwlimit (total: $totalthismonth)");
+
+        # Do not check bandwidth limits.
+        if ( $bwlimit <= 0 || -e '/var/cpanel/bwlimitcheck.disabled' ) {
+            return;
+        }
+
+        # Check if soon to exceed limits.
+        require Cpanel::BandwidthMgr;
+        if ( $totalthismonth > 0 && $cpconf->{emailusersbandwidthexceed} ) {
+            require Cpanel::NotifyDB;
+            Cpanel::NotifyDB::loadnotify($user);
+            my $notify_level = 0;
+
+            # Mark all of the levels we've passed and store the highest
+            no warnings "once";
+            foreach my $bwwarn (@Cpanel::BandwidthMgr::BWWARNLVLS) {
+                next if ( !$cpconf->{"emailusersbandwidthexceed$bwwarn"} );
+                if ( $totalthismonth > ( ( $bwwarn / 100 ) * $bwlimit ) ) {
+                    next if ( Cpanel::NotifyDB::didnotify( $user, "emailusersbandwidthexceed$bwwarn" ) );
+                    Cpanel::NotifyDB::savenotify( $user, "emailusersbandwidthexceed$bwwarn" );
+                    $notify_level = $bwwarn if $bwwarn > $notify_level;
+                }
+                else {
+                    Cpanel::NotifyDB::clearnotify( $user, "emailusersbandwidthexceed$bwwarn" );
+                }
+            }
+
+            # If we have exceeded some level, send 1 message (at the highest level)
+            # unless we have already exceeded the limit. In that case the message is
+            # sent later.
+            if ( $notify_level && ( $bwlimit >= $totalthismonth ) ) {
+                require Capture::Tiny;
+                Capture::Tiny::capture {
+                    system(
+                        '/usr/local/cpanel/bin/bwlimit_notify',
+                        $user, $domain, 1, $notify_level,
+                        sprintf( "%.2f", $bwlimit / ( 1024 * 1024 ) ),
+                        sprintf( "%.2f", $totalthismonth / ( 1024 * 1024 ) )
+                    );
+                };
+            }
+            Cpanel::NotifyDB::flushnotify($user);
+        }
+
+        # Send a message if the limit is actually exceeded.
+        require Cpanel::WildcardDomain;
+        my $safe_domain = Cpanel::WildcardDomain::encode_wildcard_domain($domain);
+        if ( $totalthismonth > $bwlimit ) {
+            Cpanel::BandwidthMgr::enablebwlimit( $user, $safe_domain, $bwlimit, $totalthismonth, $cpconf->{emailusersbandwidthexceed}, $cpuser->{DOMAINS} );
+        }
+        else {
+            Cpanel::BandwidthMgr::disablebwlimit( $user, $safe_domain, $bwlimit, $totalthismonth, $cpconf->{emailusersbandwidthexceed}, $cpuser->{DOMAINS} );
+        }
+
+        require "$FindBin::Bin/ea-nginx";
+        scripts::ea_nginx::clear_cache($user);
 
         return;
     }

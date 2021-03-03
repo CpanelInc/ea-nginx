@@ -116,6 +116,18 @@ sub describe {
         'ModSecurity::modsec_undisable_rule',
         'ModSecurity::modsec_update_vendor',
     );
+    my @just_clear_cache_actions = map {
+        {
+            'category' => 'Whostmgr',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_just_clear_user_cache',
+            'exectype' => 'module',
+        }
+    } (
+        'Accounts::suspendacct',
+        'Accounts::unsuspendacct',
+    );
     my @normal_actions = map {
         {
             'category' => 'Whostmgr',
@@ -128,8 +140,7 @@ sub describe {
         'Accounts::Create',
         'Accounts::Modify',
         'Accounts::Remove',
-        'Accounts::suspendacct',
-        'Accounts::unsuspendacct',
+        'Accounts::SiteIP::set',
         'AutoSSL::installssl',
         'Domain::park',
         'Domain::unpark',
@@ -190,6 +201,7 @@ sub describe {
         @phpfpm_actions,
         @script_php_fpm_config_actions,
         @wordpress_actions,
+        @just_clear_cache_actions,
     ];
 
     return $hook_ar;
@@ -268,13 +280,36 @@ sub _php_fpm_config {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
+sub _just_clear_user_cache {
+    my ( $hook, $event ) = @_;
+
+    my $user = $event->{args}->{user};
+
+    if ($user) {
+        eval {
+            require Cpanel::ServerTasks;
+
+            # 2 seconds seems like a good minimal time to wait
+            Cpanel::ServerTasks::schedule_task( ['NginxTasks'], 2, "clear_user_cache $user" );
+        };
+    }
+    else {
+        return ( 0, "Missing User" );
+    }
+
+    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
 sub _rebuild_config_all {
+    my ( $hook, $event ) = @_;
+
     local $@;
     eval {
         require Cpanel::ServerTasks;
 
         Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(0), 'rebuild_config' );
     };
+
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
