@@ -298,7 +298,7 @@ describe "NginxHooks" => sub {
         };
     };
 
-    describe "_rebuild_config_all" => sub {
+    describe "just_clear_cache" => sub {
         share my %mi;
         around {
             %mi = %conf;
@@ -321,39 +321,27 @@ describe "NginxHooks" => sub {
             yield;
         };
 
-        it "should not schedule a clear_cache if not suspendacct" => sub {
-            my $hook  = { event => 'some::other' };
-            my $event = { args  => { user => 'rickybobby' } };
-
-            my ( $ret, $msg ) = NginxHooks::_rebuild_config_all( $hook, $event );
-
-            my $expected_ar = ['NginxTasks,5,rebuild_config'];
-
-            is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
-        };
-
-        it "should schedule a clear_cache if suspendacct" => sub {
+        it "should schedule a clear_cache" => sub {
             my $hook  = { event => 'Accounts::suspendacct' };
             my $event = { args  => { user => 'rickybobby' } };
 
-            my ( $ret, $msg ) = NginxHooks::_rebuild_config_all( $hook, $event );
+            my ( $ret, $msg ) = NginxHooks::_just_clear_user_cache( $hook, $event );
 
             my $expected_ar = [
-                'NginxTasks,5,rebuild_config',
-                'NginxTasks,15,clear_user_cache rickybobby',
+                'NginxTasks,2,clear_user_cache rickybobby',
             ];
 
             is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
         };
 
-        it "should not schedule a clear_cache if suspendacct and no user" => sub {
-            my $hook  = { event => 'Accounts::suspendacct' };
-            my $event = { args  => {} };
+        it "should schedule a clear_cache" => sub {
+            my $hook  = { event => 'Accounts::unsuspendacct' };
+            my $event = { args  => { user => 'rickybobby' } };
 
-            my ( $ret, $msg ) = NginxHooks::_rebuild_config_all( $hook, $event );
+            my ( $ret, $msg ) = NginxHooks::_just_clear_user_cache( $hook, $event );
 
             my $expected_ar = [
-                'NginxTasks,5,rebuild_config',
+                'NginxTasks,2,clear_user_cache rickybobby',
             ];
 
             is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
