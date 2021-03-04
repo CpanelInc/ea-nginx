@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,9 @@ fi
 
 
 %changelog
+* Thu Mar 04 2021 Julian Brown <julian.brown@cpanel.net> - 1.19.7-4
+- ZC-8480: Move ea-nginx from experimental to EA4
+
 * Wed Feb 24 2021 Julian Brown <julian.brown@cpanel.net> - 1.19.7-3
 - ZC-8436: Hooks for suspend/unsuspend acct, changing ip, and refactor clear-cache for API
 - ZC-8433: handle localhost/127.0.0.1/machines's hostname consistently
