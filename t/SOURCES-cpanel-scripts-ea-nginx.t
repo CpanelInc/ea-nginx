@@ -727,7 +727,8 @@ describe "ea-nginx script" => sub {
             local $ti{clear_cache_called} = 0;
 
             no warnings "redefine";
-            local *scripts::ea_nginx::clear_cache = sub {
+            local *scripts::ea_nginx::_validate_user_arg = sub { 1 };
+            local *scripts::ea_nginx::clear_cache        = sub {
                 my (@users) = @_;
 
                 push( @{ $ti{users} }, @users );
@@ -744,19 +745,19 @@ describe "ea-nginx script" => sub {
             is( $ti{clear_cache_called}, 1 );
         };
 
-        it "should call clear_cache with no parms if no user passed" => sub {
+        it "should call clear_cache with no users if no user passed" => sub {
             scripts::ea_nginx::clear_cache_cmd( {}, () );
-            is( @{ $ti{users} }, 0 );
+            is( @{ $ti{users} }, 1 );
         };
 
-        it "should call clear_cache with no parms if --all passed" => sub {
+        it "should call clear_cache with no users if --all passed" => sub {
             scripts::ea_nginx::clear_cache_cmd( {}, '--all' );
-            is( @{ $ti{users} }, 0 );
+            is( @{ $ti{users} }, 1 );
         };
 
         it "should call clear_cache with 2 users if 2 users are passed" => sub {
             scripts::ea_nginx::clear_cache_cmd( {}, 'chucknorris', 'brucelee' );
-            is( @{ $ti{users} }, 2 );
+            is( @{ $ti{users} }, 3 );
         };
     };
 
@@ -768,7 +769,8 @@ describe "ea-nginx script" => sub {
             local $ti{delete_glob_called} = 0;
 
             no warnings "redefine";
-            local *scripts::ea_nginx::_delete_glob = sub {
+            local *scripts::ea_nginx::_validate_user_arg = sub { 1 };
+            local *scripts::ea_nginx::_delete_glob       = sub {
                 my ($glob) = @_;
 
                 push( @{ $ti{globs} }, $glob );
@@ -781,25 +783,25 @@ describe "ea-nginx script" => sub {
         };
 
         it "should call _delete_glob once if no user passed" => sub {
-            scripts::ea_nginx::clear_cache();
+            scripts::ea_nginx::clear_cache(undef);
 
             is( $ti{delete_glob_called}, 1 );
         };
 
         it "should call _delete_glob with correct glob when no user passed" => sub {
-            scripts::ea_nginx::clear_cache();
+            scripts::ea_nginx::clear_cache(undef);
 
             is( $ti{globs}->[0], '/var/cache/ea-nginx/*/*/*' );
         };
 
         it "should call _delete_glob twice when 2 users passed" => sub {
-            scripts::ea_nginx::clear_cache( 'chucknorris', 'brucelee' );
+            scripts::ea_nginx::clear_cache( undef, 'chucknorris', 'brucelee' );
 
             is( $ti{delete_glob_called}, 2 );
         };
 
         it "should call _delete_glob with correct globs when 2 users are passed" => sub {
-            scripts::ea_nginx::clear_cache( 'chucknorris', 'brucelee' );
+            scripts::ea_nginx::clear_cache( undef, 'chucknorris', 'brucelee' );
 
             cmp_deeply(
                 $ti{globs},
