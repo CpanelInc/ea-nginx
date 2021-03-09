@@ -1,0 +1,54 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - config-scripts/global/cloudflare        Copyright 2021 cPanel, L.L.C.
+#                                                           All rights Reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+use strict;
+use warnings;
+
+use Cpanel::HTTP::Client ();
+use Cpanel::JSON         ();
+
+my ( $ipv4_conf, $ipv6_conf ) = ( "", "" );
+
+my $res = Cpanel::HTTP::Client->new()->get("https://api.cloudflare.com/client/v4/ips");
+if ( !$res->{success} ) {
+    die "Could not GET cloudflare IPs ($res->{status} $res->{reason})\n";
+}
+
+my $data = Cpanel::JSON::Load( $res->{content} );
+
+my $etag = $data->{result}{etag} || "none";
+my $time = localtime();
+
+for my $ipv4 ( @{ $data->{result}{ipv4_cidrs} } ) {
+    $ipv4_conf .= "set_real_ip_from $ipv4;\n";
+}
+chomp $ipv4_conf;
+
+for my $ipv6 ( @{ $data->{result}{ipv6_cidrs} } ) {
+    $ipv6_conf .= "set_real_ip_from $ipv6;\n";
+}
+chomp $ipv6_conf;
+
+open( my $fh, ">", "/etc/nginx/conf.d/includes-optional/cloudflare.conf" ) || die "Could not write /etc/nginx/conf.d/includes-optional/cloudflare.conf: $!\n";
+print {$fh} <<"END_CLCONF";
+# Cloudflare IPs (https://api.cloudflare.com/client/v4/ips etag: $etag)
+# Auto Generated
+#   by $0
+#   at $time
+
+# IPv4:
+$ipv4_conf
+
+# IPv6:
+$ipv6_conf
+
+real_ip_header CF-Connecting-IP;
+END_CLCONF
+
+close($fh);
+
+print "Updated /etc/nginx/conf.d/includes-optional/cloudflare.conf OK\n";
+exit(0);

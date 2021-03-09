@@ -6,6 +6,14 @@ map $host $CPANEL_APACHE_PROXY_PORT {
     default [% settings.apache_port %];
 }
 
+map $host $CPANEL_APACHE_PROXY_SSL_IP {
+    default [% settings.apache_port_ip %];
+}
+
+map $host $CPANEL_APACHE_PROXY_SSL_PORT {
+    default [% settings.apache_ssl_port %];
+}
+
 server_names_hash_max_size [% settings.server_names_hash_max_size %];
 server_names_hash_bucket_size [% settings.server_names_hash_bucket_size %];
 

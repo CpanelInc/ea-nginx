@@ -14,15 +14,21 @@ To customize a specific server block you can create include files (suitable for 
 
 * the main domain for the server block with the main domain and its parked domains
 * the subdomain for the server blocks for non-addon subdomains
-* the subdomain for the server blocks for addon domains and theri subdomains
+* the subdomain for the server blocks for addon domains and their subdomains
 
-Reusable `.conf` files should go in `/etc/nginx/conf.d/server-includes-optional/`. Dependiong on what they are for you could make those symlinks/hardlinks in `…/users/<USER>/*.conf` or `…users/<USER>/<FQDN>/` or `include` them as part files that you put there.
+Reusable `.conf` files should go in `/etc/nginx/conf.d/server-includes-optional/`. Depending on what they are for, you could make those symlinks/hardlinks in `…/users/<USER>/*.conf` or `…users/<USER>/<FQDN>/` or `include` them as part files that you put there.
 
 # Global Configuration
 
 Should go in `/etc/nginx/conf.d/*.conf` just be sure not to over write a file the RPM controls or it will get blown away.
 
 If your intent is to adjust every server block you can add a `.conf` file to `/etc/nginx/conf.d/server-includes/` just be sure not to over write a file the RPM controls or it will get blown away.
+
+To have a global configuration file regenerated have your package drop a script into `/etc/nginx/ea-nginx/config-scripts/global/`. These will be executed by `/usr/local/cpanel/scripts/ea-nginx config` with `--all` or `--global`.
+
+## 3rdparty Vendor Proxy Configuration
+
+If an external package needs some specific proxy configuration beyond what `cpanel-proxy.conf` provides they can drop config files in `conf.d/includes-optional/cpanel-proxy-vendors/*.conf`.
 
 # dev notes
 
@@ -33,6 +39,30 @@ To keep things organized and revision controlled we use `SOURCES/cpanel`.
 Since `SOURCES/` must be flat it is cleaner to generate a tarball as a single source and untar it on installation.
 
 Just run: `cd SOURCES/cpanel && rm -f ../cpanel.tar.gz && tar czf ../cpanel.tar.gz conf.d ea-nginx && cd ../.. && git add SOURCES/cpanel.tar.gz`
+
+## Make sure any `proxy_pass` directives do not introduce XSS vulnerability
+
+TL;DR: simply ensure it does not end in a `/`
+
+NGINX as a reverse proxy does not re-URI encode the path that it sends to the back end when `proxy_pass`’s value ends with a `/`.
+
+For example:
+
+Given this URL `https://example.com/%3C%22your XSS goes here%22%3E/` …
+
+```
+proxy_pass https://backend/foo/;
+```
+
+… will get sent to the backend as `https://example.com/<"your XSS goes here">/`.
+
+Remove the trailing slash …
+
+```
+proxy_pass https://backend/foo;
+```
+
+… and will get sent to the backend as `https://example.com/%3C%22your XSS goes here%22%3E/`.
 
 ## Make sure any `alias` directives do not introduce path traversal exploit
 

@@ -1,17 +1,129 @@
 server {
-    server_name[% FOREACH domain IN domains %] [% domain %] www.[% domain %][% END %];
+    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% END %][% END %];
     listen 80;
 
+    [%- IF secruleengineoff %]
+    modsecurity off;
+    [% END -%]
+
+    [%- IF !logging.piped_logs %]
+    access_log /var/log/nginx/domains/[% domains.0 %] cp_combined;
+    access_log /var/log/nginx/domains/[% domains.0 %]-bytes_log cp_bytes_server;
+    [% END -%]
+
+    [%- IF cloudflare %]
+    include conf.d/includes-optional/cloudflare.conf;
+    [% END -%]
+
     set $CPANEL_APACHE_PROXY_IP [% ip %];
+    set $CPANEL_APACHE_PROXY_SSL_IP [% ip %];
+    set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_PORT;
+    set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_IP;
+    if ($scheme = https) {
+        set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_SSL_PORT;
+        set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_SSL_IP;
+    }
+
+    [%- IF behavior.caching.enabled %]
+    set $CPANEL_PROXY_CACHE [% user %];
+    set $CPANEL_SKIP_PROXY 0;
+
+    if ($request_uri ~* "(/wp-admin|/wp-login.php)") {
+        set $CPANEL_PROXY_CACHE "off";
+        set $CPANEL_SKIP_PROXY 1;
+    }
+    [% END -%]
 
     [%- IF ssl_certificate && ssl_certificate_key %]
+    [%- IF behavior.standalone %]
+    [%- IF ssl_redirect %]
+    location ~ ^/(?!(?:\.well-known/(?:pki-validation|cpanel-dcv))) {
+        if ($scheme = http) {
+            return 301 https://$host$request_uri;
+        }
+    }
+    [% END -%]
+    [% END -%]
+
     listen 443 ssl;
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
+        [% IF ea4conf.sslprotocol_list_str || ea4conf.sslprotocol %]
+    ssl_protocols [% ea4conf.sslprotocol_list_str || ea4conf.sslprotocol %];
+        [%- END -%]
+        [%- IF ea4conf.sslciphersuite %]
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers [% ea4conf.sslciphersuite %];
+        [% END -%]
     [% END -%]
+
+    location /cpanelwebcall {
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass http://127.0.0.1:2082/cpanelwebcall;
+    }
+
+    [%- IF !behavior.standalone %]
+    location / {
+        [%- IF behavior.caching.enabled %]
+            [%- IF basic_auth.realm_name.size %]
+
+        # has basic auth, so disable cache:
+        proxy_cache off;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+            [%- ELSE %]
+        proxy_cache $CPANEL_PROXY_CACHE;
+        proxy_no_cache $CPANEL_SKIP_PROXY;
+        proxy_cache_bypass $CPANEL_SKIP_PROXY;
+            [%- END %]
+
+        [%- FOREACH cache_valid IN behavior.caching.proxy_cache_valid.keys.sort %]
+        proxy_cache_valid [% cache_valid %] [% behavior.caching.proxy_cache_valid.$cache_valid %];
+        [%- END %]
+        proxy_cache_use_stale [% behavior.caching.proxy_cache_use_stale %];
+        proxy_cache_background_update [% behavior.caching.proxy_cache_background_update %];
+        proxy_cache_revalidate [% behavior.caching.proxy_cache_revalidate %];
+        proxy_cache_min_uses [% behavior.caching.proxy_cache_min_uses %];
+        proxy_cache_lock [% behavior.caching.proxy_cache_lock %];
+            [%- IF behavior.caching.x_cache_header %]
+        add_header X-Cache $upstream_cache_status;
+            [%- END %]
+        [%- END %]
+
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+    }
+
+    include conf.d/server-includes/cpanel-static-locations.conf;
+        [%- IF basic_auth.locations %]
+
+            [%- FOREACH location IN basic_auth.locations.keys.sort %]
+    location [% location %] {
+
+        # has basic auth, so disable cache:
+        proxy_cache off;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+    }
+            [% END -%]
+        [% END -%]
+    [% ELSE -%]
+    [%- FOREACH redirect IN redirects %]
+    rewrite [% redirect.regex %] [% redirect.replacement %] [% redirect.flag %];
+    [%- END %]
 
     root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;
+
+    [%- IF basic_auth.realm_name.size %]
+        [% INCLUDE "ea-nginx/cpanel-password-protected-dirs.tt"
+             realm_name = basic_auth.realm_name
+             auth_file  = basic_auth.auth_file
+             FILTER indent %]
+    [% END -%]
 
     location = /FPM_50x.html {
         root   /etc/nginx/ea-nginx/html;
@@ -22,24 +134,97 @@ server {
     location / {
         [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
         [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+        include conf.d/includes-optional/cpanel-cgi-location.conf;
+        include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     }
     [% END -%]
     [%- FOREACH wordpress_uri IN wordpress.non_docroot_uris %]
     # $docroot/[% wordpress_uri %] wordpress install
     location /[% wordpress_uri %] {
+
+        [%- FOREACH location IN basic_auth.locations.keys.sort %]
+            [%- IF location == "/" _ wordpress_uri %]
+                [%- INCLUDE "ea-nginx/cpanel-password-protected-dirs.tt"
+                   realm_name = basic_auth.locations.item(location).realm_name
+                   auth_file  = basic_auth.locations.item(location).auth_file
+                   FILTER indent FILTER indent -%]
+                [%- basic_auth.locations.delete(location) -%]
+            [% END -%]
+        [% END -%]
+
         [% INCLUDE "ea-nginx/cpanel-wordpress-location.tt" -%]
         [% INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+        include conf.d/includes-optional/cpanel-cgi-location.conf;
+        include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     }
     [% END -%]
 
-    include conf.d/server-includes/*.conf;
-    include conf.d/users/[% user %]/*.conf;
-    include conf.d/users/[% user %]/[% domains.0 %]/*.conf;
+    [%- IF basic_auth.locations %]
+        [%- FOREACH location IN basic_auth.locations.keys.sort %]
+    location [% location %] {
 
+        [%- INCLUDE "ea-nginx/cpanel-password-protected-dirs.tt"
+            realm_name = basic_auth.locations.item(location).realm_name
+            auth_file  = basic_auth.locations.item(location).auth_file
+            FILTER indent FILTER indent -%]
+
+        [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent FILTER indent -%]
+        include conf.d/includes-optional/cpanel-cgi-location.conf;
+        include conf.d/includes-optional/cpanel-server-parsed-location.conf;
+    }
+        [% END -%]
+    [% END -%]
+
+    [%- IF passenger.apps.size %]
+       [%- FOREACH app IN passenger.apps %]
+    location [% app.base_uri %] {
+        [%- IF app.envvars.size %]
+            [%- FOREACH name IN app.envvars.keys.sort %]
+        passenger_env_var [% name %] "[% app.envvars.$name.dquote %]";
+            [%- END %]
+        [% END -%]
+
+        passenger_user [% user %];
+        passenger_group [% group %];
+        passenger_app_env [% app.deployment_mode %];
+        passenger_enabled on;
+        passenger_base_uri [% app.base_uri %];
+        passenger_app_root "[% app.path.dquote %]";
+        passenger_app_group_name "[% user _ ' - ' _ app.name.dquote %]";
+        [%- IF app.ruby %]
+        passenger_ruby [% app.ruby %];
+        [%- END %]
+        [%- IF app.python %]
+        passenger_python [% app.python %];
+        [%- END %]
+        [%- IF app.nodejs %]
+        passenger_nodejs [% app.nodejs %];
+        [%- END %]
+
+        allow all; # `Allow from all` && newer `Require all granted`
+        autoindex off; # `Options -Indexes` (nginx does not do `MultiViews` so no need for equivalent `Options -MultiViews`)
+    }
+       [% END -%]
+    [% END -%]
+
+    include conf.d/server-includes/*.conf;
+    [% END -%]
+
+    include conf.d/users/[% user %]/*.conf;
+    include conf.d/users/[% user %]/[% domains.0.replace('^\*\.', '_wildcard_.') %]/*.conf;
+
+    [%- IF behavior.standalone %]
     [%- INCLUDE "ea-nginx/cpanel-php-location.tt" FILTER indent -%]
+    include conf.d/includes-optional/cpanel-cgi-location.conf;
+    include conf.d/includes-optional/cpanel-server-parsed-location.conf;
+    [% END -%]
 }
 
-[%- IF ssl_certificate && ssl_certificate_key %]
+# nginx does not support a subdomain of a wildcard domain
+# Example:  whm.*.mydomain.tld would not be allowed
+[%- SET domains = domains.grep('^[^\*]') %]
+
+[%- IF ssl_certificate && ssl_certificate_key && domains.size %]
 #### SSL Proxies for [% domains.join(', ') %] ##
     [%- SET subdom_map = {
             cpanel  = 2082, webmail    = 2095, whm        = 2086,
@@ -53,6 +238,14 @@ server {
     ssl_certificate_key [% ssl_certificate_key %];
 
     server_name [% FOREACH domain IN domains %] [% proxy_subdomain %].[% domain %][% END %];
+
+    [%- IF secruleengineoff %]
+    modsecurity off;
+    [% END -%]
+
+    [%- IF cloudflare %]
+    include conf.d/includes-optional/cloudflare.conf;
+    [% END -%]
 
     location / {
         [%- IF proxy_subdomain.match('^(?:cpanel|webmail|whm)$') %]
