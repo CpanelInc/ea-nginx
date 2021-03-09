@@ -256,21 +256,25 @@ sub clear_cache_cmd {
     my ( $app, @users ) = @_;
 
     if ( @users == 0 || $users[0] eq '--all' ) {
-        clear_cache($app);
+        shift @users;
+        die "--all can not be mixed with usernames\n" if @users;
     }
     else {
-        clear_cache( $app, @users );
+        foreach my $user (@users) {
+            _validate_user_arg( $app, $user );
+        }
     }
+
+    clear_cache(@users);
 
     return 1;
 }
 
 sub clear_cache {
-    my ( $app, @users ) = @_;
+    my (@users) = @_;
 
     if (@users) {
         foreach my $user (@users) {
-            _validate_user_arg( $app, $user );
             _delete_glob( $var_cache_ea_nginx . "/*/$user/*" );
         }
     }
