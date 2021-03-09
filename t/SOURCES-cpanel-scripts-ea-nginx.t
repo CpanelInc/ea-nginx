@@ -888,12 +888,18 @@ describe "ea-nginx script" => sub {
             mkdir $scripts::ea_nginx::var_cpanel_userdata;
             mkdir $scripts::ea_nginx::var_cpanel_userdata . "/ipman";
             mkdir $scripts::ea_nginx::etc_nginx;
+            mkdir $scripts::ea_nginx::etc_nginx . "/ea-nginx";
 
             local $ti{validate_user_called} = 0;
+            local $ti{config_called}        = 0;
 
-            no warnings qw(redefine);
+            no warnings qw(redefine once);
             local *scripts::ea_nginx::_validate_user_arg = sub {
                 $ti{validate_user_called}++;
+                return 1;
+            };
+            local *scripts::ea_nginx::config = sub {
+                $ti{config_called}++;
                 return 1;
             };
 
@@ -929,10 +935,102 @@ describe "ea-nginx script" => sub {
 
         it "should die if reset and users passed" => sub {
             trap {
-                scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--enabled=0" );
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--no-rebuild", "--enabled=0" );
             };
 
             like( $trap->die, qr/--reset does not make sense/ );
+        };
+
+        it "should go back to defaults if reset is called on system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--reset", "--no-rebuild" );
+            };
+
+            # load the file, it should match the caching_defaults
+            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
+
+            my %expected = scripts::ea_nginx::caching_defaults();
+            scripts::ea_nginx::_jsonify_caching_booleans( \%expected );
+
+            cmp_deeply( $from_file, \%expected );
+        };
+
+        it "should user file should be deleted if user passed on reset" => sub {
+            my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
+            Path::Tiny::path($file)->spew('{ enabled: true }');
+
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--no-rebuild" );
+            };
+
+            ok( !-e $file );
+        };
+
+        it "config should not be called if resetting system with no rebuild" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--reset", "--no-rebuild" );
+            };
+
+            is( $ti{config_called}, 0 );
+        };
+
+        it "config should not be called if resetting a user with no rebuild" => sub {
+            my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
+            Path::Tiny::path($file)->spew('{ enabled: true }');
+
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--no-rebuild" );
+            };
+
+            is( $ti{config_called}, 0 );
+        };
+
+        it "config should be called if resetting system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--reset" );
+            };
+
+            is( $ti{config_called}, 1 );
+        };
+
+        it "config should be called if resetting a user" => sub {
+            my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
+            Path::Tiny::path($file)->spew('{ enabled: true }');
+
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset" );
+            };
+
+            is( $ti{config_called}, 1 );
+        };
+
+        it "should just set enabled as true for system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--enabled=1" );
+            };
+
+            # load the file, it should match the caching_defaults
+            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
+
+            my %expected = ( enabled => JSON::PP::true() );
+
+            cmp_deeply( $from_file, \%expected );
+        };
+
+        it "should just set enabled as false for system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--enabled=0" );
+            };
+
+            # load the file, it should match the caching_defaults
+            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
+
+            my %expected = ( enabled => JSON::PP::false() );
+
+            cmp_deeply( $from_file, \%expected );
         };
 
     };

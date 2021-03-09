@@ -213,7 +213,8 @@ sub cache_config {
                 validate     => sub {
                     my ($prm) = @_;
                     my @given = grep { $_ ne "reset" && $_ ne "no-rebuild" } @{ $prm->param() };
-                    die "--reset does not make sense w/ other flags (besides --no-rebuild)\n" if $prm->param('reset') && @given > 1;
+
+                    die "--reset does not make sense w/ other flags (besides --no-rebuild)\n" if $prm->param('reset') && @given;
 
                     return 1;
                 },
@@ -249,6 +250,8 @@ sub cache_config {
             #    die "Invalid --zone_size, it must …\n" if … $zone_size;
             #    $conf_hr->{zone_size} = $zone_size;
             # }
+
+            print "FILE ($file)\n";
 
             _jsonify_caching_booleans($conf_hr);
             _write_json( $file, $conf_hr );
