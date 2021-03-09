@@ -256,14 +256,12 @@ sub clear_cache_cmd {
     my ( $app, @users ) = @_;
 
     if ( @users == 0 || $users[0] eq '--all' ) {
-
-        # or I could use negative logic I suppose
+        shift @users;
+        die "--all can not be mixed with usernames\n" if @users;
     }
     else {
-        if (@users) {
-            foreach my $user (@users) {
-                _validate_user_arg( $app, $user );
-            }
+        foreach my $user (@users) {
+            _validate_user_arg( $app, $user );
         }
     }
 
