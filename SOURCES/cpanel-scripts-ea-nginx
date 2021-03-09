@@ -256,25 +256,20 @@ sub clear_cache_cmd {
     my ( $app, @users ) = @_;
 
     if ( @users == 0 || $users[0] eq '--all' ) {
-        clear_cache_cli($app);
+
+        # or I could use negative logic I suppose
     }
     else {
-        clear_cache_cli( $app, @users );
-    }
-
-    return 1;
-}
-
-sub clear_cache_cli {
-    my ( $app, @users ) = @_;
-
-    if (@users) {
-        foreach my $user (@users) {
-            _validate_user_arg( $app, $user );
+        if (@users) {
+            foreach my $user (@users) {
+                _validate_user_arg( $app, $user );
+            }
         }
     }
 
     clear_cache(@users);
+
+    return 1;
 }
 
 sub clear_cache {
