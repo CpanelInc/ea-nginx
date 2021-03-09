@@ -67,9 +67,9 @@ my $cmds = {
     },
     cache => {
         code     => \&cache_config,
-        clue     => "cache [--system|<user>] [[--reset|--enabled=[1|0]]]",
+        clue     => "cache [--system|<user>] [--no-rebuild] [[--reset|--enabled=[1|0]]]",
         abstract => "Manage cache configuration at the system or user level",
-        help     => "View, configure, reset NGINX caching at the system or user level\n\t--reset w/ --system will reset the system level config to the defaultsn\\t--reset w/ a user will remove the user’s config effectively resetting it to the system level config\n",
+        help     => "View, configure, reset NGINX caching at the system or user level\n\n\t--no-rebuild will make it skip the config regen and NGINX reload to make the chnages t ake effect\n\n\t--reset w/ --system will reset the system level config to the defaults\n\t--reset w/ a user will remove the user’s config effectively resetting it to the system level config\n",
     },
 };
 
@@ -189,10 +189,13 @@ sub cache_config {
     my ( $app, $which, @flags ) = @_;
     die "First argument to `cache` must be `--system` or a cPanel user name\n" if !length $which;
 
-    my $file = "/etc/nginx/ea-nginx/cache.json";
+    my $file       = "/etc/nginx/ea-nginx/cache.json";
+    my $config_arg = "--all";
+
     if ( $which ne "--system" ) {
         _validate_user_arg( $app, $which );
-        $file = "/var/cpanel/userdata/$which/nginx-cache.json";
+        $file       = "/var/cpanel/userdata/$which/nginx-cache.json";
+        $config_arg = $which;
     }
 
     if ( !@flags ) {
@@ -203,11 +206,12 @@ sub cache_config {
         my $prm = Getopt::Param::Tiny->new(
             {
                 array_ref    => \@flags,
-                known_only   => [qw(reset enabled)],
+                known_only   => [qw(reset enabled no-rebuild)],
                 help_coderef => sub { $app->help(); exit(1) },
                 validate     => sub {
                     my ($prm) = @_;
-                    die "--reset does not make sense w/ other flags\n" if $prm->param('reset') && @{ $prm->param() } > 1;
+                    my @given = grep { $_ ne "reset" && $_ ne "no-rebuild" } @{ $prm->param() };
+                    die "--reset does not make sense w/ other flags (besides --no-rebuild)\n" if $prm->param('reset') && @given > 1;
 
                     return 1;
                 },
@@ -247,7 +251,10 @@ sub cache_config {
             _jsonify_caching_booleans($conf_hr);
             _write_json( $file, $conf_hr );
         }
+
+        config( $app, $config_arg ) unless $prm->param("no-rebuild");
     }
+
     return 1;
 
 }
