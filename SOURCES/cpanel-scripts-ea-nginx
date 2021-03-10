@@ -25,6 +25,7 @@ use Cpanel::PHPFPM::Get                     ();
 use Cpanel::PwCache                         ();
 use Cpanel::SafeRun::Object                 ();
 use Cpanel::Sys::OS                         ();
+use Cpanel::Transaction::File::JSON         ();
 use Cpanel::Validate::URL                   ();
 use Cpanel::Validate::Username              ();
 use File::Glob                              ();
@@ -35,7 +36,9 @@ use Whostmgr::TweakSettings                 ();
 
 use Path::Tiny;
 
-our $var_cache_ea_nginx = '/var/cache/ea-nginx';
+our $var_cache_ea_nginx  = '/var/cache/ea-nginx';
+our $var_cpanel_userdata = '/var/cpanel/userdata';
+our $etc_nginx           = '/etc/nginx';
 
 my $nginxroot = "/etc/nginx";
 
@@ -63,6 +66,12 @@ my $cmds = {
         clue     => "clear_cache [--all|<user1> <user2> ...]",
         abstract => 'Clear the cache for a user, some users, or all users.',
         help     => 'Clears a cache or caches. Pass the users you want to clear or none for all users.',
+    },
+    cache => {
+        code     => \&cache_config,
+        clue     => "cache [--system|<user>] [--no-rebuild] [[--reset|--enabled=[1|0]]]",
+        abstract => "Manage cache configuration at the system or user level",
+        help     => "View, configure, reset NGINX caching at the system or user level\n\n\t--no-rebuild will make it skip the config regeneration and NGINX reload necessary to make the changes take effect\n\n\t--reset w/ --system will reset the system level config to the defaults\n\t--reset w/ a user will remove the user’s config effectively resetting it to the system level config\n",
     },
 };
 
@@ -178,15 +187,95 @@ sub config {
     return 1;
 }
 
+sub cache_config {
+    my ( $app, $which, @flags ) = @_;
+    die "First argument to `cache` must be `--system` or a cPanel user name\n" if !length $which;
+
+    my $file       = $etc_nginx . "/ea-nginx/cache.json";
+    my $config_arg = "--all";
+
+    if ( $which ne "--system" ) {
+        _validate_user_arg( $app, $which );
+        $file       = $var_cpanel_userdata . "/$which/nginx-cache.json";
+        $config_arg = $which;
+    }
+
+    if ( !@flags ) {
+        print eval { path($file)->slurp } || "{}\n";
+    }
+    else {
+        require Getopt::Param::Tiny;
+        my $prm = Getopt::Param::Tiny->new(
+            {
+                array_ref    => \@flags,
+                known_only   => [qw(reset enabled no-rebuild)],
+                help_coderef => sub { $app->help(); exit(1) },
+                validate     => sub {
+                    my ($prm) = @_;
+                    my @given = grep { $_ ne "reset" && $_ ne "no-rebuild" } @{ $prm->param() };
+
+                    die "--reset does not make sense w/ other flags (besides --no-rebuild)\n" if $prm->param('reset') && @given;
+
+                    return 1;
+                },
+            }
+        );
+
+        if ( $prm->param('reset') ) {
+            if ( $which eq "--system" ) {
+                my %caching_defaults = caching_defaults();
+                _jsonify_caching_booleans( \%caching_defaults );
+                _write_json( $file, \%caching_defaults );
+            }
+            else {
+                unlink $file;
+            }
+        }
+        else {
+            my $conf_hr = eval { Cpanel::JSON::LoadFile($file) } || {};
+
+            # always set it since its the only option until ZC-8549
+            $conf_hr->{enabled} = _bool_param( enabled => scalar( $prm->param('enabled') ) );
+
+            # ZC-8549 example:
+            # my %given_params;
+            # @given_params{ $prm->param() } = ();
+            # for my $bool (qw(enabled x_cache_header logging)) {
+            #    next if !exists $given_params{$bool}; # only set it if given
+            #    $conf_hr->{$bool} = _bool_param( $bool => scalar($prm->param($bool)) );
+            # }
+            #
+            # if (exists $given_params{zone_size}) {
+            #    my $zone_size = $prm->param('zone_size');
+            #    die "Invalid --zone_size, it must …\n" if … $zone_size;
+            #    $conf_hr->{zone_size} = $zone_size;
+            # }
+
+            _jsonify_caching_booleans($conf_hr);
+            _write_json( $file, $conf_hr );
+        }
+
+        config( $app, $config_arg ) unless $prm->param("no-rebuild");
+    }
+
+    return 1;
+
+}
+
 sub clear_cache_cmd {
     my ( $app, @users ) = @_;
 
     if ( @users == 0 || $users[0] eq '--all' ) {
-        clear_cache();
+        shift @users;
+        die "--all can not be mixed with usernames\n" if @users;
     }
     else {
-        clear_cache(@users);
+        foreach my $user (@users) {
+            _validate_user_arg( $app, $user );
+        }
     }
+
+    clear_cache(@users);
 
     return 1;
 }
@@ -230,6 +319,38 @@ sub caching_defaults {    # do not want `our %caching_defaults` or a hash refere
         proxy_cache_min_uses          => 1,
         proxy_cache_lock              => "on",
     );
+}
+
+sub _bool_param {
+    my ( $flag, $value ) = @_;
+
+    die "--$flag value must be 1 or 0\n" if !defined $value || ( $value ne "1" && $value ne "0" );
+
+    return $value;
+}
+
+sub _jsonify_caching_booleans {
+    my ($hr) = @_;
+
+    require JSON::PP;
+    for my $boolkey (qw(enabled logging x_cache_header)) {
+        next if !exists $hr->{$boolkey};
+        $hr->{$boolkey} = $hr->{$boolkey} ? JSON::PP::true() : JSON::PP::false();
+    }
+
+    return;
+}
+
+sub _write_json {
+    my ( $file, $ref ) = @_;
+
+    my $transaction = Cpanel::Transaction::File::JSON->new( path => $file, "permissions" => 0644 );
+    $transaction->set_data($ref);
+
+    $transaction->save_pretty_canonical_or_die();
+    $transaction->close_or_die();
+
+    return 1;
 }
 
 my $tt;
