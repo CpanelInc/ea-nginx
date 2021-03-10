@@ -69,7 +69,7 @@ my $cmds = {
         code     => \&cache_config,
         clue     => "cache [--system|<user>] [--no-rebuild] [[--reset|--enabled=[1|0]]]",
         abstract => "Manage cache configuration at the system or user level",
-        help     => "View, configure, reset NGINX caching at the system or user level\n\n\t--no-rebuild will make it skip the config regen and NGINX reload to make the chnages t ake effect\n\n\t--reset w/ --system will reset the system level config to the defaults\n\t--reset w/ a user will remove the user’s config effectively resetting it to the system level config\n",
+        help     => "View, configure, reset NGINX caching at the system or user level\n\n\t--no-rebuild will make it skip the config regeneration and NGINX reload necessary to make the changes take effect\n\n\t--reset w/ --system will reset the system level config to the defaults\n\t--reset w/ a user will remove the user’s config effectively resetting it to the system level config\n",
     },
 };
 
