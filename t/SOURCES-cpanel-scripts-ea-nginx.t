@@ -922,7 +922,7 @@ describe "ea-nginx script" => sub {
             like( $trap->die, qr/^First argument/ );
         };
 
-        it "should show empty json if no flags passed" => sub {
+        it "should show users config file (empty json if it does not exist) if no flags passed after user" => sub {
             trap {
                 scripts::ea_nginx::cache_config( {}, "ipman" );
             };
@@ -931,6 +931,34 @@ describe "ea-nginx script" => sub {
                 $trap->stdout, q/{}
 /
             );
+        };
+
+        it "should show users config file if no flags passed after user" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--enabled=1" );
+                scripts::ea_nginx::cache_config( {}, "ipman" );
+            };
+
+            my $expected = q/{
+   "enabled" : true
+}
+/;
+
+            is( $trap->stdout, $expected );
+        };
+
+        it "should show system config file if no flags passed after --system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--enabled=1" );
+                scripts::ea_nginx::cache_config( {}, "--system" );
+            };
+
+            my $expected = q/{
+   "enabled" : true
+}
+/;
+
+            is( $trap->stdout, $expected );
         };
 
         it "should die if --reset is mixed with other configuration flags" => sub {
