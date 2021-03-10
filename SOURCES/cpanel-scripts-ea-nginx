@@ -36,7 +36,9 @@ use Whostmgr::TweakSettings                 ();
 
 use Path::Tiny;
 
-our $var_cache_ea_nginx = '/var/cache/ea-nginx';
+our $var_cache_ea_nginx  = '/var/cache/ea-nginx';
+our $var_cpanel_userdata = '/var/cpanel/userdata';
+our $etc_nginx           = '/etc/nginx';
 
 my $nginxroot = "/etc/nginx";
 
@@ -189,12 +191,12 @@ sub cache_config {
     my ( $app, $which, @flags ) = @_;
     die "First argument to `cache` must be `--system` or a cPanel user name\n" if !length $which;
 
-    my $file       = "/etc/nginx/ea-nginx/cache.json";
+    my $file       = $etc_nginx . "/ea-nginx/cache.json";
     my $config_arg = "--all";
 
     if ( $which ne "--system" ) {
         _validate_user_arg( $app, $which );
-        $file       = "/var/cpanel/userdata/$which/nginx-cache.json";
+        $file       = $var_cpanel_userdata . "/$which/nginx-cache.json";
         $config_arg = $which;
     }
 
@@ -211,7 +213,8 @@ sub cache_config {
                 validate     => sub {
                     my ($prm) = @_;
                     my @given = grep { $_ ne "reset" && $_ ne "no-rebuild" } @{ $prm->param() };
-                    die "--reset does not make sense w/ other flags (besides --no-rebuild)\n" if $prm->param('reset') && @given > 1;
+
+                    die "--reset does not make sense w/ other flags (besides --no-rebuild)\n" if $prm->param('reset') && @given;
 
                     return 1;
                 },

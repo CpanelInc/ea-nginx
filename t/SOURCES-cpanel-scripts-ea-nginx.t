@@ -11,6 +11,9 @@ use Test::Spec;    # automatically turns on strict and warnings
 use FindBin;
 use File::Glob ();
 
+use File::Temp;
+use Path::Tiny;
+
 use Cpanel::Config::userdata::Load ();
 
 our $system_calls   = [];
@@ -747,17 +750,22 @@ describe "ea-nginx script" => sub {
 
         it "should call clear_cache with no users if no user passed" => sub {
             scripts::ea_nginx::clear_cache_cmd( {}, () );
-            is( @{ $ti{users} }, 1 );
+            is( @{ $ti{users} }, 0 );
         };
 
         it "should call clear_cache with no users if --all passed" => sub {
             scripts::ea_nginx::clear_cache_cmd( {}, '--all' );
-            is( @{ $ti{users} }, 1 );
+            is( @{ $ti{users} }, 0 );
+        };
+
+        it "should call clear_cache if --all passed" => sub {
+            scripts::ea_nginx::clear_cache_cmd( {}, '--all' );
+            is( $ti{clear_cache_called}, 1 );
         };
 
         it "should call clear_cache with 2 users if 2 users are passed" => sub {
             scripts::ea_nginx::clear_cache_cmd( {}, 'chucknorris', 'brucelee' );
-            is( @{ $ti{users} }, 3 );
+            is( @{ $ti{users} }, 2 );
         };
     };
 
@@ -783,25 +791,25 @@ describe "ea-nginx script" => sub {
         };
 
         it "should call _delete_glob once if no user passed" => sub {
-            scripts::ea_nginx::clear_cache(undef);
+            scripts::ea_nginx::clear_cache();
 
             is( $ti{delete_glob_called}, 1 );
         };
 
         it "should call _delete_glob with correct glob when no user passed" => sub {
-            scripts::ea_nginx::clear_cache(undef);
+            scripts::ea_nginx::clear_cache();
 
             is( $ti{globs}->[0], '/var/cache/ea-nginx/*/*/*' );
         };
 
         it "should call _delete_glob twice when 2 users passed" => sub {
-            scripts::ea_nginx::clear_cache( undef, 'chucknorris', 'brucelee' );
+            scripts::ea_nginx::clear_cache( 'chucknorris', 'brucelee' );
 
             is( $ti{delete_glob_called}, 2 );
         };
 
         it "should call _delete_glob with correct globs when 2 users are passed" => sub {
-            scripts::ea_nginx::clear_cache( undef, 'chucknorris', 'brucelee' );
+            scripts::ea_nginx::clear_cache( 'chucknorris', 'brucelee' );
 
             cmp_deeply(
                 $ti{globs},
@@ -866,6 +874,193 @@ describe "ea-nginx script" => sub {
         };
 
         describe "_delete_glob" => sub { it "should be tested" };
+    };
+
+    describe "cache_config" => sub {
+        share my %ti;
+
+        around {
+            local $ti{temp_dir} = File::Temp->newdir();
+
+            local $scripts::ea_nginx::var_cpanel_userdata = $ti{temp_dir} . "/userdata";
+            local $scripts::ea_nginx::etc_nginx           = $ti{temp_dir} . "/etc_nginx";
+
+            mkdir $scripts::ea_nginx::var_cpanel_userdata;
+            mkdir $scripts::ea_nginx::var_cpanel_userdata . "/ipman";
+            mkdir $scripts::ea_nginx::etc_nginx;
+            mkdir $scripts::ea_nginx::etc_nginx . "/ea-nginx";
+
+            local $ti{validate_user_called} = 0;
+            local $ti{config_called}        = 0;
+
+            no warnings qw(redefine once);
+            local *scripts::ea_nginx::_validate_user_arg = sub {
+                $ti{validate_user_called}++;
+                return 1;
+            };
+            local *scripts::ea_nginx::config = sub {
+                $ti{config_called}++;
+                return 1;
+            };
+
+            yield;
+        };
+
+        it "should die if no user or system passed" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {} );
+            };
+
+            like( $trap->die, qr/^First argument/ );
+        };
+
+        it "should die if user is empty" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "" );
+            };
+
+            like( $trap->die, qr/^First argument/ );
+        };
+
+        it "should show users config file (empty json if it does not exist) if no flags passed after user" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman" );
+            };
+
+            is(
+                $trap->stdout, q/{}
+/
+            );
+        };
+
+        it "should show users config file if no flags passed after user" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--enabled=1" );
+                scripts::ea_nginx::cache_config( {}, "ipman" );
+            };
+
+            my $expected = q/{
+   "enabled" : true
+}
+/;
+
+            is( $trap->stdout, $expected );
+        };
+
+        it "should show system config file if no flags passed after --system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--enabled=1" );
+                scripts::ea_nginx::cache_config( {}, "--system" );
+            };
+
+            my $expected = q/{
+   "enabled" : true
+}
+/;
+
+            is( $trap->stdout, $expected );
+        };
+
+        it "should die if --reset is mixed with other configuration flags" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--no-rebuild", "--enabled=0" );
+            };
+
+            like( $trap->die, qr/--reset does not make sense/ );
+        };
+
+        it "should go back to defaults if reset is called on system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--reset", "--no-rebuild" );
+            };
+
+            # load the file, it should match the caching_defaults
+            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
+
+            my %expected = scripts::ea_nginx::caching_defaults();
+            scripts::ea_nginx::_jsonify_caching_booleans( \%expected );
+
+            cmp_deeply( $from_file, \%expected );
+        };
+
+        it "should user file should be deleted if user passed on reset" => sub {
+            my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
+            Path::Tiny::path($file)->spew('{ enabled: true }');
+
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--no-rebuild" );
+            };
+
+            ok( !-e $file );
+        };
+
+        it "config should not be called if resetting system with no rebuild" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--reset", "--no-rebuild" );
+            };
+
+            is( $ti{config_called}, 0 );
+        };
+
+        it "config should not be called if resetting a user with no rebuild" => sub {
+            my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
+            Path::Tiny::path($file)->spew('{ enabled: true }');
+
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--no-rebuild" );
+            };
+
+            is( $ti{config_called}, 0 );
+        };
+
+        it "config should be called if resetting system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--reset" );
+            };
+
+            is( $ti{config_called}, 1 );
+        };
+
+        it "config should be called if resetting a user" => sub {
+            my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
+            Path::Tiny::path($file)->spew('{ enabled: true }');
+
+            trap {
+                scripts::ea_nginx::cache_config( {}, "ipman", "--reset" );
+            };
+
+            is( $ti{config_called}, 1 );
+        };
+
+        it "should just set enabled as true for system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--enabled=1" );
+            };
+
+            # load the file, it should match the caching_defaults
+            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
+
+            my %expected = ( enabled => JSON::PP::true() );
+
+            cmp_deeply( $from_file, \%expected );
+        };
+
+        it "should just set enabled as false for system" => sub {
+            trap {
+                scripts::ea_nginx::cache_config( {}, "--system", "--enabled=0" );
+            };
+
+            # load the file, it should match the caching_defaults
+            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
+
+            my %expected = ( enabled => JSON::PP::false() );
+
+            cmp_deeply( $from_file, \%expected );
+        };
+
     };
 };
 
