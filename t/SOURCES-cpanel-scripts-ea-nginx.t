@@ -933,7 +933,7 @@ describe "ea-nginx script" => sub {
             );
         };
 
-        it "should die if reset and users passed" => sub {
+        it "should die if --reset is mixed with other configuration flags" => sub {
             trap {
                 scripts::ea_nginx::cache_config( {}, "ipman", "--reset", "--no-rebuild", "--enabled=0" );
             };
