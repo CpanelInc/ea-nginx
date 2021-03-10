@@ -251,8 +251,6 @@ sub cache_config {
             #    $conf_hr->{zone_size} = $zone_size;
             # }
 
-            print "FILE ($file)\n";
-
             _jsonify_caching_booleans($conf_hr);
             _write_json( $file, $conf_hr );
         }

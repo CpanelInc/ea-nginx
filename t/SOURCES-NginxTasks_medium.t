@@ -13,9 +13,6 @@ use FindBin;
 use Cpanel::ServerTasks ();
 use Cpanel::Debug       ();
 
-use Test::MockModule;
-use Test::MockFile;
-
 use File::Temp;
 use Path::Tiny;
 
@@ -89,25 +86,17 @@ describe "clear_user_cache" => sub {
 
     describe "_do_child_task" => sub {
         it "should call clear_cache with one user" => sub {
-          SKIP: {
-                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+            $mi{mocks}->{task}->add_args('ricky_bobby');
+            $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
 
-                $mi{mocks}->{task}->add_args('ricky_bobby');
-                $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
-
-                is( @{ $mi{mocks}->{globs} }, 1 );
-            }
+            is( @{ $mi{mocks}->{globs} }, 1 );
         };
 
         it "should call clear_cache with the correct user" => sub {
-          SKIP: {
-                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+            $mi{mocks}->{task}->add_args('ricky_bobby');
+            $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
 
-                $mi{mocks}->{task}->add_args('ricky_bobby');
-                $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
-
-                is( $mi{mocks}->{globs}->[0], '/var/cache/ea-nginx/*/ricky_bobby/*' );
-            }
+            is( $mi{mocks}->{globs}->[0], '/var/cache/ea-nginx/*/ricky_bobby/*' );
         };
     };
 };
