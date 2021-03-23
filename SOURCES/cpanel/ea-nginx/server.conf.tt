@@ -62,6 +62,11 @@ server {
         proxy_pass http://127.0.0.1:2082/cpanelwebcall;
     }
 
+    location /Microsoft-Server-ActiveSync {
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass http://127.0.0.1:2090/Microsoft-Server-ActiveSync;
+    }
+
     [%- IF !behavior.standalone %]
     location / {
         [%- IF behavior.caching.enabled %]

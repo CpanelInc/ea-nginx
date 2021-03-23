@@ -96,7 +96,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.19.7
+%define main_version 1.19.8
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,18 @@ fi
 
 
 %changelog
+* Thu Mar 18 2021 Tim Mullin <tim@cpanel.net> - 1.19.8-3
+- EA-9652: Invoke whmapi1 with full cPanel path
+
+* Thu Mar 11 2021 Daniel Muey <dan@cpanel.net> - 1.19.8-2
+- ZC-8591: Add `/Microsoft-Server-ActiveSync` proxy
+
+* Wed Mar 10 2021 Cory McIntire <cory@cpanel.net> - 1.19.8-1
+- EA-9638: Update ea-nginx from v1.19.7 to v1.19.8
+
+* Mon Mar 08 2021 Daniel Muey <dan@cpanel.net> - 1.19.7-5
+- ZC-8541: Add sub command to scripts/ea-nginx to configure cacheing
+
 * Thu Mar 04 2021 Julian Brown <julian.brown@cpanel.net> - 1.19.7-4
 - ZC-8480: Move ea-nginx from experimental to EA4
 
