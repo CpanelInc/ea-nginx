@@ -107,7 +107,7 @@ sub _set_ts {
 sub _get_apicall {
     my ( $function, @args ) = @_;
 
-    my $run = Cpanel::SafeRun::Object->new( program => '/usr/sbin/whmapi1', args => [ $function, '--output=json', @args ] );
+    my $run = Cpanel::SafeRun::Object->new( program => '/usr/local/cpanel/bin/whmapi1', args => [ $function, '--output=json', @args ] );
 
     if ( $run->CHILD_ERROR() ) {
         warn $run->CHILD_ERROR() . "\n";
