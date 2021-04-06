@@ -229,7 +229,7 @@ server {
 # Example:  whm.*.mydomain.tld would not be allowed
 [%- SET domains = domains.grep('^[^\*]') %]
 
-[%- IF ssl_certificate && ssl_certificate_key && domains.size %]
+[%- IF ssl_certificate && ssl_certificate_key && proxysubdomains_enabled && domains.size %]
 #### SSL Proxies for [% domains.join(', ') %] ##
     [%- SET subdom_map = {
             cpanel  = 2082, webmail    = 2095, whm        = 2086,
