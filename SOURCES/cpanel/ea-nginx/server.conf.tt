@@ -1,5 +1,5 @@
 server {
-    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% END %][% END %];
+    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %] mail.[% domain %][% END %][% END %];
     listen 80;
 
     [%- IF secruleengineoff %]
