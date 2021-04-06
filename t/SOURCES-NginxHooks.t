@@ -10,9 +10,10 @@ use Test::Spec;    # automatically turns on strict and warnings
 
 use FindBin;
 
-use Cpanel::ServerTasks    ();
-use Cpanel::PHPFPM::Config ();
-use Cpanel::AdminBin::Call ();
+use Cpanel::ServerTasks       ();
+use Cpanel::PHPFPM::Config    ();
+use Cpanel::AdminBin::Call    ();
+use Cpanel::PHPFPM::Constants ();
 
 use Test::MockModule;
 use Test::MockFile;
@@ -36,6 +37,7 @@ my %conf = (
 require $conf{require};
 
 my @log_output;
+my $delay_time = $Cpanel::PHPFPM::Constants::delay_for_rebuild + 5;
 
 package test::logger {
 
@@ -81,21 +83,21 @@ describe "NginxHooks" => sub {
             is( $ret, 5 );
         };
 
-        it "should return 300 if phpfpm is not default and long time set" => sub {
+        it "should return $delay_time if phpfpm is not default and long time set" => sub {
             my $ret = NginxHooks::get_time_to_wait(1);
-            is( $ret, 300 );
+            is( $ret, $delay_time );
         };
 
-        it "should return 300 if phpfpm is default and not long time set" => sub {
+        it "should return $delay_time if phpfpm is default and not long time set" => sub {
             $mi{mocks}->{phpfpm_config_status} = 1;
             my $ret = NginxHooks::get_time_to_wait(0);
-            is( $ret, 300 );
+            is( $ret, $delay_time );
         };
 
-        it "should return 300 if phpfpm is default and long time set" => sub {
+        it "should return $delay_time if phpfpm is default and long time set" => sub {
             $mi{mocks}->{phpfpm_config_status} = 1;
             my $ret = NginxHooks::get_time_to_wait(1);
-            is( $ret, 300 );
+            is( $ret, $delay_time );
         };
     };
 
@@ -131,7 +133,7 @@ describe "NginxHooks" => sub {
 
         it "should do the thing if happy path" => sub {
             my ( $ret, $msg ) = NginxHooks::_possible_php_fpm();
-            my $expected_ar = ['NginxTasks,300,rebuild_config'];
+            my $expected_ar = ["NginxTasks,$delay_time,rebuild_config"];
 
             is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
         };
@@ -180,7 +182,7 @@ describe "NginxHooks" => sub {
 
         it "should do the thing if happy path" => sub {
             my ( $ret, $msg ) = NginxHooks::_possible_php_fpm();
-            my $expected_ar = ['NginxTasks,300,rebuild_config'];
+            my $expected_ar = ["NginxTasks,$delay_time,rebuild_config"];
 
             is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
         };
