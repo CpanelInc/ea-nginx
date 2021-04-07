@@ -96,7 +96,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.19.8
+%define main_version 1.19.9
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,9 @@ fi
 
 
 %changelog
+* Wed Apr 07 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.9-1
+- EA-9683: Update ea-nginx from v1.19.8 to v1.19.9
+
 * Tue Apr 06 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.8-5
 - EA-9672: Decrease delay to rebuild config when creating new domains
 - EA-9673: Honor proxysubdomains tweak setting when rebuilding config
