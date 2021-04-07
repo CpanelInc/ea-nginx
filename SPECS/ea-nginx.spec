@@ -641,6 +641,7 @@ fi
 %changelog
 * Wed Apr 07 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.9-1
 - EA-9683: Update ea-nginx from v1.19.8 to v1.19.9
+- EA-9682: Create hook to rebuild config for tweak settings changes in WHM
 
 * Tue Apr 06 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.8-5
 - EA-9672: Decrease delay to rebuild config when creating new domains
