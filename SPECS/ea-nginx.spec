@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,10 @@ fi
 
 
 %changelog
+* Tue Apr 06 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.8-5
+- EA-9672: Decrease delay to rebuild config when creating new domains
+- EA-9673: Honor proxysubdomains tweak setting when rebuilding config
+
 * Tue Apr 06 2021 Daniel Muey <dan@cpanel.net> - 1.19.8-4
 - ZC-8719: Add `mail` subdomain like it does `www`
 

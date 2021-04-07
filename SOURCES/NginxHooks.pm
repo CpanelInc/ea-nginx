@@ -213,15 +213,13 @@ sub get_time_to_wait {
     $get_long_time ||= 0;
 
     require Cpanel::PHPFPM::Config;
+    require Cpanel::PHPFPM::Constants;
 
-    my $time_to_wait = 5;
+    my $time_to_wait      = 5;
+    my $delay_for_rebuild = $Cpanel::PHPFPM::Constants::delay_for_rebuild if $Cpanel::PHPFPM::Constants::delay_for_rebuild;
+    $delay_for_rebuild ||= 10;    # based on the constant value in 96
 
-    # due to the task queue dance that is played out, converting an account to
-    # fpm can take upwards of 240 seconds, 300 pretty much guarantees it is
-    # ready.  I wanted to pull from the PHPFPM::Constants, but alas it is not
-    # a constant.
-
-    $time_to_wait = 300 if ( $get_long_time || Cpanel::PHPFPM::Config::get_default_accounts_to_fpm() );
+    $time_to_wait += $delay_for_rebuild if ( $get_long_time || Cpanel::PHPFPM::Config::get_default_accounts_to_fpm() );
     return $time_to_wait;
 }
 

@@ -10,6 +10,7 @@ use warnings;
 package scripts::ea_nginx;
 
 use Cpanel::Apache::TLS                     ();
+use Cpanel::Config::LoadCpConf              ();
 use Cpanel::Config::LoadUserDomains         ();
 use Cpanel::Config::LoadWwwAcctConf         ();
 use Cpanel::Config::userdata                ();
@@ -678,6 +679,8 @@ sub _render_and_append {
 
     my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
 
+    my $cpconf_hr = Cpanel::Config::LoadCpConf::loadcpconf();
+
     my $ea4_conf_hr = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     $tt->process(
         \$server_tt,
@@ -709,6 +712,7 @@ sub _render_and_append {
                 standalone => ( -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0 ),
                 caching    => $caching_hr,
             },
+            proxysubdomains_enabled => $cpconf_hr->{proxysubdomains},
         },
         sub {
             my ($out) = @_;
