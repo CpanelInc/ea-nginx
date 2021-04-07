@@ -149,6 +149,7 @@ sub describe {
         'SSL::delssl',
         'SSL::installssl',
         'TweakSettings::Basic',
+        'TweakSettings::Main',
     );
     my @adminbin_actions = map {
         {
