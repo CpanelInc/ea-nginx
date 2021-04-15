@@ -57,6 +57,8 @@ server {
         [% END -%]
     [% END -%]
 
+    root [% docroot %];
+
     location /cpanelwebcall {
         include conf.d/includes-optional/cpanel-proxy.conf;
         proxy_pass http://127.0.0.1:2082/cpanelwebcall;
@@ -120,7 +122,6 @@ server {
     rewrite [% redirect.regex %] [% redirect.replacement %] [% redirect.flag %];
     [%- END %]
 
-    root [% docroot %];
     index [% IF fpm_socket %]index.php [% END %]index.html;
 
     [%- IF basic_auth.realm_name.size %]
