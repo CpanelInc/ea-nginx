@@ -96,7 +96,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.19.9
+%define main_version 1.19.10
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,12 @@ fi
 
 
 %changelog
+* Thu Apr 15 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.10-2
+- EA-9692: Ensure server blocks contain root path when in reverse proxy mode
+
+* Wed Apr 14 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.10-1
+- EA-9694: Update ea-nginx from v1.19.9 to v1.19.10
+
 * Wed Apr 07 2021 Travis Holloway <t.holloway@cpanel.net> - 1.19.9-1
 - EA-9683: Update ea-nginx from v1.19.8 to v1.19.9
 - EA-9682: Create hook to rebuild config for tweak settings changes in WHM
