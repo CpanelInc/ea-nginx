@@ -27,11 +27,6 @@ server {
     [%- IF behavior.caching.enabled %]
     set $CPANEL_PROXY_CACHE [% user %];
     set $CPANEL_SKIP_PROXY 0;
-
-    if ($request_uri ~* "(/wp-admin|/wp-login.php)") {
-        set $CPANEL_PROXY_CACHE "off";
-        set $CPANEL_SKIP_PROXY 1;
-    }
     [% END -%]
 
     [%- IF ssl_certificate && ssl_certificate_key %]
