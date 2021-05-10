@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,9 @@ fi
 
 
 %changelog
+* Mon May 10 2021 Daniel Muey <dan@cpanel.net> - 1.20.0-3
+- ZC-8817: clear cache on certain ops
+
 * Thu May 06 2021 Travis Holloway <t.holloway@cpanel.net> - 1.20.0-2
 - EA-9757: Remove unnecessary proxy config setting for wordpress sites
 
