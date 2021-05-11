@@ -143,7 +143,10 @@ sub remove {
         if ( -f $file ) {
             die "Unable to remove $file\n";
         }
-        _reload() unless grep { $_ eq '--no-reload' } @args;
+        unless ( grep { $_ eq '--no-reload' } @args ) {
+            _reload();
+            clear_cache($user);
+        }
 
     }
     else {
@@ -163,6 +166,7 @@ sub remove {
 sub config {
     my ( $app, $user, @args ) = @_;
 
+    my $reload = grep { $_ eq '--no-reload' } @args ? 0 : 1;
     if ( $user eq '--all' || $user eq '--global' ) {
         _write_global_logging();
         _write_global_passenger();
@@ -176,13 +180,20 @@ sub config {
                 _write_user_conf($usr);
             }
         }
-        _reload() unless grep { $_ eq '--no-reload' } @args;
+        if ($reload) {
+            _reload();
+            clear_cache();
+        }
+
     }
     else {
         _validate_user_arg( $app, $user );
         mkdir "/etc/nginx/conf.d/users/";
         _write_user_conf($user);
-        _reload("/etc/nginx/conf.d/users/$user.conf") unless grep { $_ eq '--no-reload' } @args;
+        if ($reload) {
+            _reload("/etc/nginx/conf.d/users/$user.conf");
+            clear_cache($user);
+        }
     }
 
     return 1;
@@ -292,9 +303,11 @@ sub clear_cache {
     else {
         _delete_glob( $var_cache_ea_nginx . "/*/*/*" );
     }
+
+    return 1;
 }
 
-sub reload { _reload() }
+sub reload { _reload(); clear_cache(); }
 
 ###############
 #### helpers ##
