@@ -166,7 +166,8 @@ sub remove {
 sub config {
     my ( $app, $user, @args ) = @_;
 
-    my $reload = grep { $_ eq '--no-reload' } @args ? 0 : 1;
+    my $reload = grep( { $_ eq '--no-reload' } @args ) ? 0 : 1;
+
     if ( $user eq '--all' || $user eq '--global' ) {
         _write_global_logging();
         _write_global_passenger();
