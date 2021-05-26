@@ -641,6 +641,7 @@ fi
 %changelog
 * Wed May 26 2021 Cory McIntire <cory@cpanel.net> - 1.21.0-1
 - EA-9798: Update ea-nginx from v1.20.0 to v1.21.0
+- EA-9791: Add alarm to request to determine if a domain is using CloudFlare
 
 * Mon May 17 2021 Travis Holloway <t.holloway@cpanel.net> - 1.20.0-5
 - EA-9774: Ensure logs are rotated daily
