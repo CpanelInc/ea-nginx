@@ -43,7 +43,7 @@
                     # Normally (i.e. not under `sharedscripts`),
                     # the absolute path to the log file is passed as the first argument to the script and
                     # the absolute path to the final rotated log file is passed as the second argument
-                    /usr/local/cpanel/scripts/ea-nginx-logrotate $2
+                    /usr/local/cpanel/scripts/ea-nginx-logrotate $2 >/dev/null 2>&1 || true
                 else
                    # v3.8.6
                    # Normally (i.e. not under `sharedscripts`),
@@ -54,7 +54,7 @@
                    # just_rotated_path=${just_rotated_path/\/var\/log\/nginx\/domains\//\/var\/log\/nginx\/domains.rotated\/}
                    # this will work when /bin/sh -> /bin/dash or /bin/bash or /bin/zsh
                    just_rotated_path=$(echo "$just_rotated_path" | sed "s/\/var\/log\/nginx\/domains\//\/var\/log\/nginx\/domains.rotated\//")
-                   /usr/local/cpanel/scripts/ea-nginx-logrotate $just_rotated_path
+                   /usr/local/cpanel/scripts/ea-nginx-logrotate $just_rotated_path >/dev/null 2>&1 || true
                 fi
         endscript
 }

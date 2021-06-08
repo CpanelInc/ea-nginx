@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,9 @@ fi
 
 
 %changelog
+* Tue Jun 08 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-3
+- EA-9789: Silence logrotate script
+
 * Tue Jun 01 2021 Cory McIntire <cory@cpanel.net> - 1.21.0-2
 - EA-9812: NGINX fails to start when a folder contains a space
 
