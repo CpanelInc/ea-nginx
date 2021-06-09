@@ -100,7 +100,7 @@ server {
         [%- IF basic_auth.locations %]
 
             [%- FOREACH location IN basic_auth.locations.keys.sort %]
-    location [% location %] {
+    location "[% location.dquote %]" {
 
         # has basic auth, so disable cache:
         proxy_cache off;
@@ -162,7 +162,7 @@ server {
 
     [%- IF basic_auth.locations %]
         [%- FOREACH location IN basic_auth.locations.keys.sort %]
-    location [% location %] {
+    location "[% location.dquote %]" {
 
         [%- INCLUDE "ea-nginx/cpanel-password-protected-dirs.tt"
             realm_name = basic_auth.locations.item(location).realm_name
@@ -178,7 +178,7 @@ server {
 
     [%- IF passenger.apps.size %]
        [%- FOREACH app IN passenger.apps %]
-    location [% app.base_uri %] {
+    location "[% app.base_uri.dquote %]" {
         [%- IF app.envvars.size %]
             [%- FOREACH name IN app.envvars.keys.sort %]
         passenger_env_var [% name %] "[% app.envvars.$name.dquote %]";
