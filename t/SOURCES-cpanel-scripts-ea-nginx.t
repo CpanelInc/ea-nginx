@@ -822,6 +822,42 @@ describe "ea-nginx script" => sub {
     };
 
     describe "private routines" => sub {
+        describe "_get_domains_with_ssls" => sub {
+            around {
+                no warnings "redefine";
+                local *Cpanel::ConfigFiles::Apache::Config::get_httpd_vhosts_hash = sub {
+                    return {
+                        'domain.tld'     => {},
+                        'domain.tld_SSL' => {},
+                        'nossl.tld'      => {},
+                        'ssl.tld_SSL'    => {},
+                    };
+                };
+
+                yield;
+            };
+
+            it "should return a href" => sub {
+                my $href = scripts::ea_nginx::_get_domains_with_ssls();
+                ok( ref($href) eq 'HASH' );
+            };
+
+            it "should return domain.tld as a key based on the mocking" => sub {
+                my $href = scripts::ea_nginx::_get_domains_with_ssls();
+                is( $href->{'domain.tld'}, 1 );
+            };
+
+            it "should NOT return nossl.tld as a key based on the mocking" => sub {
+                my $href = scripts::ea_nginx::_get_domains_with_ssls();
+                isnt( $href->{'nossl.tld'}, 1 );
+            };
+
+            it "should return ssl.tld as a key based on the mocking" => sub {
+                my $href = scripts::ea_nginx::_get_domains_with_ssls();
+                is( $href->{'ssl.tld'}, 1 );
+            };
+        };
+
         describe "_get_caching_hr" => sub {
             around {
                 local $cpanel_json_loadfiles_string = "";

@@ -639,6 +639,20 @@ sub _get_group_for {
     return $group_cache{$user};
 }
 
+our $domains_with_ssl;
+
+sub _get_domains_with_ssls {
+    return unless ( eval { require Cpanel::ConfigFiles::Apache::Config; 1; } );
+
+    my $vhosts_hr  = Cpanel::ConfigFiles::Apache::Config::get_httpd_vhosts_hash();
+    my %ssl_vhosts = map {
+        $_ =~ s/_SSL$//;
+        $_ => 1
+    } grep { substr( $_, -4 ) eq '_SSL' ? 1 : 0 } keys %$vhosts_hr;
+
+    return \%ssl_vhosts;
+}
+
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
@@ -686,6 +700,19 @@ sub _render_and_append {
         }
     }
 
+    $domains_with_ssl ||= _get_domains_with_ssls();
+
+    my $has_ssl = 0;
+    if ( defined $domains_with_ssl ) {
+        foreach my $domain (@$domains) {
+            $has_ssl = 1 if $domains_with_ssl->{$domain};
+            last         if $has_ssl;
+        }
+    }
+    else {
+        $has_ssl = 1;    # default to enabled if $domains_with_ssl is undefined in order to mimic the previous behavior
+    }
+
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     $combined_tls = "" if !-f $combined_tls;
 
@@ -700,6 +727,7 @@ sub _render_and_append {
         \$server_tt,
         {
             docroot                      => $docroot,
+            has_ssl                      => $has_ssl,
             ssl_certificate              => $combined_tls,
             ssl_certificate_key          => $combined_tls,
             ssl_redirect                 => $ssl_redirect,
@@ -752,13 +780,13 @@ sub _is_cloudflare {
     my $res;
     eval {
         local $SIG{ALRM} = sub { die "alarm\n" };
-        alarm 2;                                        # typically takes <1 second for a 200 response from cloudflare
+        alarm 2;                                               # typically takes <1 second for a 200 response from cloudflare
         $res = $http->get("https://$domain/cdn-cgi/trace");    # dies on SSL error which means its not cloudflare
         alarm 0;
     };
 
     return 0 if $@ || $res->{status} eq "404";
-    return 1 if $res->{status} eq "200";                # ¿ && content has a line: "h=$domain\n" - YAGNI ?
+    return 1 if $res->{status} eq "200";                       # ¿ && content has a line: "h=$domain\n" - YAGNI ?
 
     warn "Could not verify if $domain is cloudflare or not ($res->{status} $res->{reason})\n";
     return;
