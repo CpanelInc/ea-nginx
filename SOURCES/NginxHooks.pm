@@ -22,6 +22,9 @@ sub describe {
         }
     } (
         'Lang::PHP::set_vhost_versions',
+        'Lang::PHP::ini_set_content',
+        'Lang::PHP::set_system_default_version',
+        'Lang::PHP::ini_set_directives',
     );
     my @script_php_fpm_config_actions = map {
         {
@@ -128,6 +131,25 @@ sub describe {
         'Accounts::suspendacct',
         'Accounts::unsuspendacct',
     );
+    my @rebuild_user_actions = map {
+        {
+            'category' => 'Whostmgr',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_rebuild_user',
+            'exectype' => 'module',
+        }
+    } (
+        'Accounts::Create',
+        'Accounts::Modify',
+        'Accounts::Remove',
+        'Accounts::SiteIP::set',
+        'AutoSSL::installssl',
+        'SSL::delssl',
+        'SSL::installssl',
+        'Domain::park',
+        'Domain::unpark',
+    );
     my @normal_actions = map {
         {
             'category' => 'Whostmgr',
@@ -137,17 +159,8 @@ sub describe {
             'exectype' => 'module',
         }
     } (
-        'Accounts::Create',
-        'Accounts::Modify',
-        'Accounts::Remove',
-        'Accounts::SiteIP::set',
-        'AutoSSL::installssl',
-        'Domain::park',
-        'Domain::unpark',
         'Hostname::change',
         'PipedLogConfiguration',
-        'SSL::delssl',
-        'SSL::installssl',
         'TweakSettings::Basic',
         'TweakSettings::Main',
     );
@@ -173,6 +186,8 @@ sub describe {
         'Api2::SubDomain::addsubdomain',
         'Api2::SubDomain::delsubdomain',
         'UAPI::LangPHP::php_set_vhost_versions',
+        'UAPI::LangPHP::php_ini_set_user_content',
+        'UAPI::LangPHP::php_ini_set_user_basic_directives',
         'UAPI::Mime::add_redirect',
         'UAPI::Mime::delete_redirect',
         'UAPI::SSL::delete_ssl',
@@ -199,6 +214,7 @@ sub describe {
         @modsecurity_category,
         @modsec_vendor,
         @normal_actions,
+        @rebuild_user_actions,
         @phpfpm_actions,
         @script_php_fpm_config_actions,
         @wordpress_actions,
@@ -225,12 +241,51 @@ sub get_time_to_wait {
 }
 
 sub _possible_php_fpm {
-    local $@;
-    eval {
-        require Cpanel::ServerTasks;
-        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(1), 'rebuild_config' );
-    };
-    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+    my ( $hook, $event ) = @_;
+
+    my @users;
+    my @domains;
+
+    if ( exists $event->{vhost} ) {
+        push( @domains, $event->{vhost} );
+    }
+    elsif ( exists $event->{'vhost-1'} ) {
+        for my $idx ( 1 .. 100 ) {
+            my $evhost = 'vhost-' . $idx;
+            last if !exists $event->{$evhost};
+            push( @domains, $event->{$evhost} );
+        }
+    }
+
+    if (@domains) {
+        require Cpanel::PHP::Config;
+
+        my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( \@domains );
+        my %users_hash;
+        foreach my $domain ( keys %{$php_config_ref} ) {
+            $users_hash{ $php_config_ref->{$domain}->{username} } = 1;
+        }
+        push( @users, keys %users_hash );
+    }
+
+    if (@users) {
+        local $@;
+        eval {
+            require Cpanel::ServerTasks;
+            foreach my $user (@users) {
+                Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(1), "rebuild_user $user" );
+            }
+        };
+        return $@ ? ( 0, $@ ) : ( 1, "Success" );
+    }
+    else {
+        local $@;
+        eval {
+            require Cpanel::ServerTasks;
+            Cpanel::ServerTasks::schedule_task( ['NginxTasks'], get_time_to_wait(1), 'rebuild_config' );
+        };
+        return $@ ? ( 0, $@ ) : ( 1, "Success" );
+    }
 }
 
 sub _modsecurity_user {
@@ -297,6 +352,50 @@ sub _just_clear_user_cache {
     }
 
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
+sub _rebuild_user {
+    my ( $hook, $event ) = @_;
+
+    my $cpuser;
+    my $domain;
+
+    if ( exists $event->{user} ) {
+        $cpuser = $event->{user};
+        Cpanel::Debug::log_info("_rebuild_user: 001 User :$cpuser:");
+    }
+
+    if ( !$cpuser && exists $event->{domain} ) {
+        require Cpanel::PHP::Config;
+
+        $domain = $event->{domain};
+
+        Cpanel::Debug::log_info("_rebuild_user: 002 Domain :$domain:");
+
+        my @domains        = ($domain);
+        my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( \@domains );
+
+        $cpuser = $php_config_ref->{$domain}->{username} if exists $php_config_ref->{$domain}->{username};
+
+        Cpanel::Debug::log_info("_rebuild_user: 003 User :$cpuser:") if defined $cpuser;
+    }
+
+    if ( !defined $cpuser && exists $event->{domainowner} ) {
+        $cpuser = $event->{domainowner};
+    }
+
+    if ( defined $cpuser ) {
+        Cpanel::Debug::log_info("_rebuild_user: 004 User :$cpuser:");
+        eval {
+            require Cpanel::ServerTasks;
+            Cpanel::ServerTasks::schedule_task( ['NginxTasks'], NginxHooks::get_time_to_wait(0), "rebuild_user $cpuser" );
+        };
+
+        return $@ ? ( 0, $@ ) : ( 1, "Success" );
+    }
+
+    Cpanel::Debug::log_info("_rebuild_user: User Not Found, Fallback to rebuild_all");
+    return _rebuild_config_all( $hook, $event );
 }
 
 sub _rebuild_config_all {
