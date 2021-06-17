@@ -26,7 +26,7 @@ server {
 
     [%- IF behavior.caching.enabled %]
     set $CPANEL_PROXY_CACHE [% user %];
-    set $CPANEL_SKIP_PROXY 0;
+    set $CPANEL_SKIP_PROXY_CACHING 0;
     [% END -%]
 
     [%- IF has_ssl && ssl_certificate && ssl_certificate_key %]
@@ -75,8 +75,8 @@ server {
         proxy_cache_bypass 1;
             [%- ELSE %]
         proxy_cache $CPANEL_PROXY_CACHE;
-        proxy_no_cache $CPANEL_SKIP_PROXY;
-        proxy_cache_bypass $CPANEL_SKIP_PROXY;
+        proxy_no_cache $CPANEL_SKIP_PROXY_CACHING;
+        proxy_cache_bypass $CPANEL_SKIP_PROXY_CACHING;
             [%- END %]
 
         [%- FOREACH cache_valid IN behavior.caching.proxy_cache_valid.keys.sort %]
