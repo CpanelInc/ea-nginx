@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,9 @@ fi
 
 
 %changelog
+* Thu Jun 17 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-6
+- EA-9836: Add support for Let's Encrypt AutoSSL provider
+
 * Tue Jun 15 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-5
 - EA-9790: Only put SSL server block in place when it is desired
 

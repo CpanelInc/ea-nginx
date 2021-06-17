@@ -248,6 +248,18 @@ server {
     include conf.d/includes-optional/cloudflare.conf;
     [% END -%]
 
+    location /.well-known/cpanel-dcv {
+        root [% docroot %];
+    }
+
+    location /.well-known/pki-validation {
+        root [% docroot %];
+    }
+
+    location /.well-known/acme-challenge {
+        root [% docroot %];
+    }
+
     location / {
         [%- IF proxy_subdomain.match('^(?:cpanel|webmail|whm)$') %]
         # since proxy_set_header can not be done inside an if block we jump though hoops
