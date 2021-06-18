@@ -641,6 +641,7 @@ fi
 %changelog
 * Fri Jun 18 2021 Travis Holloway <t.holloway@cpanel.net> = 1.21.0-8
 - EA-9879: Make timeout on request to determine if a domain is using CloudFlare threadsafe
+- EA-9880: Move Accounts::Modify and Accounts::Remove from rebuild_user action to rebuild_all action
 
 * Thu Jun 17 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-7
 - ZC-8831: clarify a variable name
