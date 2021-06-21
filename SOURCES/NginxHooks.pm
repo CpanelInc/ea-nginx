@@ -141,8 +141,6 @@ sub describe {
         }
     } (
         'Accounts::Create',
-        'Accounts::Modify',
-        'Accounts::Remove',
         'Accounts::SiteIP::set',
         'AutoSSL::installssl',
         'SSL::delssl',
@@ -159,6 +157,8 @@ sub describe {
             'exectype' => 'module',
         }
     } (
+        'Accounts::Modify',
+        'Accounts::Remove',
         'Hostname::change',
         'PipedLogConfiguration',
         'TweakSettings::Basic',
