@@ -776,17 +776,11 @@ my $http;
 sub _is_cloudflare {
     my ($domain) = @_;
 
-    $http //= Cpanel::HTTP::Client->new();
-    my $res;
-    eval {
-        local $SIG{ALRM} = sub { die "alarm\n" };
-        alarm 2;                                               # typically takes <1 second for a 200 response from cloudflare
-        $res = $http->get("https://$domain/cdn-cgi/trace");    # dies on SSL error which means its not cloudflare
-        alarm 0;
-    };
+    $http //= Cpanel::HTTP::Client->new( timeout => 2 );
+    my $res = eval { $http->get("https://$domain/cdn-cgi/trace") };    # dies on SSL error whch means its not cloudflare
 
     return 0 if $@ || $res->{status} eq "404";
-    return 1 if $res->{status} eq "200";                       # ¿ && content has a line: "h=$domain\n" - YAGNI ?
+    return 1 if $res->{status} eq "200";                               # ¿ && content has a line: "h=$domain\n" - YAGNI ?
 
     warn "Could not verify if $domain is cloudflare or not ($res->{status} $res->{reason})\n";
     return;
