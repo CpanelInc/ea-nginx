@@ -45,10 +45,12 @@ server {
     ssl_certificate_key [% ssl_certificate_key %];
         [% IF ea4conf.sslprotocol_list_str || ea4conf.sslprotocol %]
     ssl_protocols [% ea4conf.sslprotocol_list_str || ea4conf.sslprotocol %];
+    proxy_ssl_protocols [% ea4conf.sslprotocol_list_str || ea4conf.sslprotocol %];
         [%- END -%]
         [%- IF ea4conf.sslciphersuite %]
     ssl_prefer_server_ciphers on;
     ssl_ciphers [% ea4conf.sslciphersuite %];
+    proxy_ssl_ciphers [% ea4conf.sslciphersuite %];
         [% END -%]
     [% END -%]
 

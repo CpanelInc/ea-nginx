@@ -483,8 +483,8 @@ sub _write_global_passenger {
 
 sub _write_global_ea_nginx {
     my $cur_settings = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/settings.json");
-    my $cont         = path("/etc/nginx/ea-nginx/ea-nginx.conf.tt")->slurp;
-    return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { settings => $cur_settings } );
+    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
+    return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { ea4conf => $ea4_conf_hr, settings => $cur_settings } );
 }
 
 sub _write_global_logging {
