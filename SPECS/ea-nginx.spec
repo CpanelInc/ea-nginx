@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,22 @@ fi
 
 
 %changelog
+* Fri Jun 18 2021 Travis Holloway <t.holloway@cpanel.net> = 1.21.0-8
+- EA-9879: Make timeout on request to determine if a domain is using CloudFlare threadsafe
+- EA-9880: Move Accounts::Modify and Accounts::Remove from rebuild_user action to rebuild_all action
+
+* Thu Jun 17 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-7
+- ZC-8831: clarify a variable name
+
+* Thu Jun 17 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-6
+- EA-9836: Add support for Let's Encrypt AutoSSL provider
+
+* Tue Jun 15 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-5
+- EA-9790: Only put SSL server block in place when it is desired
+
+* Wed Jun 09 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-4
+- ZC-8934: Update some hooks to only operate on the user in question
+
 * Tue Jun 08 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-3
 - EA-9789: Silence logrotate script
 
