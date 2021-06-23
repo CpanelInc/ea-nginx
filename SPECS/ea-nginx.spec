@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 10
+%define release_prefix 11
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,9 @@ fi
 
 
 %changelog
+* Wed Jun 23 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-11
+- EA-9874: Cache 301 redirects
+
 * Wed Jun 23 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-10
 - ZC-9009: Do not die when a domain’s PHP config is missing
 

@@ -9,7 +9,7 @@
    "proxy_cache_revalidate" : "on",
    "proxy_cache_use_stale" : "error timeout http_429 http_500 http_502 http_503 http_504",
    "proxy_cache_valid" : {
-      "200 302" : "60m",
+      "200 301 302" : "60m",
       "404" : "1m"
    },
    "x_cache_header" : false,
