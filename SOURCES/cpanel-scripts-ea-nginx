@@ -653,6 +653,8 @@ sub _get_domains_with_ssls {
     return \%ssl_vhosts;
 }
 
+my $standalone;
+
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
@@ -663,6 +665,7 @@ sub _render_and_append {
     my $cpanel_redirects                      = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_redirects.json");
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
+    $standalone //= -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0;
     $tt                ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
     $server_tt         ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
@@ -691,11 +694,18 @@ sub _render_and_append {
         my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $domains->[$i] );
         if ($has_fpm) {
             my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [ $domains->[$i] ] )->{ $domains->[$i] };
-            my ( $proxy, $socket ) = Cpanel::PHPFPM::Get::get_proxy_from_php_config_for_domain($php_config_ref);
-            $fpm_socket = $socket;
-            if ( $fpm_socket =~ m{/\w+-php(\d)\d/} ) {
-                $fpm_socket_php_major_version = $1;
+
+            if ($php_config_ref) {
+                my ( $proxy, $socket ) = Cpanel::PHPFPM::Get::get_proxy_from_php_config_for_domain($php_config_ref);
+                $fpm_socket = $socket;
+                if ( $fpm_socket =~ m{/\w+-php(\d)\d/} ) {
+                    $fpm_socket_php_major_version = $1;
+                }
             }
+            elsif ($standalone) {
+                warn "Could not find PHP configuration for “$domains->[$i]”, it will not be configured to use PHP-FPM\n";
+            }
+
             last;
         }
     }
@@ -751,7 +761,7 @@ sub _render_and_append {
                 apps => $passenger_apps,
             },
             behavior => {
-                standalone => ( -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0 ),
+                standalone => $standalone,
                 caching    => $caching_hr,
             },
             proxysubdomains_enabled => $cpconf_hr->{proxysubdomains},
