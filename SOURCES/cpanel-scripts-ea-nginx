@@ -174,18 +174,29 @@ sub config {
         _write_global_ea_nginx();
         _do_other_global_config();
 
+        my %errors;
         if ( $user eq '--all' ) {
             mkdir "/etc/nginx/conf.d/users/";
             unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
             for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
-                _write_user_conf($usr);
+                eval { _write_user_conf($usr); };
+                $errors{$usr} = $@ if $@;
             }
         }
+
         if ($reload) {
             _reload();
             clear_cache();
         }
 
+        if ( keys %errors ) {
+            my $err = "";
+            for my $usr ( sort keys %errors ) {
+                $err .= "\tUser “$usr”: $errors{$usr}\n\n";
+            }
+
+            die "The following user related errors need attention:\n$err";
+        }
     }
     else {
         _validate_user_arg( $app, $user );
