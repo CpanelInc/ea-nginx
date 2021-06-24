@@ -16,6 +16,7 @@ map $host $CPANEL_APACHE_PROXY_SSL_PORT {
 
 server_names_hash_max_size [% settings.server_names_hash_max_size %];
 server_names_hash_bucket_size [% settings.server_names_hash_bucket_size %];
+client_max_body_size [% settings.client_max_body_size %];
 
 [% IF ea4conf.sslprotocol_list_str || ea4conf.sslprotocol -%]
 ssl_protocols [% ea4conf.sslprotocol_list_str || ea4conf.sslprotocol %];

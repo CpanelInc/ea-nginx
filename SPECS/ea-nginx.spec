@@ -641,6 +641,7 @@ fi
 %changelog
 * Wed Jun 23 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-11
 - EA-9874: Cache 301 redirects
+- EA-9814: Set client_max_body_size to 128m
 
 * Wed Jun 23 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-10
 - ZC-9009: Do not die when a domain’s PHP config is missing
