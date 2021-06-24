@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 11
+%define release_prefix 12
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,9 @@ fi
 
 
 %changelog
+* Thu Jun 24 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-12
+- ZC-9005: Do not hide Upgrade header when proxying
+
 * Wed Jun 23 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-11
 - EA-9874: Cache 301 redirects
 - EA-9814: Set client_max_body_size to 128m
