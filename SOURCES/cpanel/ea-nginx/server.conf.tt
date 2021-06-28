@@ -279,8 +279,11 @@ server {
         #   the headers below to handle the websockets over `http`.
         proxy_set_header Upgrade $upgrade_value; # the header will be only sent if $upgrade_value is not empty
         proxy_set_header Connection $connection_value; # the header will be only sent if $connection_value is not empty
-        [%- END %]
         include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass_header Upgrade; # this is hidden in cpanel-proxy.conf, but is needed for websockets
+        [%- ELSE %]
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        [%- END %]
         proxy_pass http://127.0.0.1:[% subdom_map.$proxy_subdomain %];
     }
 }
