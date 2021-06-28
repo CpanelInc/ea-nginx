@@ -642,6 +642,7 @@ fi
 * Thu Jun 24 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-12
 - ZC-9005: Do not hide Upgrade header when proxying websockets under main service subdomains
 - ZC-9018: rebuild all users; reporting any issues at the end
+- ZC-9020: Add cache related methods to adminbin
 
 * Wed Jun 23 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-11
 - EA-9874: Cache 301 redirects

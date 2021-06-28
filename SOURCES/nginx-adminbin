@@ -14,20 +14,21 @@ use base qw( Cpanel::AdminBin::Script::Call );
 use lib '/var/cpanel/perl5/lib';
 use Cpanel::Debug ();
 
+eval { require '/usr/local/cpanel/scripts/ea-nginx' };
+if ($@) {
+    use FindBin ();
+    require "$FindBin::Bin/../SOURCES/cpanel-scripts-ea-nginx";
+}
+
 __PACKAGE__->run( 'alarm' => 120 ) unless caller;
 
 sub _actions {
-    return qw/UPDATE_CONFIG/;
+    return qw(UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE);
 }
 
 sub UPDATE_CONFIG {
     my ($self) = @_;
-
-    if ($Cpanel::Debug::level) {
-        Cpanel::Debug::log_info("UPDATE_CONFIG: called");
-    }
-
-    my $cpuser = $self->get_caller_username();
+    my $cpuser = $self->_debug_and_user();
 
     require '/var/cpanel/perl5/lib/NginxHooks.pm';
 
@@ -38,6 +39,50 @@ sub UPDATE_CONFIG {
     };
 
     return 1;
+}
+
+sub CLEAR_CACHE {
+    my ($self) = @_;
+    my $cpuser = $self->_debug_and_user();
+    return scripts::ea_nginx::run( clear_cache => $cpuser );
+}
+
+sub RESET_CACHE_CONFIG {
+    my ($self) = @_;
+    my $cpuser = $self->_debug_and_user();
+    reset scripts::ea_nginx::run( cache => $cpuser, '--reset' );
+}
+
+sub ENABLE_CACHE {
+    my ($self) = @_;
+    my $cpuser = $self->_debug_and_user();
+    reset scripts::ea_nginx::run( cache => $cpuser, '--enabled=1' );
+}
+
+sub DISABLE_CACHE {
+    my ($self) = @_;
+    my $cpuser = $self->_debug_and_user();
+    reset scripts::ea_nginx::run( cache => $cpuser, '--enabled=0' );
+}
+
+###############
+#### helpers ##
+###############
+
+sub _debug_and_user {
+    my ($self) = @_;
+
+    my @caller = caller(1);
+    my $method = $caller[3];
+    $method =~ s/^.*::([^:]+)$/$1/;
+
+    if ($Cpanel::Debug::level) {
+        Cpanel::Debug::log_info("$method() called");
+    }
+
+    my $cpuser = $self->get_caller_username();
+
+    return $cpuser;
 }
 
 1;
@@ -67,13 +112,29 @@ nginx is deployed by the RPM to /usr/local/cpanel/bin/admin/Cpanel.
 
 =head2 _actions
 
-Lists the one action allowed by this admin bin script.
+Lists the actions allowed by this admin bin script.
 
 =head2 UPDATE_CONFIG
 
 This function determines the user calling, and then schedules a
 rebuild of the user's Nginx configuration to happen in the time
 needed depending on whether PHP-FPM is defaulted to on or not.
+
+=head2 CLEAR_CACHE
+
+Clears the user’s NGINX cache.
+
+=head2 RESET_CACHE_CONFIG
+
+Resets the user’s NGINX cache config to default to what is set at the system level.
+
+=head2 ENABLE_CACHE
+
+Enable NGINX caching for the user.
+
+=head2 DISABLE_CACHE
+
+Disable NGINX caching for the user.
 
 =cut
 
