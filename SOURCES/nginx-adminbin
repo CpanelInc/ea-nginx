@@ -14,6 +14,7 @@ use base qw( Cpanel::AdminBin::Script::Call );
 use lib '/var/cpanel/perl5/lib';
 use Cpanel::Debug ();
 use Cpanel        ();
+use Capture::Tiny 'capture_merged';
 
 eval { require '/usr/local/cpanel/scripts/ea-nginx' };    # Prefer the package’s script …
 if ($@) {                                                 # … if its not installed do the devbox version
@@ -45,33 +46,42 @@ sub UPDATE_CONFIG {
 sub CLEAR_CACHE {
     my ($self) = @_;
     my $cpuser = $self->_debug_and_user();
-    return scripts::ea_nginx::run( clear_cache => $cpuser );
+    return _silent_running( clear_cache => $cpuser );
 }
 
 sub RESET_CACHE_CONFIG {
     my ($self) = @_;
     exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
     my $cpuser = $self->_debug_and_user();
-    reset scripts::ea_nginx::run( cache => $cpuser, '--reset' );
+    return _silent_running( cache => $cpuser, '--reset' );
 }
 
 sub ENABLE_CACHE {
     my ($self) = @_;
     exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
     my $cpuser = $self->_debug_and_user();
-    reset scripts::ea_nginx::run( cache => $cpuser, '--enabled=1' );
+    return _silent_running( cache => $cpuser, '--enabled=1' );
 }
 
 sub DISABLE_CACHE {
     my ($self) = @_;
     exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
     my $cpuser = $self->_debug_and_user();
-    reset scripts::ea_nginx::run( cache => $cpuser, '--enabled=0' );
+    return _silent_running( cache => $cpuser, '--enabled=0' );
 }
 
 ###############
 #### helpers ##
 ###############
+
+sub _silent_running {
+    my (@args) = @_;
+
+    my $rv;
+    capture_merged { $rv = scripts::ea_nginx::run(@args) };
+
+    return $rv;
+}
 
 sub _debug_and_user {
     my ($self) = @_;
