@@ -13,9 +13,10 @@ use base qw( Cpanel::AdminBin::Script::Call );
 
 use lib '/var/cpanel/perl5/lib';
 use Cpanel::Debug ();
+use Cpanel        ();
 
-eval { require '/usr/local/cpanel/scripts/ea-nginx' };
-if ($@) {
+eval { require '/usr/local/cpanel/scripts/ea-nginx' };    # Prefer the package’s script …
+if ($@) {                                                 # … if its not installed do the devbox version
     use FindBin ();
     require "$FindBin::Bin/../SOURCES/cpanel-scripts-ea-nginx";
 }
@@ -49,18 +50,21 @@ sub CLEAR_CACHE {
 
 sub RESET_CACHE_CONFIG {
     my ($self) = @_;
+    exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
     my $cpuser = $self->_debug_and_user();
     reset scripts::ea_nginx::run( cache => $cpuser, '--reset' );
 }
 
 sub ENABLE_CACHE {
     my ($self) = @_;
+    exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
     my $cpuser = $self->_debug_and_user();
     reset scripts::ea_nginx::run( cache => $cpuser, '--enabled=1' );
 }
 
 sub DISABLE_CACHE {
     my ($self) = @_;
+    exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
     my $cpuser = $self->_debug_and_user();
     reset scripts::ea_nginx::run( cache => $cpuser, '--enabled=0' );
 }
@@ -128,13 +132,19 @@ Clears the user’s NGINX cache.
 
 Resets the user’s NGINX cache config to default to what is set at the system level.
 
+Requires the `toggle_nginx_caching` feature.
+
 =head2 ENABLE_CACHE
 
 Enable NGINX caching for the user.
 
+Requires the `toggle_nginx_caching` feature.
+
 =head2 DISABLE_CACHE
 
 Disable NGINX caching for the user.
+
+Requires the `toggle_nginx_caching` feature.
 
 =cut
 

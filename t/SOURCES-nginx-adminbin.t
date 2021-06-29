@@ -50,6 +50,14 @@ shared_examples_for "all subcommand based methods" => sub {
         bin::admin::Cpanel::nginx->new()->$meth();
         is_deeply $non_hook_method_data->{debug}, [ ["$meth_map->[0]() called"] ];
     };
+
+    it "should behave properly depending on feature" => sub {
+        my $meth        = $meth_map->[0];
+        my $should_exit = $meth_map->[2];
+        my $feat        = Test::MockModule->new("Cpanel")->redefine( hasfeature => sub { 0 } );
+        trap { bin::admin::Cpanel::nginx->new()->$meth(); };
+        $should_exit ? ok( $trap->exit ) : ok( !$trap->exit );
+    };
 };
 
 describe "nginx-adminbin" => sub {
@@ -157,22 +165,22 @@ describe "nginx-adminbin" => sub {
         };
 
         describe "CLEAR_CACHE" => sub {
-            before all => sub { $meth_map = [ "CLEAR_CACHE" => [ clear_cache => "trex$$" ] ] };
+            before all => sub { $meth_map = [ "CLEAR_CACHE" => [ clear_cache => "trex$$" ], 0 ] };
             it_should_behave_like "all subcommand based methods";
         };
 
         describe "RESET_CACHE_CONFIG" => sub {
-            before all => sub { $meth_map = [ "RESET_CACHE_CONFIG" => [ cache => "trex$$", '--reset' ] ] };
+            before all => sub { $meth_map = [ "RESET_CACHE_CONFIG" => [ cache => "trex$$", '--reset' ], 1 ] };
             it_should_behave_like "all subcommand based methods";
         };
 
         describe "ENABLE_CACHE" => sub {
-            before all => sub { $meth_map = [ "ENABLE_CACHE" => [ cache => "trex$$", '--enabled=1' ] ] };
+            before all => sub { $meth_map = [ "ENABLE_CACHE" => [ cache => "trex$$", '--enabled=1' ], 1 ] };
             it_should_behave_like "all subcommand based methods";
         };
 
         describe "DISABLE_CACHE" => sub {
-            before all => sub { $meth_map = [ "DISABLE_CACHE" => [ cache => "trex$$", '--enabled=0' ] ] };
+            before all => sub { $meth_map = [ "DISABLE_CACHE" => [ cache => "trex$$", '--enabled=0' ], 1 ] };
             it_should_behave_like "all subcommand based methods";
         };
 
