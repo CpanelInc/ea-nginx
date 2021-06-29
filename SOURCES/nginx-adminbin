@@ -30,7 +30,7 @@ sub _actions {
 
 sub UPDATE_CONFIG {
     my ($self) = @_;
-    my $cpuser = $self->_debug_and_user();
+    my $cpuser = $self->_debug_and_user(0);
 
     require '/var/cpanel/perl5/lib/NginxHooks.pm';
 
@@ -45,28 +45,25 @@ sub UPDATE_CONFIG {
 
 sub CLEAR_CACHE {
     my ($self) = @_;
-    my $cpuser = $self->_debug_and_user();
+    my $cpuser = $self->_debug_and_user(0);
     return _silent_running( clear_cache => $cpuser );
 }
 
 sub RESET_CACHE_CONFIG {
     my ($self) = @_;
-    exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
-    my $cpuser = $self->_debug_and_user();
+    my $cpuser = $self->_debug_and_user(1);
     return _silent_running( cache => $cpuser, '--reset' );
 }
 
 sub ENABLE_CACHE {
     my ($self) = @_;
-    exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
-    my $cpuser = $self->_debug_and_user();
+    my $cpuser = $self->_debug_and_user(1);
     return _silent_running( cache => $cpuser, '--enabled=1' );
 }
 
 sub DISABLE_CACHE {
     my ($self) = @_;
-    exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
-    my $cpuser = $self->_debug_and_user();
+    my $cpuser = $self->_debug_and_user(1);
     return _silent_running( cache => $cpuser, '--enabled=0' );
 }
 
@@ -84,7 +81,7 @@ sub _silent_running {
 }
 
 sub _debug_and_user {
-    my ($self) = @_;
+    my ( $self, $requires_feature ) = @_;
 
     my @caller = caller(1);
     my $method = $caller[3];
@@ -95,6 +92,10 @@ sub _debug_and_user {
     }
 
     my $cpuser = $self->get_caller_username();
+    if ($requires_feature) {
+        Cpanel::initcp($cpuser);
+        exit(1) if !Cpanel::hasfeature('toggle_nginx_caching');
+    }
 
     return $cpuser;
 }
