@@ -493,9 +493,40 @@ sub _write_global_passenger {
 }
 
 sub _write_global_ea_nginx {
-    my $cur_settings = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/settings.json");
-    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
+    my $user_settings = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/settings.json");
+    my $cur_settings  = {
+        _settings_defaults(),
+        %{$user_settings},
+    };
+
+    my $ea4_conf_hr = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { ea4conf => $ea4_conf_hr, settings => $cur_settings } );
+}
+
+our $cpconf_hr;
+
+sub _settings_defaults {
+
+    $cpconf_hr ||= _get_cpconf_hr();
+
+    my %ports;
+    foreach my $key ( 'apache_port', 'apache_ssl_port' ) {
+        $ports{$key} = $cpconf_hr->{$key} =~ /:([0-9]+)$/ ? $1 : 0;
+        if ( $ports{$key} < 1 || $ports{$key} > 65535 ) {    # last ditch fall back if cpconf has an invalid value
+            $ports{$key} = $key eq 'apache_port' ? 81 : 444;
+        }
+    }
+
+    # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/settings.json
+    return (
+        apache_port                   => $ports{apache_port},
+        apache_port_ip                => '127.0.0.1',
+        apache_ssl_port               => $ports{apache_ssl_port},
+        apache_ssl_port_ip            => '127.0.0.1',
+        server_names_hash_bucket_size => 128,
+        server_names_hash_max_size    => 1024,
+        client_max_body_size          => '128m',
+    );
 }
 
 sub _write_global_logging {
@@ -741,7 +772,7 @@ sub _render_and_append {
 
     my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
 
-    my $cpconf_hr = Cpanel::Config::LoadCpConf::loadcpconf();
+    $cpconf_hr ||= _get_cpconf_hr();
 
     my $ea4_conf_hr = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     $tt->process(
@@ -1055,6 +1086,10 @@ sub _delete_glob {
     }
 
     return;
+}
+
+sub _get_cpconf_hr {
+    return Cpanel::Config::LoadCpConf::loadcpconf();
 }
 
 1;
