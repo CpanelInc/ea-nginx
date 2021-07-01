@@ -104,6 +104,8 @@ sub _debug_and_user {
 
 __END__
 
+=encoding utf-8
+
 =head1 NAME
 
 nginx
