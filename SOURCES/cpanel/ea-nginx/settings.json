@@ -3,6 +3,7 @@
   "apache_port_ip" : null,
   "apache_ssl_port" : null,
   "apache_ssl_port_ip" : null,
+  "client_max_body_size" : "128m",
   "server_names_hash_max_size" : 1024,
   "server_names_hash_bucket_size" : 128
 }

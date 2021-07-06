@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 8
+%define release_prefix 13
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -639,6 +639,24 @@ fi
 
 
 %changelog
+* Tue Jun 29 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-13
+- EA-9909: Add hard coded fallback values for keys in settings.json
+
+* Thu Jun 24 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-12
+- ZC-9005: Do not hide Upgrade header when proxying websockets under main service subdomains
+- ZC-9018: rebuild all users; reporting any issues at the end
+- ZC-9020: Add cache related methods to adminbin
+
+* Wed Jun 23 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-11
+- EA-9874: Cache 301 redirects
+- EA-9814: Set client_max_body_size to 128m
+
+* Wed Jun 23 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-10
+- ZC-9009: Do not die when a domain’s PHP config is missing
+
+* Mon Jun 21 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-9
+- ZC-8589: Improve proxy/SSL configuration
+
 * Fri Jun 18 2021 Travis Holloway <t.holloway@cpanel.net> = 1.21.0-8
 - EA-9879: Make timeout on request to determine if a domain is using CloudFlare threadsafe
 - EA-9880: Move Accounts::Modify and Accounts::Remove from rebuild_user action to rebuild_all action
