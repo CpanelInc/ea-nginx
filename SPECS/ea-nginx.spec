@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 13
+%define release_prefix 14
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -158,6 +158,7 @@ Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
 Source26: cpanel-scripts-ea-nginx-logrotate
 Source27: 007-restartsrv_nginx
+Source28: whm_feature_addon
 
 Patch1: 0001-Fix-auto-feature-test-C-code-to-not-fail-due-to-its-.patch
 
@@ -352,6 +353,9 @@ mkdir -p $RPM_BUILD_ROOT/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDC
 %{__install} -p %{SOURCE27} $RPM_BUILD_ROOT/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
 %endif
 
+mkdir -p %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures
+install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
+
 rm -rf %{bdir}/_passenger_source_code
 
 %clean
@@ -408,6 +412,8 @@ rm -rf %{bdir}/_passenger_source_code
 %else
 %attr(755, root, root) /etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
 %endif
+
+%attr(644, root, root) /usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
 
 /usr/local/cpanel/scripts/restartsrv_nginx
 /etc/chkserv.d/nginx
@@ -639,6 +645,9 @@ fi
 
 
 %changelog
+* Wed Jul 07 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-14
+- ZC-9047: Add `toggle_nginx_caching` to WHM Feature Manager
+
 * Tue Jun 29 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-13
 - EA-9909: Add hard coded fallback values for keys in settings.json
 
