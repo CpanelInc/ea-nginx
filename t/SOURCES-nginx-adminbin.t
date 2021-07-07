@@ -156,6 +156,7 @@ describe "nginx-adminbin" => sub {
             local $non_hook_method_data = { debug => [], run => [] };
             local $Cpanel::Debug::level = 0;
 
+            my $mk_cp = Test::MockModule->new('Cpanel')->redefine( initcp => sub { } );
             my $mk_cd = Test::MockModule->new('Cpanel::Debug')->redefine( log_info => sub { push @{ $non_hook_method_data->{debug} }, \@_ } );
             my $mk_gu = Test::MockModule->new('Cpanel::AdminBin::Script::Call')->redefine( get_caller_username => sub { "trex$$" } )->redefine( new => sub { bless {}, shift } );
 
