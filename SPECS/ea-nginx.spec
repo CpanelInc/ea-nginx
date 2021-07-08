@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 14
+%define release_prefix 15
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -386,7 +386,7 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
-%config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
+%config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
 
 %dir %{_sysconfdir}/nginx/ea-nginx
@@ -420,7 +420,7 @@ rm -rf %{bdir}/_passenger_source_code
 
 %{_sysconfdir}/nginx/modules
 
-%config(noreplace) %{_sysconfdir}/nginx/nginx.conf
+%config %{_sysconfdir}/nginx/nginx.conf
 %config(noreplace) %{_sysconfdir}/nginx/conf.d/default.conf
 %config(noreplace) %{_sysconfdir}/nginx/mime.types
 %config(noreplace) %{_sysconfdir}/nginx/fastcgi_params
@@ -645,6 +645,9 @@ fi
 
 
 %changelog
+* Thu Jul 08 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-15
+- EA-9944: Remove noreplace from nginx.conf and ea-nginx.conf
+
 * Wed Jul 07 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-14
 - ZC-9047: Add `toggle_nginx_caching` to WHM Feature Manager
 
