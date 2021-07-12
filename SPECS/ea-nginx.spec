@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 14
+%define release_prefix 15
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -381,26 +381,26 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-non-www.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-www.conf
-%config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cloudflare.conf
+%config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cloudflare.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
-%config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
+%config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
 
 %dir %{_sysconfdir}/nginx/ea-nginx
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/meta/apache
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/config-scripts/global/config-scripts-global-cloudflare
-%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
-%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
-%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/settings.json
+%config %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
+%config %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
+%config %{_sysconfdir}/nginx/ea-nginx/settings.json
 %{_sysconfdir}/nginx/ea-nginx/cpanel-password-protected-dirs.tt
 %{_sysconfdir}/nginx/ea-nginx/cpanel-php-location.tt
 %{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
-%config(noreplace) %{_sysconfdir}/nginx/ea-nginx/cache.json
+%config %{_sysconfdir}/nginx/ea-nginx/cache.json
 %{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
@@ -420,19 +420,19 @@ rm -rf %{bdir}/_passenger_source_code
 
 %{_sysconfdir}/nginx/modules
 
-%config(noreplace) %{_sysconfdir}/nginx/nginx.conf
-%config(noreplace) %{_sysconfdir}/nginx/conf.d/default.conf
-%config(noreplace) %{_sysconfdir}/nginx/mime.types
-%config(noreplace) %{_sysconfdir}/nginx/fastcgi_params
-%config(noreplace) %{_sysconfdir}/nginx/scgi_params
-%config(noreplace) %{_sysconfdir}/nginx/uwsgi_params
-%config(noreplace) %{_sysconfdir}/nginx/koi-utf
-%config(noreplace) %{_sysconfdir}/nginx/koi-win
-%config(noreplace) %{_sysconfdir}/nginx/win-utf
+%config %{_sysconfdir}/nginx/nginx.conf
+%config %{_sysconfdir}/nginx/conf.d/default.conf
+%config %{_sysconfdir}/nginx/mime.types
+%config %{_sysconfdir}/nginx/fastcgi_params
+%config %{_sysconfdir}/nginx/scgi_params
+%config %{_sysconfdir}/nginx/uwsgi_params
+%config %{_sysconfdir}/nginx/koi-utf
+%config %{_sysconfdir}/nginx/koi-win
+%config %{_sysconfdir}/nginx/win-utf
 
-%config(noreplace) %{_sysconfdir}/logrotate.d/nginx
-%config(noreplace) %{_sysconfdir}/sysconfig/nginx
-%config(noreplace) %{_sysconfdir}/sysconfig/nginx-debug
+%config %{_sysconfdir}/logrotate.d/nginx
+%config %{_sysconfdir}/sysconfig/nginx
+%config %{_sysconfdir}/sysconfig/nginx-debug
 %if %{use_systemd}
 %{_unitdir}/nginx.service
 %{_unitdir}/nginx-debug.service
@@ -475,6 +475,44 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(0644,root,root) /usr/local/cpanel/bin/admin/Cpanel/nginx.conf
 
 %pre
+# Other nginx implementations can leave behind stray config files when they are removed.
+# As such, we make a best effort to ensure a clean config when ea-nginx is installed
+if [ $1 = 1 ]; then
+    # Engintron will leave behind executable files in this directory which in turn are called via a cron job
+    # The executables can and do create files in /etc/nginx/conf.d/ that will cause nginx to fail to start with
+    # our implementation
+    if [ -e /etc/nginx/utilities ]; then
+        echo "Removing /etc/nginx_utilities.pre_install_ea_nginx_config"
+        rm -rf /etc/nginx_utilities.pre_install_ea_nginx_config
+        echo "Moving /etc/nginx/utilities aside to ensure valid config for ea-nginx since this is a new install"
+        mv -fv /etc/nginx/utilities /etc/nginx_utilities.pre_install_ea_nginx_config ||:
+    fi
+
+    # Since any stray *.conf files in this directory will be picked up by nginx.conf,
+    # we want to ensure that this directory is fresh on new installs
+    if [ -e /etc/nginx/conf.d ]; then
+        echo "Removing /etc/nginx_conf.d.pre_install_ea_nginx_config"
+        rm -rf /etc/nginx_conf.d.pre_install_ea_nginx_config
+        echo "Moving /etc/nginx/conf.d aside to ensure valid config for ea-nginx since this is a new install"
+        mv -fv /etc/nginx/conf.d /etc/nginx_conf.d.pre_install_ea_nginx_config ||:
+    fi
+
+    # We need to ensure that any config files that were present are still present
+    # so that cpio does not fail to unpack
+    if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/includes-optional/cloudflare.conf ]; then
+        mkdir -p /etc/nginx/conf.d/includes-optional
+        cp /etc/nginx_conf.d.pre_install_ea_nginx_config/includes-optional/cloudflare.conf /etc/nginx/conf.d/includes-optional/cloudflare.conf
+    fi
+    if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/ea-nginx.conf ]; then
+        mkdir -p /etc/nginx/conf.d
+        cp /etc/nginx_conf.d.pre_install_ea_nginx_config/ea-nginx.conf /etc/nginx/conf.d/ea-nginx.conf
+    fi
+    if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/default.conf ]; then
+        mkdir -p /etc/nginx/conf.d
+        cp /etc/nginx_conf.d.pre_install_ea_nginx_config/default.conf /etc/nginx/conf.d/default.conf
+    fi
+fi
+
 # we need to know the version of cPanel, the hooks cannot be deployed
 # before version 11.80
 cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
@@ -645,6 +683,10 @@ fi
 
 
 %changelog
+* Thu Jul 08 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-15
+- EA-9944: Remove noreplace from nginx.conf and ea-nginx.conf
+- EA-9945: Ensure clean '/etc/nginx' directory on new installs
+
 * Wed Jul 07 2021 Daniel Muey <dan@cpanel.net> - 1.21.0-14
 - ZC-9047: Add `toggle_nginx_caching` to WHM Feature Manager
 
