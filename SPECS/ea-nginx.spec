@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 15
+%define release_prefix 16
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -683,6 +683,9 @@ fi
 
 
 %changelog
+* Tue Jul 13 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-16
+- EA-9946: Add syntax validation check to configuration script
+
 * Thu Jul 08 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-15
 - EA-9944: Remove noreplace from nginx.conf and ea-nginx.conf
 - EA-9945: Ensure clean '/etc/nginx' directory on new installs
