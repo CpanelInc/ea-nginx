@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 15
+%define release_prefix 16
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -497,6 +497,13 @@ if [ $1 = 1 ]; then
         mv -fv /etc/nginx/conf.d /etc/nginx_conf.d.pre_install_ea_nginx_config ||:
     fi
 
+    # If modsec rulesets have been installed, they will create a symlink in '/etc/nginx/conf.d/modsec_vendor_configs/'
+    # with conf files in it.  We need to make sure we do not blow away modsec rulesets here too.
+    if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/modsec_vendor_configs ]; then
+        mkdir -p /etc/nginx/conf.d
+        cp -r /etc/nginx_conf.d.pre_install_ea_nginx_config/modsec_vendor_configs /etc/nginx/conf.d/modsec_vendor_configs
+    fi
+
     # We need to ensure that any config files that were present are still present
     # so that cpio does not fail to unpack
     if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/includes-optional/cloudflare.conf ]; then
@@ -683,6 +690,10 @@ fi
 
 
 %changelog
+* Tue Jul 13 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-16
+- EA-9946: Add syntax validation check to configuration script
+- EA-9967: Ensure 'modsec_vendor_configs' is left in place on new installs
+
 * Thu Jul 08 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-15
 - EA-9944: Remove noreplace from nginx.conf and ea-nginx.conf
 - EA-9945: Ensure clean '/etc/nginx' directory on new installs
