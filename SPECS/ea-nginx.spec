@@ -96,7 +96,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.21.0
+%define main_version 1.21.1
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 16
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -690,6 +690,9 @@ fi
 
 
 %changelog
+* Thu Jul 15 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-1
+- EA-9968: Update ea-nginx from v1.21.0 to v1.21.1
+
 * Tue Jul 13 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.0-16
 - EA-9946: Add syntax validation check to configuration script
 - EA-9967: Ensure 'modsec_vendor_configs' is left in place on new installs
