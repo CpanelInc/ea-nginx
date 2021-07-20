@@ -40,6 +40,9 @@ spec_helper "/usr/local/cpanel/t/small/.spec_helpers/App-CmdDispatch_based_modul
 
 use App::CmdDispatch ();
 use Test::MockFile   ();
+use Test::MockModule ();
+
+use Test::Fatal qw( dies_ok lives_ok );
 
 my ( @_write_user_conf, @_reload );
 my $orig__write_user_conf        = \&scripts::ea_nginx::_write_user_conf;
@@ -160,8 +163,9 @@ describe "ea-nginx script" => sub {
                 local $mi{cmd} = "config";
                 local @glob_res = ();
                 no warnings "redefine";
-                local *File::Glob::bsd_glob                      = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
-                local *scripts::ea_nginx::_write_global_ea_nginx = sub { };
+                local *File::Glob::bsd_glob                         = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
+                local *scripts::ea_nginx::_write_global_ea_nginx    = sub { };
+                local *scripts::ea_nginx::ensure_valid_nginx_config = sub { };
                 yield;
             };
             it_should_behave_like "any sub command that takes a cpanel user";
@@ -581,6 +585,9 @@ describe "ea-nginx script" => sub {
         describe "`remove`" => sub {
             around {
                 local $mi{cmd} = "remove";
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::ensure_valid_nginx_config = sub { };
                 yield;
             };
             it_should_behave_like "any sub command that takes a cpanel user";
@@ -631,7 +638,8 @@ describe "ea-nginx script" => sub {
         describe "`reload`" => sub {
             around {
                 no warnings "redefine";
-                local *scripts::ea_nginx::_reload = $orig__reload;
+                local *scripts::ea_nginx::_reload                   = $orig__reload;
+                local *scripts::ea_nginx::ensure_valid_nginx_config = sub { };
                 yield;
             };
 
@@ -910,6 +918,40 @@ describe "ea-nginx script" => sub {
         };
 
         describe "_delete_glob" => sub { it "should be tested" };
+
+        describe "_get_nginx_bin" => sub {
+            it "should die if the nginx binary is not executable" => sub {
+                my $mock = Test::MockFile->file( '/usr/sbin/nginx', 'nginx executable' );
+                dies_ok { scripts::ea_nginx::_get_nginx_bin() };
+            };
+
+            it "should return the path to the nginx binary if it is executable" => sub {
+                my $mock = Test::MockFile->file( '/usr/sbin/nginx', 'nginx executable', { mode => 0755 } );
+                is( scripts::ea_nginx::_get_nginx_bin(), '/usr/sbin/nginx' );
+            };
+        };
+
+        describe "_attempt_to_fix_syntax_errors" => sub {
+            it "should die if no arguments are passed" => sub {
+                dies_ok { scripts::ea_nginx::_attempt_to_fix_syntax_errors() };
+            };
+
+            it "should return 0 if it does not resolve any syntax errors" => sub {
+                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors('foo'), 0 );
+            };
+
+            it "should return 0 if the line with an error does not contain they key" => sub {
+                Path::Tiny::path('/etc/nginx/conf.d/duplicate.conf')->spew("bad_key\n42\n;\n");
+                my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:3];
+                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 0 );
+            };
+
+            it "should return 1 if it comments out a duplicate key" => sub {
+                Path::Tiny::path('/etc/nginx/conf.d/duplicate.conf')->spew("bad_key 42;\n");
+                my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:1];
+                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
+            };
+        };
     };
 
     describe "cache_config" => sub {
@@ -1097,6 +1139,42 @@ describe "ea-nginx script" => sub {
             cmp_deeply( $from_file, \%expected );
         };
 
+    };
+
+    describe "ensure_valid_nginx_config" => sub {
+        around {
+            no warnings 'redefine';
+            local *scripts::ea_nginx::_get_nginx_bin = sub { return '/usr/sbin/nginx' };
+
+            my $mock_io_callback = Test::MockModule->new('IO::Callback');
+            $mock_io_callback->redefine( new => sub { } );
+
+            yield;
+        };
+
+        it "should return if it does not discover any syntax errors in the nginx config" => sub {
+            my $mock_cpanel_saferun_object = Test::MockModule->new('Cpanel::SafeRun::Object');
+            $mock_cpanel_saferun_object->redefine(
+                new         => sub { return bless {}, shift; },
+                CHILD_ERROR => sub { },
+            );
+
+            lives_ok { scripts::ea_nginx::ensure_valid_nginx_config() };
+        };
+
+        it "should die if the nginx configuration has a syntax error that it can not resolve" => sub {
+            my $mock_cpanel_saferun_object = Test::MockModule->new('Cpanel::SafeRun::Object');
+            $mock_cpanel_saferun_object->redefine(
+                new         => sub { return bless {}, shift; },
+                CHILD_ERROR => sub { return 1; }
+            );
+
+            no warnings 'redefine';
+            local *scripts::ea_nginx::_attempt_to_fix_syntax_errors = sub { return 0; };
+            use warnings;
+
+            dies_ok { scripts::ea_nginx::ensure_valid_nginx_config() };
+        };
     };
 };
 

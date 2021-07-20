@@ -31,6 +31,7 @@ use Cpanel::Validate::URL                   ();
 use Cpanel::Validate::Username              ();
 use File::Glob                              ();
 use File::Path::Tiny                        ();
+use IO::Callback                            ();
 use String::UnicodeUTF8                     ();
 use Template                                ();
 use Whostmgr::TweakSettings                 ();
@@ -325,6 +326,40 @@ sub reload { _reload(); clear_cache(); }
 #### helpers ##
 ###############
 
+sub ensure_valid_nginx_config {
+    my ($depth) = @_;
+    $depth //= 0;
+
+    # limit recursion depth to 25
+    my $max_depth = 25;
+
+    my $nginx_bin = _get_nginx_bin();
+
+    my $combined_output = '';
+    my $output_handler  = IO::Callback->new( '>', sub { $combined_output .= shift } );
+    my $run             = Cpanel::SafeRun::Object->new(
+        program => $nginx_bin,
+        args    => ['-t'],
+        stdout  => $output_handler,
+        stderr  => $output_handler,
+    );
+
+    my $resolved_issue;
+    if ( $run->CHILD_ERROR() ) {
+        $resolved_issue = _attempt_to_fix_syntax_errors($combined_output);
+    }
+    else {
+        print "Verified valid syntax for nginx configuration\n";
+        return;
+    }
+
+    ( $resolved_issue && $depth < $max_depth )
+      ? return ensure_valid_nginx_config( ++$depth )
+      : die "Unable to ensure a valid nginx configuration:\n\n$combined_output\n\nYou will need to manually resolve this issue.\n";
+
+    return;
+}
+
 sub caching_defaults {    # do not want `our %caching_defaults` or a hash reference so that no one can accidentally change it
 
     # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/cache.json
@@ -554,6 +589,8 @@ sub _write_global_logging {
 
 sub _reload {
     my ($new_file) = @_;
+
+    ensure_valid_nginx_config();    # dies if it fails to ensure a valid config
 
     if ( system("/usr/local/cpanel/scripts/restartsrv_nginx reload") != 0 ) {
         if ($new_file) {
@@ -1090,6 +1127,56 @@ sub _delete_glob {
 
 sub _get_cpconf_hr {
     return Cpanel::Config::LoadCpConf::loadcpconf();
+}
+
+sub _get_nginx_bin {
+    my $nginx_bin = '/usr/sbin/nginx';
+
+    # This executable is provided by the ea-nginx RPM so this should never happen
+    die "Could not find an executable nginx binary\n" unless -x $nginx_bin;
+    return $nginx_bin;
+}
+
+sub _attempt_to_fix_syntax_errors {
+    my ($combined_output) = @_;
+    die "_attempt_to_fix_syntax_errors: ‘combined_output’ arg is required\n"
+      unless defined $combined_output;
+
+    my $resolved_issue = 0;
+    my @output_lines   = split /\n/, $combined_output;
+    foreach my $output_line (@output_lines) {
+
+        # For example:
+        # nginx: [emerg] "client_max_body_size" directive is duplicate in /etc/nginx/conf.d/ea-nginx.conf:19
+        # use non greedy modifier here to ensure we do not match more than we intend to
+        if ( $output_line =~ m{^nginx: \[emerg\] "(.*?)" directive is duplicate in (.*?):([0-9]+)$} ) {
+            my $key       = $1;
+            my $file_path = $2;
+            my $line_num  = $3;
+
+            die "‘$file_path’ reported an error on line $line_num.  However, ‘$file_path’ does not exist on the system\n"
+              unless -s $file_path;
+
+            my $file       = Path::Tiny::path($file_path);
+            my @file_lines = $file->lines();
+            chomp(@file_lines);
+            $line_num--;    # avoid off by 1 error (line 42 in the file is item 41 in the array)
+
+            # For example:
+            # nginx_key value_for_key;
+            if ( $file_lines[$line_num] =~ m{^\s*\Q$key\E.*;$} ) {
+                $resolved_issue = 1;
+                $file_lines[$line_num] = '# ' . $file_lines[$line_num];
+                $line_num++;
+                print "Line $line_num in the file ‘$file_path’ was commented out since another entry exists for the key:  $key\n";
+            }
+
+            $file->spew( join( "\n", @file_lines ) );
+            last;    # nginx -t only reveals the first issue it encounters
+        }
+    }
+
+    return $resolved_issue;
 }
 
 1;
