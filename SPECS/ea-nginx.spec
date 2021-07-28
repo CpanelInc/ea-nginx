@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -617,7 +617,8 @@ fi
 %posttrans
 # I move this to here, to deal with the craziness of the order of operations
 # on yum upgrade and downgrades.
-/usr/local/cpanel/scripts/ea-nginx config --all
+# No need to restart nginx here since that is handled in the universal-hook
+/usr/local/cpanel/scripts/ea-nginx config --all --no-reload
 
 cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
 if [ $cpversion -ge 80 ]; then
@@ -690,6 +691,9 @@ fi
 
 
 %changelog
+* Mon Jul 26 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-2
+- EA-9875: Avoid race condition when binding to ports 80/443
+
 * Thu Jul 15 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-1
 - EA-9968: Update ea-nginx from v1.21.0 to v1.21.1
 
