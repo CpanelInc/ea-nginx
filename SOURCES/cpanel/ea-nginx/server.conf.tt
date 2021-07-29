@@ -1,6 +1,7 @@
 server {
     server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %] mail.[% domain %][% END %][% END %];
     listen 80;
+    listen [::]:80;
 
     [%- IF secruleengineoff %]
     modsecurity off;
@@ -41,6 +42,7 @@ server {
     [% END -%]
 
     listen 443 ssl;
+    listen [::]:443 ssl;
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
         [% IF ea4conf.sslprotocol_list_str || ea4conf.sslprotocol %]
@@ -237,6 +239,8 @@ server {
     [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
 server {
     listen 443 ssl;
+    listen [::]:443 ssl;
+
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
 
