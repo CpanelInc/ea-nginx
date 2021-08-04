@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -219,6 +219,7 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
+    --with-ipv6 \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
@@ -230,6 +231,7 @@ make %{?_smp_mflags}
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
+    --with-ipv6 \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
@@ -691,6 +693,9 @@ fi
 
 
 %changelog
+* Thu Jul 29 2021 Dan Muey <dan@cpanel.net> - 1.21.1-3
+- ZC-5555: Listen on IPv6 like we do IPv4
+
 * Mon Jul 26 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-2
 - EA-9875: Avoid race condition when binding to ports 80/443
 
