@@ -1,1 +1,1 @@
-toggle_nginx_caching:EA4 - Allow enabling/disabling NGINX caching (v100 or newer)
+toggle_nginx_caching:EA4 - Allow enabling/disabling NGINX caching (requires cPanel & WHM version 100 or later)

@@ -1,4 +1,82 @@
-#!/bin/sh
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - SOURCES/007-restatsrv_nginx             Copyright 2021 cPanel, L.L.C.
+#                                                           All rights reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
 
-/usr/local/cpanel/scripts/restartsrv_nginx --stop
-/usr/local/cpanel/scripts/restartsrv_nginx --start
+package ea_nginx::SOURCES::restartsrv_nginx;
+
+use strict;
+use warnings;
+
+use Cpanel::AppPort ();
+
+run(@ARGV) unless caller();
+
+=head1 DESCRIPTION
+
+Ensure nginx is able to bind to port 80/443 by forcing apache to release them if necessary
+
+=cut
+
+sub run {
+    my $stopped_apache = 0;
+    if ( _is_listening_on_80_or_443('httpd') ) {
+        print "Stopping apache …\n";
+        system('/usr/local/cpanel/scripts/restartsrv_httpd --stop');
+        $stopped_apache = 1;
+    }
+
+    # Ensure apache stops before continuing
+    if ($stopped_apache) {
+        print "Waiting on apache to fully stop before continuing …\n";
+
+        my $httpd_is_listening = 0;
+        for ( 1 .. 5 ) {
+            $httpd_is_listening = _is_listening_on_80_or_443('httpd');
+            last unless $httpd_is_listening;
+            select( undef, undef, undef, 0.25 );
+        }
+
+        die "Apache is still bound to ports 80/443\n" if $httpd_is_listening;
+    }
+
+    print "Starting nginx …\n";
+    system('/usr/local/cpanel/scripts/ea-nginx reload');
+
+    print "Waiting on nginx to come up …\n";
+
+    my $nginx_is_listening = 0;
+    for ( 1 .. 5 ) {
+        $nginx_is_listening = _is_listening_on_80_or_443('nginx');
+        last if $nginx_is_listening;
+        select( undef, undef, undef, 0.25 );
+    }
+
+    die "Nginx was unable to start\n" unless $nginx_is_listening;
+
+    print "Starting apache …\n";
+    system('/usr/local/cpanel/scripts/restartsrv_httpd --start');
+
+    print "… done\n";
+    return 0;
+}
+
+sub _is_listening_on_80_or_443 {
+    my ($service) = @_;
+    die "_is_listening_on_80_or_443: service arg is required\n" unless $service;
+
+    my @ports = (
+        80,
+        443,
+    );
+
+    my $app_pid_ref = Cpanel::AppPort::get_pids_bound_to_ports( \@ports );
+    foreach my $pid ( keys %$app_pid_ref ) {
+        return 1 if $app_pid_ref->{$pid}{process} eq $service;
+    }
+
+    return 0;
+}
+
+1;

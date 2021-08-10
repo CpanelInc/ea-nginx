@@ -173,6 +173,7 @@ sub config {
         _write_global_logging();
         _write_global_passenger();
         _write_global_ea_nginx();
+        _write_global_default();
         _do_other_global_config();
 
         my %errors;
@@ -325,6 +326,13 @@ sub reload { _reload(); clear_cache(); }
 ###############
 #### helpers ##
 ###############
+
+my $has_ipv6;
+
+sub _has_ipv6 {
+    $has_ipv6 //= -f '/proc/net/if_inet6' ? 1 : 0;
+    return $has_ipv6;
+}
 
 sub ensure_valid_nginx_config {
     my ($depth) = @_;
@@ -499,6 +507,21 @@ sub _get_application_paths {
     }
 
     return;
+}
+
+sub _write_global_default {
+    my $ipv6   = _has_ipv6();
+    my $prefix = $ipv6 ? "" : "# server does not have IPv6 enabled: ";
+
+    my $dflt    = path("/etc/nginx/conf.d/default.conf");
+    my $content = $dflt->slurp;
+
+    # toggle IPv6
+    $content =~ s/^.*(listen\s+\[::\]:)/    $prefix$1/gm;
+
+    $dflt->spew($content);
+
+    return 1;
 }
 
 sub _write_global_passenger {
@@ -759,6 +782,8 @@ sub _render_and_append {
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
 
+    my $ipv6 = _has_ipv6();
+
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
     chmod 0640, "/var/log/nginx/domains/$domains->[0]";
@@ -826,6 +851,7 @@ sub _render_and_append {
             user                         => $user,
             group                        => $group,
             ip                           => $ip,
+            ipv6                         => $ipv6,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
             wordpress                    => {

@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -219,6 +219,7 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
+    --with-ipv6 \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
@@ -230,6 +231,7 @@ make %{?_smp_mflags}
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
+    --with-ipv6 \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
@@ -617,7 +619,8 @@ fi
 %posttrans
 # I move this to here, to deal with the craziness of the order of operations
 # on yum upgrade and downgrades.
-/usr/local/cpanel/scripts/ea-nginx config --all
+# No need to restart nginx here since that is handled in the universal-hook
+/usr/local/cpanel/scripts/ea-nginx config --all --no-reload
 
 cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
 if [ $cpversion -ge 80 ]; then
@@ -690,6 +693,12 @@ fi
 
 
 %changelog
+* Thu Jul 29 2021 Dan Muey <dan@cpanel.net> - 1.21.1-3
+- ZC-5555: Listen on IPv6 like we do IPv4
+
+* Mon Jul 26 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-2
+- EA-9875: Avoid race condition when binding to ports 80/443
+
 * Thu Jul 15 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-1
 - EA-9968: Update ea-nginx from v1.21.0 to v1.21.1
 
