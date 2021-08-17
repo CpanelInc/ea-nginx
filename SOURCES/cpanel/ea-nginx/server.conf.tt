@@ -102,6 +102,7 @@ server {
     }
 
     include conf.d/server-includes/cpanel-static-locations.conf;
+    include conf.d/server-includes/cpanel-proxy-bypass-regex.conf;
         [%- IF basic_auth.locations %]
 
             [%- FOREACH location IN basic_auth.locations.keys.sort %]

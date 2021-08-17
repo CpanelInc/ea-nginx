@@ -166,6 +166,7 @@ describe "ea-nginx script" => sub {
                 local *File::Glob::bsd_glob                         = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
                 local *scripts::ea_nginx::_write_global_ea_nginx    = sub { };
                 local *scripts::ea_nginx::ensure_valid_nginx_config = sub { };
+                local *scripts::ea_nginx::_write_global_default     = sub { };
                 yield;
             };
             it_should_behave_like "any sub command that takes a cpanel user";

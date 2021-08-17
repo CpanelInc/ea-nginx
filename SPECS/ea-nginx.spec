@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -388,6 +388,7 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-proxy-bypass-regex.conf
 %config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
 
@@ -693,6 +694,9 @@ fi
 
 
 %changelog
+* Fri Aug 06 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-4
+- EA-9902: Do not cache the wordpress homepage when users are logged into wp-admin
+
 * Thu Jul 29 2021 Dan Muey <dan@cpanel.net> - 1.21.1-3
 - ZC-5555: Listen on IPv6 like we do IPv4
 
