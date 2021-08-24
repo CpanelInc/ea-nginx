@@ -41,6 +41,7 @@ use Path::Tiny;
 our $var_cache_ea_nginx  = '/var/cache/ea-nginx';
 our $var_cpanel_userdata = '/var/cpanel/userdata';
 our $etc_nginx           = '/etc/nginx';
+our $settings_file       = '/etc/nginx/ea-nginx/settings.json';
 
 my $nginxroot = "/etc/nginx";
 
@@ -551,7 +552,7 @@ sub _write_global_passenger {
 }
 
 sub _write_global_ea_nginx {
-    my $user_settings = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/settings.json");
+    my $user_settings = Cpanel::JSON::LoadFile($settings_file);
     my $cur_settings  = {
         _settings_defaults(),
         %{$user_settings},
@@ -1200,9 +1201,64 @@ sub _attempt_to_fix_syntax_errors {
             $file->spew( join( "\n", @file_lines ) );
             last;    # nginx -t only reveals the first issue it encounters
         }
+
+        # For example:
+        # nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_max_size: 2
+        elsif ( $output_line =~ m{^nginx: \[emerg\] could not build server_names_hash, you should increase server_names_hash_max_size: ([0-9]+)$} ) {
+            my $current_value     = $1;
+            my $num_current_users = _get_num_current_users();
+            last unless defined $num_current_users;
+
+            # http://nginx.org/en/docs/http/server_names.html
+            # The recommendation here is to set 'server_names_hash_max_size' to the number of server_names on the server
+            # We are taking a more conservative approach here is that number is actually 7x the number
+            # of users on the server at a minimum
+            my $update_value = ( $num_current_users > $current_value ) ? $num_current_users : $current_value * 2;
+
+            _update_global_ea_nginx_settings( 'server_names_hash_max_size', $update_value );
+            _write_global_ea_nginx();
+            $resolved_issue = 1;
+
+            last;    # nginx -t only reveals the first issue it encounters
+        }
+
+        # For example:
+        # nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_bucket_size: 64
+        elsif ( $output_line =~ m{^nginx: \[emerg\] could not build server_names_hash, you should increase server_names_hash_bucket_size: ([0-9]+)$} ) {
+            my $current_value = $1;
+
+            # http://nginx.org/en/docs/http/server_names.html
+            # The recommendation here is to set 'server_names_hash_bucket_size' to the next power of 2
+            # I am going to make the assumption that the initial value is a power of 2
+            my $update_value = $current_value * 2;
+
+            _update_global_ea_nginx_settings( 'server_names_hash_bucket_size', $update_value );
+            _write_global_ea_nginx();
+            $resolved_issue = 1;
+
+            last;    # nginx -t only reveals the first issue it encounters
+        }
     }
 
     return $resolved_issue;
+}
+
+sub _update_global_ea_nginx_settings {
+    my ( $key, $value ) = @_;
+    die "_update_global_ea_nginx_settings: ‘key’ arg is required\n"   unless $key;
+    die "_update_global_ea_nginx_settings: ‘value’ arg is required\n" unless $value;
+
+    my $user_settings_hr = Cpanel::JSON::LoadFile($settings_file);
+    $user_settings_hr->{$key} = $value;
+    Cpanel::JSON::DumpFile( $settings_file, $user_settings_hr );
+
+    print "Updated ‘$key’ to ‘$value’ since the current value is too low\n";
+    return;
+}
+
+sub _get_num_current_users {
+    return unless ( eval { require Cpanel::Config::LoadUserDomains::Count; 1; } );
+    return Cpanel::Config::LoadUserDomains::Count::counttrueuserdomains();
 }
 
 1;
