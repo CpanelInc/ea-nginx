@@ -933,6 +933,15 @@ describe "ea-nginx script" => sub {
         };
 
         describe "_attempt_to_fix_syntax_errors" => sub {
+            around {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_num_current_users           = sub { return 42; };
+                local *scripts::ea_nginx::_update_global_ea_nginx_settings = sub { return; };
+                local *scripts::ea_nginx::_write_global_ea_nginx           = sub { return; };
+
+                yield;
+            };
+
             it "should die if no arguments are passed" => sub {
                 dies_ok { scripts::ea_nginx::_attempt_to_fix_syntax_errors() };
             };
@@ -941,7 +950,7 @@ describe "ea-nginx script" => sub {
                 is( scripts::ea_nginx::_attempt_to_fix_syntax_errors('foo'), 0 );
             };
 
-            it "should return 0 if the line with an error does not contain they key" => sub {
+            it "should return 0 if the line with an error does match any known patterns" => sub {
                 Path::Tiny::path('/etc/nginx/conf.d/duplicate.conf')->spew("bad_key\n42\n;\n");
                 my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:3];
                 is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 0 );
@@ -951,6 +960,54 @@ describe "ea-nginx script" => sub {
                 Path::Tiny::path('/etc/nginx/conf.d/duplicate.conf')->spew("bad_key 42;\n");
                 my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:1];
                 is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
+            };
+
+            it "should return 1 if it increases the value of server_names_hash_max_size" => sub {
+                my $line = q[nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_max_size: 32];
+                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
+            };
+
+            it "should return 1 if it increases the value of server_names_hash_bucket_size" => sub {
+                my $line = q[nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_bucket_size: 16];
+                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
+            };
+        };
+
+        describe "_update_global_ea_nginx_settings" => sub {
+            it "should die if called with no arguments" => sub {
+                dies_ok { scripts::ea_nginx::_update_global_ea_nginx_settings() };
+            };
+
+            it "should die if only called with one argument" => sub {
+                dies_ok { scripts::ea_nginx::_update_global_ea_nginx_settings(42) };
+            };
+
+            it "should call ‘Cpanel::JSON::DumpFile’ with the updated key/value pair" => sub {
+                my $hr = {};
+
+                no warnings 'redefine';
+                local *Cpanel::JSON::LoadFile = sub { return; };
+                local *Cpanel::JSON::DumpFile = sub { $hr = $_[1]; };
+
+                scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 );
+                is_deeply( $hr, { universe => 42 } );
+            };
+
+            it "should return undef if called correctly" => sub {
+                no warnings 'redefine';
+                local *Cpanel::JSON::LoadFile = sub { return; };
+                local *Cpanel::JSON::DumpFile = sub { return; };
+
+                is( scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 ), undef );
+            };
+        };
+
+        describe "_get_num_current_users" => sub {
+            it "should return a scalar value if it loads ‘Cpanel::Config::LoadUserDomains::Count’" => sub {
+                no warnings 'redefine';
+                local *Cpanel::Config::LoadUserDomains::Count::counttrueuserdomains = sub { return 42; };
+
+                is( scripts::ea_nginx::_get_num_current_users(), 42 );
             };
         };
     };
