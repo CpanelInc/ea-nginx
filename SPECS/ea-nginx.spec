@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -694,6 +694,9 @@ fi
 
 
 %changelog
+* Tue Aug 24 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-5
+- EA-9954: Add logic for server_names_hash_max_size and server_names_hash_bucket_size to syntax checker
+
 * Fri Aug 06 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-4
 - EA-9902: Do not cache the wordpress homepage when users are logged into wp-admin
 
