@@ -96,7 +96,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.21.1
+%define main_version 1.21.2
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -694,6 +694,9 @@ fi
 
 
 %changelog
+* Tue Sep 07 2021 Cory McIntire <cory@cpanel.net> - 1.21.2-1
+- EA-10095: Update ea-nginx from v1.21.1 to v1.21.2
+
 * Thu Sep 02 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.1-6
 - EA-9957: Configure ssl_dhparam directive
 
