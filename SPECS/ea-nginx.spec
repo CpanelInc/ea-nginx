@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -279,6 +279,7 @@ perl -pi -e 's/^user\s+nginx;/user nobody;/g' $RPM_BUILD_ROOT%{_sysconfdir}/ngin
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/includes-optional/
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes/
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/server-includes-standalone/
 mkdir cpanel && cd cpanel && tar xzf %{SOURCE14}  && cd ..
 cp -r cpanel/conf.d/* $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d
 
@@ -384,9 +385,9 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-non-www.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-www.conf
 %config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cloudflare.conf
-%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-dcv.conf
-%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-mailman-locations.conf
-%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-redirect-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-dcv.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-mailman-locations.conf
+%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-redirect-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-proxy-bypass-regex.conf
 %config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
@@ -694,6 +695,9 @@ fi
 
 
 %changelog
+* Mon Sep 20 2021 Dan Muey <dan@cpanel.net> - 1.21.3-2
+- ZC-9260: Move standalone includes to seperate folder && bring in server includes on reverse proxy and standalone
+
 * Thu Sep 16 2021 Cory McIntire <cory@cpanel.net> - 1.21.3-1
 - EA-10108: Update ea-nginx from v1.21.2 to v1.21.3
 
