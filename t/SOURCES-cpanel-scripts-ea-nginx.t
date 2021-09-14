@@ -951,13 +951,29 @@ describe "ea-nginx script" => sub {
             };
 
             it "should return 0 if the line with an error does match any known patterns" => sub {
-                Path::Tiny::path('/etc/nginx/conf.d/duplicate.conf')->spew("bad_key\n42\n;\n");
+                my $mockdir  = Test::MockFile->dir( '/etc/nginx/conf.d/', ['duplicate.conf'] );
+                my $mockfile = Test::MockFile->file( '/etc/nginx/conf.d/duplicate.conf', 'doit' );
+                my $mock     = Test::MockModule->new('Path::Tiny');
+                $mock->redefine(
+                    path  => sub { return bless {}, 'Path::Tiny'; },
+                    lines => sub { return ( 'bad_key', '42', ';' ); },
+                    spew  => sub { return; },
+                );
+
                 my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:3];
                 is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 0 );
             };
 
             it "should return 1 if it comments out a duplicate key" => sub {
-                Path::Tiny::path('/etc/nginx/conf.d/duplicate.conf')->spew("bad_key 42;\n");
+                my $mockdir  = Test::MockFile->dir( '/etc/nginx/conf.d/', ['duplicate.conf'] );
+                my $mockfile = Test::MockFile->file( '/etc/nginx/conf.d/duplicate.conf', 'doit' );
+                my $mock     = Test::MockModule->new('Path::Tiny');
+                $mock->redefine(
+                    path  => sub { return bless {}, 'Path::Tiny'; },
+                    lines => sub { return ('bad_key 42;'); },
+                    spew  => sub { return; },
+                );
+
                 my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:1];
                 is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
             };
