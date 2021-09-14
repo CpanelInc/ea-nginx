@@ -380,6 +380,7 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
+%config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-non-www.conf
@@ -521,6 +522,10 @@ if [ $1 = 1 ]; then
     if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/default.conf ]; then
         mkdir -p /etc/nginx/conf.d
         cp /etc/nginx_conf.d.pre_install_ea_nginx_config/default.conf /etc/nginx/conf.d/default.conf
+    fi
+    if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf ]; then
+        mkdir -p /etc/nginx/conf.d/includes-optional
+        cp /etc/nginx_conf.d.pre_install_ea_nginx_config/set-CACHE_KEY_PREFIX.conf /etc/nginx/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf
     fi
 fi
 
@@ -697,6 +702,7 @@ fi
 %changelog
 * Mon Sep 20 2021 Dan Muey <dan@cpanel.net> - 1.21.3-2
 - ZC-9260: Move standalone includes to seperate folder && bring in server includes on reverse proxy and standalone
+- ZC-9261: Allow include to prefix `proxy_cache_key` based on any criteria
 
 * Thu Sep 16 2021 Cory McIntire <cory@cpanel.net> - 1.21.3-1
 - EA-10108: Update ea-nginx from v1.21.2 to v1.21.3
