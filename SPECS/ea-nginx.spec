@@ -96,7 +96,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.21.2
+%define main_version 1.21.3
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -694,6 +694,9 @@ fi
 
 
 %changelog
+* Thu Sep 16 2021 Cory McIntire <cory@cpanel.net> - 1.21.3-1
+- EA-10108: Update ea-nginx from v1.21.2 to v1.21.3
+
 * Tue Sep 07 2021 Cory McIntire <cory@cpanel.net> - 1.21.2-1
 - EA-10095: Update ea-nginx from v1.21.1 to v1.21.2
 
