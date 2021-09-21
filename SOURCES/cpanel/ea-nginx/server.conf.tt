@@ -101,8 +101,6 @@ server {
         proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
     }
 
-    include conf.d/server-includes/cpanel-static-locations.conf;
-    include conf.d/server-includes/cpanel-proxy-bypass-regex.conf;
         [%- IF basic_auth.locations %]
 
             [%- FOREACH location IN basic_auth.locations.keys.sort %]
@@ -214,9 +212,10 @@ server {
        [% END -%]
     [% END -%]
 
-    include conf.d/server-includes/*.conf;
+    include conf.d/server-includes-standalone/*.conf;
     [% END -%]
 
+    include conf.d/server-includes/*.conf;
     include conf.d/users/[% user %]/*.conf;
     include conf.d/users/[% user %]/[% domains.0.replace('^\*\.', '_wildcard_.') %]/*.conf;
 
