@@ -101,15 +101,15 @@ install -p ${SOURCE25} $DEB_INSTALL_ROOT/usr/local/cpanel/bin/admin/Cpanel/nginx
 
 mkdir -p $DEB_INSTALL_ROOT/var/cache/ea-nginx/proxy
 
+mkdir -p ${DEB_INSTALL_ROOT}/usr/local/cpanel/whostmgr/addonfeatures
+install ${SOURCE28} ${DEB_INSTALL_ROOT}/usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
+
 ##########
 # DAN EMERGENCY - BEGIN
 ##########
 
 mkdir -p $DEB_INSTALL_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__
 install -p ${SOURCE27} $DEB_INSTALL_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
-
-mkdir -p ${DEB_INSTALL_ROOT}/usr/local/cpanel/whostmgr/addonfeatures
-install ${SOURCE28} ${DEB_INSTALL_ROOT}/usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
 
 # These files perplex me.  On CentOS it does not exist throughout %build or
 # %install, there are no %posts that I can see.   Yet this file is delivered.
