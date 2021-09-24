@@ -25,7 +25,6 @@ use Cpanel::PHP::Config                     ();
 use Cpanel::PHPFPM::Get                     ();
 use Cpanel::PwCache                         ();
 use Cpanel::SafeRun::Object                 ();
-use Cpanel::Sys::OS                         ();
 use Cpanel::Transaction::File::JSON         ();
 use Cpanel::Validate::URL                   ();
 use Cpanel::Validate::Username              ();
