@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -700,6 +700,9 @@ fi
 
 
 %changelog
+* Fri Sep 24 2021 Dan Muey <dan@cpanel.net> - 1.21.3-3
+- ZC-9317: Stop using deprecated (and unused) module
+
 * Mon Sep 20 2021 Dan Muey <dan@cpanel.net> - 1.21.3-2
 - ZC-9260: Move standalone includes to seperate folder && bring in server includes on reverse proxy and standalone
 - ZC-9261: Allow include to prefix `proxy_cache_key` based on any criteria
