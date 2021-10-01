@@ -1,0 +1,80 @@
+#!/bin/bash
+
+if test -x "/usr/bin/apt"; then
+    # Dir needs to exist
+
+    mkdir -p /etc/nginx/conf.d/modules
+
+    # Register the nginx service
+    /usr/bin/systemctl preset nginx.service >/dev/null 2>&1 ||:
+    /usr/bin/systemctl preset nginx-debug.service >/dev/null 2>&1 ||:
+    /usr/bin/systemctl enable nginx.service >/dev/null 2>&1 ||:
+    # print site info
+    cat <<BANNER
+----------------------------------------------------------------------
+
+Thanks for using nginx!
+
+Please find the official documentation for nginx here:
+* http://nginx.org/en/docs/
+
+Please subscribe to nginx-announce mailing list to get
+the most important news about nginx:
+* http://nginx.org/en/support.html
+
+Commercial subscriptions for nginx are available on:
+* http://nginx.com/products/
+
+----------------------------------------------------------------------
+BANNER
+
+    # Touch and set permisions on default log files on installation
+
+    if [ -d ${_localstatedir}/log/nginx ]; then
+        if [ ! -e ${_localstatedir}/log/nginx/access.log ]; then
+            touch ${_localstatedir}/log/nginx/access.log
+            chmod 640 ${_localstatedir}/log/nginx/access.log
+            chown ${nginx_user}:${nginx_loggroup} ${_localstatedir}/log/nginx/access.log
+        fi
+
+        if [ ! -e ${_localstatedir}/log/nginx/error.log ]; then
+            touch ${_localstatedir}/log/nginx/error.log
+            chmod 640 ${_localstatedir}/log/nginx/error.log
+            chown ${nginx_user}:${nginx_loggroup} ${_localstatedir}/log/nginx/error.log
+        fi
+    fi
+
+    /usr/local/cpanel/scripts/restartsrv_httpd --stop
+    ${_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_to_alt_ports
+    echo "nginx:1" >> /etc/chkserv.d/chkservd.conf
+
+    /usr/bin/systemctl start nginx.service >/dev/null 2>&1 ||:
+
+    # record the current value of fileprotect
+    if [ -e /var/cpanel/fileprotect ];
+    then
+        touch /etc/nginx/ea-nginx/meta/fileprotect
+    else
+        rm -f /etc/nginx/ea-nginx/meta/fileprotect
+    fi
+
+    # disable file protect
+
+    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
+
+    # I move this to here, to deal with the craziness of the order of operations
+    # on yum upgrade and downgrades.
+    # No need to restart nginx here since that is handled in the universal-hook
+    /usr/local/cpanel/scripts/ea-nginx config --all --no-reload
+
+    cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
+    if [ $cpversion -ge 80 ]; then
+        # Remove "bad" hooks that were left around by a bad previous version of the RPM
+        # Ignore failures in case you are on a version of cPanel too old for feature
+        /usr/local/cpanel/bin/manage_hooks prune; /bin/true;
+        /usr/local/cpanel/bin/manage_hooks add module NginxHooks
+    fi
+
+    /etc/apt/universal-hooks/multi_pkgs/Post-Invoke/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
+fi
+

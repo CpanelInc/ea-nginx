@@ -104,36 +104,8 @@ mkdir -p $DEB_INSTALL_ROOT/var/cache/ea-nginx/proxy
 mkdir -p ${DEB_INSTALL_ROOT}/usr/local/cpanel/whostmgr/addonfeatures
 install ${SOURCE28} ${DEB_INSTALL_ROOT}/usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
 
-##########
-# DAN EMERGENCY - BEGIN
-##########
-
-mkdir -p $DEB_INSTALL_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__
-install -p ${SOURCE27} $DEB_INSTALL_ROOT/etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
-
-# These files perplex me.  On CentOS it does not exist throughout %build or
-# %install, there are no %posts that I can see.   Yet this file is delivered.
-# But I have no idea why or how.
-mkdir -p debian/tmp/etc/nginx/conf.d/modules
-echo "load_module modules/ngx_http_pipelog_module.so;" > debian/tmp/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf
-
-# This one will surely fail, I cannot understand why this is delivered, nor
-# where its contents came from, much less what the contents should be
-cat <<EOF > debian/tmp/etc/nginx/conf.d/passenger.conf
-passenger_root
-/opt/cpanel/ea-ruby27/root/usr/libexec/../share/passenger/phusion_passenger/locations.ini;
-passenger_enabled off;
-passenger_user_switching on;
-passenger_disable_security_update_check on;
-passenger_instance_registry_dir
-/opt/cpanel/ea-ruby27/root/usr/libexec/../../var/run/passenger-instreg;
-passenger_ruby /opt/cpanel/ea-ruby27/root/usr/libexec/passenger-ruby27;
-passenger_python /usr/bin/python;
-EOF
-
-##########
-# DAN EMERGENCY - END
-##########
+mkdir -p $DEB_INSTALL_ROOT/etc/apt/universal-hooks/multi_pkgs/Post-Invoke/ea-__WILDCARD__nginx__WILDCARD__
+install -p ${SOURCE27} $DEB_INSTALL_ROOT/etc/apt/universal-hooks/multi_pkgs/Post-Invoke/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
 
 mkdir -p debian/tmp/etc/nginx/ea-nginx/html
 cp $SOURCE17 debian/tmp/etc/nginx/ea-nginx/html

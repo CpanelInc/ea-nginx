@@ -9,7 +9,8 @@
         "_localstatedir": "/var",
         "_libdir": "/usr/lib64",
         "_sbindir": "/usr/sbin",
-        "_libexecdir": "/usr/libexec"
+        "_libexecdir": "/usr/libexec",
+        "nginx_loggroup": "adm"
     },
     "source_tarball_regex": "nginx",
     "remove_from_requires": [
@@ -41,6 +42,24 @@
             "libaio1"
         ]
     },
-    "fix_dh_usrlocal": 1
+    "fix_dh_usrlocal": 1,
+    "remove_from_specific_install": {
+        "ea-nginx": [
+            "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf",
+            "/etc/nginx/conf.d/passenger.conf"
+        ]
+    },
+    "adjust_install_file_src": [
+        [ 
+            "etc/yum/universal-hooks/multi_pkgs/posttrans",
+            "debian/tmp/etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+        ]
+    ],
+    "adjust_install_file_dst": [
+        [ 
+            "etc/yum/universal-hooks/multi_pkgs/posttrans",
+            "/etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+        ]
+    ]
 }
 
