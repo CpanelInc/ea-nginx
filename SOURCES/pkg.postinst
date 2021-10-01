@@ -1,16 +1,17 @@
 #!/bin/bash
 
 if test -x "/usr/bin/apt"; then
-    # Dir needs to exist
+    if [ "$1" = "configure" ]; then
+        # Dir needs to exist
 
-    mkdir -p /etc/nginx/conf.d/modules
+        mkdir -p /etc/nginx/conf.d/modules
 
-    # Register the nginx service
-    /usr/bin/systemctl preset nginx.service >/dev/null 2>&1 ||:
-    /usr/bin/systemctl preset nginx-debug.service >/dev/null 2>&1 ||:
-    /usr/bin/systemctl enable nginx.service >/dev/null 2>&1 ||:
-    # print site info
-    cat <<BANNER
+        # Register the nginx service
+        /usr/bin/systemctl preset nginx.service >/dev/null 2>&1 ||:
+        /usr/bin/systemctl preset nginx-debug.service >/dev/null 2>&1 ||:
+        /usr/bin/systemctl enable nginx.service >/dev/null 2>&1 ||:
+        # print site info
+        cat <<BANNER
 ----------------------------------------------------------------------
 
 Thanks for using nginx!
@@ -28,25 +29,26 @@ Commercial subscriptions for nginx are available on:
 ----------------------------------------------------------------------
 BANNER
 
-    # Touch and set permisions on default log files on installation
+        # Touch and set permisions on default log files on installation
 
-    if [ -d ${_localstatedir}/log/nginx ]; then
-        if [ ! -e ${_localstatedir}/log/nginx/access.log ]; then
-            touch ${_localstatedir}/log/nginx/access.log
-            chmod 640 ${_localstatedir}/log/nginx/access.log
-            chown ${nginx_user}:${nginx_loggroup} ${_localstatedir}/log/nginx/access.log
+        if [ -d ${_localstatedir}/log/nginx ]; then
+            if [ ! -e ${_localstatedir}/log/nginx/access.log ]; then
+                touch ${_localstatedir}/log/nginx/access.log
+                chmod 640 ${_localstatedir}/log/nginx/access.log
+                chown ${nginx_user}:${nginx_loggroup} ${_localstatedir}/log/nginx/access.log
+            fi
+
+            if [ ! -e ${_localstatedir}/log/nginx/error.log ]; then
+                touch ${_localstatedir}/log/nginx/error.log
+                chmod 640 ${_localstatedir}/log/nginx/error.log
+                chown ${nginx_user}:${nginx_loggroup} ${_localstatedir}/log/nginx/error.log
+            fi
         fi
 
-        if [ ! -e ${_localstatedir}/log/nginx/error.log ]; then
-            touch ${_localstatedir}/log/nginx/error.log
-            chmod 640 ${_localstatedir}/log/nginx/error.log
-            chown ${nginx_user}:${nginx_loggroup} ${_localstatedir}/log/nginx/error.log
-        fi
+        /usr/local/cpanel/scripts/restartsrv_httpd --stop
+        ${_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_to_alt_ports
+        echo "nginx:1" >> /etc/chkserv.d/chkservd.conf
     fi
-
-    /usr/local/cpanel/scripts/restartsrv_httpd --stop
-    ${_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_to_alt_ports
-    echo "nginx:1" >> /etc/chkserv.d/chkservd.conf
 
     /usr/bin/systemctl start nginx.service >/dev/null 2>&1 ||:
 
