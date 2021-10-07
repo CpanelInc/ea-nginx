@@ -67,6 +67,9 @@ BANNER
     # No need to restart nginx here since that is handled in the universal-hook
     /usr/local/cpanel/scripts/ea-nginx config --all --no-reload
 
+    /usr/local/cpanel/bin/manage_hooks prune; /bin/true;
+    /usr/local/cpanel/bin/manage_hooks add module NginxHooks
+
     # hook is not run for the transaction that installs it, so for good measure (ZC-7669)
     /etc/apt/universal-hooks/multi_pkgs/Post-Invoke/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
 fi
