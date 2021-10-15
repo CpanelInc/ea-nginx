@@ -459,8 +459,17 @@ sub _do_other_global_config {
     #  _do_other_config_user($user) via /etc/nginx/ea-nginx/config-scripts/user/*
 
     for my $script ( File::Glob::bsd_glob("/etc/nginx/ea-nginx/config-scripts/global/*") ) {
-        print "Running (global) “$script” …\n";
-        system($script) && warn "“$script” did not exit clean\n";
+        # Seen during the install of ea-modsec30-connector-nginx
+        # During the install of multiple packages, the script
+        #     - May not actually be completely there it ends in .dpkg-new
+        #     - May not be executable
+        if (-x $script && $script !~ m/dpkg-new$/) {
+            print "Running (global) “$script” …\n";
+            system($script) && warn "“$script” did not exit clean\n";
+        }
+        else {
+            print "Skipping “$script” as it is not executable\n";
+        }
     }
 
     return;
