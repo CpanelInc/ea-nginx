@@ -249,8 +249,14 @@ sub _possible_php_fpm {
     if ( exists $event->{vhost} ) {
         push( @domains, $event->{vhost} );
     }
-    elsif ( exists $event->{'vhost-1'} ) {
-        for my $idx ( 1 .. 100 ) {
+
+    my $start_idx;
+
+    $start_idx = 1 if ( exists $event->{'vhost-1'} );
+    $start_idx = 0 if ( exists $event->{'vhost-0'} );
+
+    if ($start_idx) {
+        for my $idx ( $start_idx .. 99 ) {
             my $evhost = 'vhost-' . $idx;
             last if !exists $event->{$evhost};
             push( @domains, $event->{$evhost} );
