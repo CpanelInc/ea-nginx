@@ -243,25 +243,11 @@ sub get_time_to_wait {
 sub _possible_php_fpm {
     my ( $hook, $event ) = @_;
 
+    require Cpanel::Form::Param;
+
+    my $prm     = Cpanel::Form::Param->new( { parseform_hr => $event } );
+    my @domains = $prm->param('vhost');
     my @users;
-    my @domains;
-
-    if ( exists $event->{vhost} ) {
-        push( @domains, $event->{vhost} );
-    }
-
-    my $start_idx;
-
-    $start_idx = 1 if ( exists $event->{'vhost-1'} );
-    $start_idx = 0 if ( exists $event->{'vhost-0'} );
-
-    if ( defined $start_idx ) {
-        for my $idx ( $start_idx .. 100 ) {
-            my $evhost = 'vhost-' . $idx;
-            last if !exists $event->{$evhost};
-            push( @domains, $event->{$evhost} );
-        }
-    }
 
     if (@domains) {
         require Cpanel::PHP::Config;
