@@ -1,0 +1,34 @@
+#!/bin/bash
+
+if test -x "/usr/bin/apt"; then
+    if [ "$1" = "remove" ]; then
+        # we need to know the version of cPanel, the hooks cannot be deployed
+        # before version 11.80
+        cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
+        if [ $cpversion -ge 80 ]; then
+            # ZC-5816: both pre and preun remove our hooks.
+            # meaning it would happen twice on downgrade/upgrade etc, seeing errors on
+            # the 2nd removal.
+            numhooks=`/usr/local/cpanel/bin/manage_hooks list 2> /dev/null | grep 'hook: NginxHooks::' | wc -l`
+            if [ "$numhooks" -ge 1 ]; then
+                /usr/local/cpanel/bin/manage_hooks delete module NginxHooks
+            fi
+        fi
+
+        /usr/bin/systemctl --no-reload disable nginx.service >/dev/null 2>&1 ||:
+        /usr/bin/systemctl stop nginx.service >/dev/null 2>&1 ||:
+
+        /usr/local/cpanel/scripts/restartsrv_httpd --stop
+        /usr/local/cpanel/scripts/restartsrv_nginx --stop
+
+        sed -i '/nginx:1/d' /etc/chkserv.d/chkservd.conf
+
+        ${_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
+
+        if [ -e /etc/nginx/ea-nginx/meta/fileprotect ]; then
+            rm -f /etc/nginx/ea-nginx/meta/fileprotect
+            /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
+        fi
+    fi
+fi
+
