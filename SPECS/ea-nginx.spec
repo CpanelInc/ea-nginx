@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -700,6 +700,9 @@ fi
 
 
 %changelog
+* Thu Oct 28 2021 Dan Muey <dan@cpanel.net> - 1.21.3-5
+- ZC-9439: Set user/group for -ssl_log if it exists (i.e. piped logging is enabeld)
+
 * Thu Oct 21 2021 Julian Brown <julian.brown@cpanel.net> - 1.21.3-4
 - ZC-9382: Clear all user caches when default php is changed.
 

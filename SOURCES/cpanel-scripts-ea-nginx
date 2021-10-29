@@ -459,11 +459,12 @@ sub _do_other_global_config {
     #  _do_other_config_user($user) via /etc/nginx/ea-nginx/config-scripts/user/*
 
     for my $script ( File::Glob::bsd_glob("/etc/nginx/ea-nginx/config-scripts/global/*") ) {
+
         # Seen during the install of ea-modsec30-connector-nginx
         # During the install of multiple packages, the script
         #     - May not actually be completely there it ends in .dpkg-new
         #     - May not be executable
-        if (-x $script && $script !~ m/dpkg-new$/) {
+        if ( -x $script && $script !~ m/dpkg-new$/ ) {
             print "Running (global) “$script” …\n";
             system($script) && warn "“$script” did not exit clean\n";
         }
@@ -793,13 +794,20 @@ sub _render_and_append {
 
     my $ipv6 = _has_ipv6();
 
+    my $gid = ( Cpanel::PwCache::getpwnam($user) )[3];
+
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
     chmod 0640, "/var/log/nginx/domains/$domains->[0]";
-    chown 0, ( Cpanel::PwCache::getpwnam($user) )[3], "/var/log/nginx/domains/$domains->[0]";
+    chown 0, $gid, "/var/log/nginx/domains/$domains->[0]";
+
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]-bytes_log");
     chmod 0644, "/var/log/nginx/domains/$domains->[0]-bytes_log";
     chown 0, 0, "/var/log/nginx/domains/$domains->[0]-bytes_log";
+
+    if ( -f "/var/log/nginx/domains/$domains->[0]-ssl_log" ) {
+        chown 0, $gid, "/var/log/nginx/domains/$domains->[0]-ssl_log";
+    }
 
     my $fpm_socket;
     my $fpm_socket_php_major_version;
