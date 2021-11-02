@@ -1,0 +1,78 @@
+#!/bin/bash
+
+if test -x "/usr/bin/apt"; then
+    if [ "$1" = "install" ]; then
+        # Other nginx implementations can leave behind stray config files when they are removed.
+        # As such, we make a best effort to ensure a clean config when ea-nginx is installed
+
+        # Engintron will leave behind executable files in this directory which in turn are called via a cron job
+        # The executables can and do create files in /etc/nginx/conf.d/ that will cause nginx to fail to start with
+        # our implementation
+        if [ -e /etc/nginx/utilities ]; then
+            echo "Removing /etc/nginx_utilities.pre_install_ea_nginx_config"
+            rm -rf /etc/nginx_utilities.pre_install_ea_nginx_config
+            echo "Moving /etc/nginx/utilities aside to ensure valid config for ea-nginx since this is a new install"
+            mv -fv /etc/nginx/utilities /etc/nginx_utilities.pre_install_ea_nginx_config ||:
+        fi
+
+        # Since any stray *.conf files in this directory will be picked up by nginx.conf,
+        # we want to ensure that this directory is fresh on new installs
+        if [ -e /etc/nginx/conf.d ]; then
+            echo "Removing /etc/nginx_conf.d.pre_install_ea_nginx_config"
+            rm -rf /etc/nginx_conf.d.pre_install_ea_nginx_config
+            echo "Moving /etc/nginx/conf.d aside to ensure valid config for ea-nginx since this is a new install"
+            mv -fv /etc/nginx/conf.d /etc/nginx_conf.d.pre_install_ea_nginx_config ||:
+        fi
+
+        # If modsec rulesets have been installed, they will create a symlink in '/etc/nginx/conf.d/modsec_vendor_configs/'
+        # with conf files in it.  We need to make sure we do not blow away modsec rulesets here too.
+        if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/modsec_vendor_configs ]; then
+            mkdir -p /etc/nginx/conf.d
+            cp -r /etc/nginx_conf.d.pre_install_ea_nginx_config/modsec_vendor_configs /etc/nginx/conf.d/modsec_vendor_configs
+        fi
+
+        # We need to ensure that any config files that were present are still present
+        # so that cpio does not fail to unpack
+        if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/includes-optional/cloudflare.conf ]; then
+            mkdir -p /etc/nginx/conf.d/includes-optional
+            cp /etc/nginx_conf.d.pre_install_ea_nginx_config/includes-optional/cloudflare.conf /etc/nginx/conf.d/includes-optional/cloudflare.conf
+        fi
+        if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/ea-nginx.conf ]; then
+            mkdir -p /etc/nginx/conf.d
+            cp /etc/nginx_conf.d.pre_install_ea_nginx_config/ea-nginx.conf /etc/nginx/conf.d/ea-nginx.conf
+        fi
+        if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/default.conf ]; then
+            mkdir -p /etc/nginx/conf.d
+            cp /etc/nginx_conf.d.pre_install_ea_nginx_config/default.conf /etc/nginx/conf.d/default.conf
+        fi
+        if [ -e /etc/nginx_conf.d.pre_install_ea_nginx_config/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf ]; then
+            mkdir -p /etc/nginx/conf.d/includes-optional
+            cp /etc/nginx_conf.d.pre_install_ea_nginx_config/set-CACHE_KEY_PREFIX.conf /etc/nginx/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf
+        fi
+    fi
+
+    # we need to know the version of cPanel, the hooks cannot be deployed
+    # before version 11.80
+    cpversion=`/usr/local/cpanel/3rdparty/bin/perl -MCpanel::Version -e 'print Cpanel::Version::get_short_release_number()'`
+    if [ $cpversion -ge 80 ]; then
+        # do not let nginx hooks run during upgrade. Use GTE because it can go higher,
+        # but anything 2 or greater is still an upgrade.
+        # Also deregister the hooks on this step, as that's the right point to do it
+
+        # ZC-5816: both pre and preun remove our hooks.
+        # meaning it would happen twice on downgrade/upgrade etc, seeing errors on
+        # the 2nd removal.
+        numhooks=`/usr/local/cpanel/bin/manage_hooks list 2> /dev/null | grep 'hook: NginxHooks::' | wc -l`
+        if [ "$numhooks" -ge 1 ]; then
+            /usr/local/cpanel/bin/manage_hooks delete module NginxHooks
+        fi
+    fi
+
+    # Add the "nginx" user
+    getent group ${nginx_group} >/dev/null || groupadd -r ${nginx_group}
+    getent passwd ${nginx_user} >/dev/null || \
+        useradd -r -g ${nginx_group} -s /sbin/nologin \
+        -d ${nginx_home} -c "nginx user"  ${nginx_user}
+    exit 0
+fi
+

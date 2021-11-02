@@ -1,0 +1,65 @@
+{
+    "override_vars": {
+        "use_systemd": 1,
+        "BASE_WITH_CC_OPT": "-I/opt/cpanel/ea-passenger-src/passenger-release-6.0.10/src/nginx_module",
+        "BASE_WITH_LD_OPT": "-Wl,-z,relro -Wl,-z,now -pie -ldl",
+        "_builddir": "",
+        "_sysconfdir": "/etc",
+        "_datadir": "/usr/share",
+        "_localstatedir": "/var",
+        "_libdir": "/usr/lib64",
+        "_sbindir": "/usr/sbin",
+        "_libexecdir": "/usr/libexec",
+        "nginx_loggroup": "adm"
+    },
+    "source_tarball_regex": "nginx",
+    "remove_from_requires": [
+        "ea-ruby27-mod-passenger",
+        "ea-ruby27-ruby-devel",
+        "ea-ruby27-rubygem-passenger",
+        "ea-ruby27-rubygem-rake",
+        "libcurl4-gnutls-dev",
+        "libopenssl-devel",
+        "redhat-lsb-core",
+        "ea-ruby27",
+        "initscripts",
+        "apache24-passenger"
+    ],
+    "add_to_build_requires": [
+        "libcurl4-openssl-dev",
+        "ea-passenger-src",
+        "ruby",
+        "ruby-dev",
+        "libaio-dev",
+        "libaio1",
+        "linux-libc-dev",
+        "libc6-dev"
+    ],
+    "add_to_requires": {
+        "ea-nginx": [
+            "ea-apache24-mod-passenger",
+            "ea-passenger-runtime",
+            "libaio1"
+        ]
+    },
+    "fix_dh_usrlocal": 1,
+    "remove_from_specific_install": {
+        "ea-nginx": [
+            "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf",
+            "/etc/nginx/conf.d/passenger.conf"
+        ]
+    },
+    "adjust_install_file_src": [
+        [ 
+            "etc/yum/universal-hooks/multi_pkgs/posttrans",
+            "debian/tmp/etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+        ]
+    ],
+    "adjust_install_file_dst": [
+        [ 
+            "etc/yum/universal-hooks/multi_pkgs/posttrans",
+            "/etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+        ]
+    ]
+}
+

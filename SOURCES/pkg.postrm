@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if test -x "/usr/bin/apt"; then
+    /usr/bin/systemctl daemon-reload >/dev/null 2>&1 ||:
+
+    # /etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf is a %ghost so will get removed
+    # /etc/nginx/conf.d/global-logging.conf will be left behind and, if it has
+    #   piped logging enabled then its an invalid configuraiton *but* we don't have nginc
+    #  at this point and reinstalling should regen config so do we care?
+    rm -rf  /etc/nginx/conf.d/global-logging.conf
+
+    if [ "$1" = "upgrade" ]; then
+        /sbin/service nginx status  >/dev/null 2>&1 || exit 0
+        /sbin/service nginx upgrade >/dev/null 2>&1 || echo "Binary upgrade failed, please check nginx's error.log"
+
+        exit 0
+    fi
+
+    rm -f /etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf
+    rm -f /etc/nginx/conf.d/passenger.conf
+fi
+
