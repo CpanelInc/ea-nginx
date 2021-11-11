@@ -12,9 +12,7 @@ server {
     access_log /var/log/nginx/domains/[% domains.0 %]-bytes_log cp_bytes_server;
     [% END -%]
 
-    [%- IF cloudflare %]
     include conf.d/includes-optional/cloudflare.conf;
-    [% END -%]
 
     set $CPANEL_APACHE_PROXY_IP [% ip %];
     set $CPANEL_APACHE_PROXY_SSL_IP [% ip %];
@@ -251,9 +249,7 @@ server {
     modsecurity off;
     [% END -%]
 
-    [%- IF cloudflare %]
     include conf.d/includes-optional/cloudflare.conf;
-    [% END -%]
 
     location /.well-known/cpanel-dcv {
         root [% docroot %];

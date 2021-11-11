@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -700,6 +700,9 @@ fi
 
 
 %changelog
+* Thu Nov 11 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.4-3
+- EA-10221: Always configure domains to support CloudFlare
+
 * Thu Nov 04 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.4-2
 - EA-10144: Set new default open files limit for worker processes
 
