@@ -788,7 +788,6 @@ sub _render_and_append {
     my $logging_hr       = _get_logging_hr();
     my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
     my $secruleengineoff = -e "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf" ? _get_secruleengineoff( $user => $domains ) : 0;
-    my $cloudflare       = _is_cloudflare( $domains->[0] );
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
 
@@ -863,7 +862,6 @@ sub _render_and_append {
             ssl_certificate_key          => $combined_tls,
             ssl_redirect                 => $ssl_redirect,
             secruleengineoff             => $secruleengineoff,
-            cloudflare                   => $cloudflare,
             domains                      => $domains,
             user                         => $user,
             group                        => $group,
@@ -901,21 +899,6 @@ sub _render_and_append {
     }
 
     return 1;
-}
-
-my $http;
-
-sub _is_cloudflare {
-    my ($domain) = @_;
-
-    $http //= Cpanel::HTTP::Client->new( timeout => 2 );
-    my $res = eval { $http->get("https://$domain/cdn-cgi/trace") };    # dies on SSL error whch means its not cloudflare
-
-    return 0 if $@ || $res->{status} eq "404";
-    return 1 if $res->{status} eq "200";                               # ¿ && content has a line: "h=$domain\n" - YAGNI ?
-
-    warn "Could not verify if $domain is cloudflare or not ($res->{status} $res->{reason})\n";
-    return;
 }
 
 sub _get_homedir {
