@@ -7,6 +7,10 @@ server {
     modsecurity off;
     [% END -%]
 
+    [%- IF uid %]
+    set $USER_ID [% uid %];
+    [% END -%]
+
     [%- IF !logging.piped_logs %]
     access_log /var/log/nginx/domains/[% domains.0 %] cp_combined;
     access_log /var/log/nginx/domains/[% domains.0 %]-bytes_log cp_bytes_server;
@@ -247,6 +251,10 @@ server {
 
     [%- IF secruleengineoff %]
     modsecurity off;
+    [% END -%]
+
+    [%- IF uid %]
+    set $USER_ID [% uid %];
     [% END -%]
 
     include conf.d/includes-optional/cloudflare.conf;
