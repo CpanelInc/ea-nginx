@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -700,6 +700,9 @@ fi
 
 
 %changelog
+* Mon Nov 22 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.4-4
+- EA-10029: Get wordpress info from wp-toolkit if it is installed
+
 * Thu Nov 11 2021 Travis Holloway <t.holloway@cpanel.net> - 1.21.4-3
 - EA-10221: Always configure domains to support CloudFlare
 

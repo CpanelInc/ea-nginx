@@ -41,6 +41,7 @@ our $var_cache_ea_nginx  = '/var/cache/ea-nginx';
 our $var_cpanel_userdata = '/var/cpanel/userdata';
 our $etc_nginx           = '/etc/nginx';
 our $settings_file       = '/etc/nginx/ea-nginx/settings.json';
+our $wp_toolkit_bin      = '/usr/local/bin/wp-toolkit';
 
 my $nginxroot = "/etc/nginx";
 
@@ -1070,9 +1071,59 @@ sub _get_wp_uapi {
         args    => [ "--output=json", "--user=$user", "WordPressInstanceManager", "get_instances" ],
     );
 
-    warn "Could not determine managed wordpres instances for $user\n" if $uapi->CHILD_ERROR();
+    warn "Could not determine managed wordpress instances for $user\n" if $uapi->CHILD_ERROR();
 
     return eval { Cpanel::JSON::Load( $uapi->stdout() ) } || {};
+}
+
+my $wp_toolkit_list;
+
+sub _get_wp_toolkit_list {
+    my $run = Cpanel::SafeRun::Object->new(
+        program => $wp_toolkit_bin,
+        args    => [ '--list', '-format', 'json' ],
+    );
+
+    warn 'Could not determine managed wordpress instances via wordpress toolkit' if $run->CHILD_ERROR();
+
+    return eval { Cpanel::JSON::Load( $run->stdout() ) } || [];
+}
+
+sub _get_wp_toolkit_list_for_user {
+    my ( $user, $docroot, $res ) = @_;
+
+    $wp_toolkit_list ||= _get_wp_toolkit_list();
+
+    my ( @list, %non_docroot_uris );
+    foreach my $wordpress_instance (@$wp_toolkit_list) {
+        if ( $wordpress_instance->{fullPath} =~ m{/\Q$user\E/} ) {
+            if ( $wordpress_instance->{fullPath} eq $docroot ) {
+                $res->{docroot_install} = 1;
+                next;
+            }
+
+            my $uri_from_path = $wordpress_instance->{fullPath};
+            $uri_from_path =~ s{^\Q$docroot\E/}{};
+
+            my $uri_from_siteurl = $wordpress_instance->{siteUrl};
+            $uri_from_siteurl =~ s{^https?://[^/]+/}{};
+
+            if ( $uri_from_path eq $uri_from_siteurl ) {
+                $non_docroot_uris{$uri_from_path} = 1;
+                next;
+            }
+        }
+
+        push @list, $wordpress_instance;
+    }
+
+    # Do it this way in case there are duplicate entries in $wp_toolkit_list
+    @{ $res->{non_docroot_uris} } = keys %non_docroot_uris;
+
+    # Remove the entries in $res from the list since they will only match 1 time
+    $wp_toolkit_list = \@list;
+
+    return $res;
 }
 
 sub _get_wordpress_info {
@@ -1083,12 +1134,22 @@ sub _get_wordpress_info {
         non_docroot_uris => [],
     };
 
-    return $res if !-e "/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm";
+    if ( -e $wp_toolkit_bin ) {
+        $res = _get_wp_toolkit_list_for_user( $user, $docroot, $res );
+    }
+    elsif ( -e '/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm' ) {
+        $wordpress_lu->{$user} ||= _get_wp_uapi($user);
+        $res = _get_wordpress_info_from_wpmanager( $docroot, $wordpress_lu->{$user}{result}{data}{instances}, $res );
+    }
 
-    $wordpress_lu->{$user} ||= _get_wp_uapi($user);
+    return $res;
+}
+
+sub _get_wordpress_info_from_wpmanager {
+    my ( $docroot, $wordpress_instances, $res ) = @_;
 
     # paths passed in and from API call do not have trailing slash, if that changes we could normalize them
-    for my $wp_instance ( @{ $wordpress_lu->{$user}{result}{data}{instances} } ) {
+    for my $wp_instance (@$wordpress_instances) {
         if ( length $wp_instance->{rel_path} ) {
             my $instance_docroot = $wp_instance->{full_path};
             $instance_docroot =~ s{/\Q$wp_instance->{rel_path}\E$}{};
