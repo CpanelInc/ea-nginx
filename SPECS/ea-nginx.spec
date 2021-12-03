@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -700,6 +700,9 @@ fi
 
 
 %changelog
+* Fri Dec 03 2021 Julian Brown <julian.brown@cpanel.net> - 1.21.4-6
+- ZC-9343: ZC-9343: Change worker_processes to auto
+
 * Wed Nov 24 2021 Dan Muey <dan@cpanel.net> - 1.21.4-5
 - ZC-9527: set USER_ID for server block if uid given && not zero
 
