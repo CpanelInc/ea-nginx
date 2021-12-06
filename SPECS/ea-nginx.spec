@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -700,6 +700,9 @@ fi
 
 
 %changelog
+* Tue Jan 11 2022 Tim Mullin <tim@cpanel.net> - 1.21.4-8
+- SEC-611: Set the server_tokens directive to off in nginx.conf
+
 * Tue Dec 28 2021 Dan Muey <dan@cpanel.net> - 1.21.4-7
 - ZC-9428: Configure http2 support
 - ZC-9615: IPv6 support for proxy subdomain redirect to https
