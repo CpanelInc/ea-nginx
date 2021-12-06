@@ -809,6 +809,12 @@ sub _render_and_append {
         chown 0, $gid, "/var/log/nginx/domains/$domains->[0]-ssl_log";
     }
 
+    # Include numeric UID if they want it
+    my $uid;
+    if ( -e "/etc/cpanel/ea4/option-flags/set-USER_ID" ) {
+        $uid = ( Cpanel::PwCache::getpwnam($user) )[2];
+    }
+
     my $fpm_socket;
     my $fpm_socket_php_major_version;
     for my $i ( 0, 1 ) {
@@ -857,15 +863,16 @@ sub _render_and_append {
     $tt->process(
         \$server_tt,
         {
-            docroot                      => $docroot,
-            has_ssl                      => $has_ssl,
-            ssl_certificate              => $combined_tls,
-            ssl_certificate_key          => $combined_tls,
-            ssl_redirect                 => $ssl_redirect,
-            secruleengineoff             => $secruleengineoff,
-            domains                      => $domains,
-            user                         => $user,
-            group                        => $group,
+            docroot             => $docroot,
+            has_ssl             => $has_ssl,
+            ssl_certificate     => $combined_tls,
+            ssl_certificate_key => $combined_tls,
+            ssl_redirect        => $ssl_redirect,
+            secruleengineoff    => $secruleengineoff,
+            domains             => $domains,
+            user                => $user,
+            group               => $group,
+            ( defined $uid ? ( uid => $uid ) : () ),
             ip                           => $ip,
             ipv6                         => $ipv6,
             fpm_socket                   => $fpm_socket,
