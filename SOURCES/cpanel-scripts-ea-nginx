@@ -174,6 +174,7 @@ sub config {
         _write_global_logging();
         _write_global_passenger();
         _write_global_ea_nginx();
+        _write_global_nginx_conf();
         _write_global_default();
         _do_other_global_config();
 
@@ -518,6 +519,26 @@ sub _get_application_paths {
     }
 
     return;
+}
+
+sub _write_global_nginx_conf {
+    my $val            = "auto";
+    my $local_settings = Cpanel::JSON::LoadFile($settings_file);
+    if ( exists $local_settings->{worker_processes} && $local_settings->{worker_processes} ne "auto" ) {
+        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ ) {
+            $val = $local_settings->{worker_processes};
+        }
+        else {
+            warn "Custom `worker_processes` in “$settings_file” is not a number, falling back to “auto” …\n";
+        }
+    }
+
+    my $main = path("/etc/nginx/nginx.conf");
+    my $cont = $main->slurp;
+    $cont =~ s/^(\s*worker_processes\s+)\S+(\s*;)/$1$val$2/gm;
+    $main->spew($cont);
+
+    return 1;
 }
 
 sub _write_global_default {
