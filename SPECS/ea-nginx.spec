@@ -703,6 +703,7 @@ fi
 * Fri Dec 03 2021 Julian Brown <julian.brown@cpanel.net> - 1.21.4-6
 - ZC-9343: Change worker_processes to auto
 - ZC-9343: Allow setting `worker_processes` via /etc/nginx/ea-nginx/settings.json
+- ZC-9343: When writing settings.json make it human readable
 - ZC-7303: Support IP based requests
 
 * Wed Nov 24 2021 Dan Muey <dan@cpanel.net> - 1.21.4-5
