@@ -1338,7 +1338,7 @@ sub _update_global_ea_nginx_settings {
 
     my $user_settings_hr = Cpanel::JSON::LoadFile($settings_file);
     $user_settings_hr->{$key} = $value;
-    Cpanel::JSON::DumpFile( $settings_file, $user_settings_hr );
+    _write_json( $settings_file, $user_settings_hr );
 
     print "Updated ‘$key’ to ‘$value’ since the current value is too low\n";
     return;
