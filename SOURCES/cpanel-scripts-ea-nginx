@@ -551,6 +551,20 @@ sub _write_global_default {
     # toggle IPv6
     $content =~ s/^.*(listen\s+\[::\]:)/    $prefix$1/gm;
 
+    # toggle the pem
+    if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
+
+        # ensure it is /var/cpanel/ssl/cpanel/mycpanel.pem
+        $content =~ s{/var/cpanel/ssl/cpanel/cpanel\.pem}{/var/cpanel/ssl/cpanel/mycpanel.pem}gm;
+    }
+    else {
+        # ensure it is /var/cpanel/ssl/cpanel/cpanel.pem
+        $content =~ s{/var/cpanel/ssl/cpanel/mycpanel\.pem}{/var/cpanel/ssl/cpanel/cpanel.pem}gm;
+    }
+
+    # ¿YAGNI? we could check and warn if there ia an ssl_certificate_key or ssl_certificate
+    #   that is not /var/cpanel/ssl/cpanel/mycpanel.pem or /var/cpanel/ssl/cpanel/cpanel.pem
+
     $dflt->spew($content);
 
     return 1;

@@ -705,6 +705,7 @@ fi
 - ZC-9343: Allow setting `worker_processes` via /etc/nginx/ea-nginx/settings.json
 - ZC-9343: When writing settings.json make it human readable
 - ZC-7303: Support IP based requests
+- ZC-9384: Use mycpanel.pem if its there
 
 * Wed Nov 24 2021 Dan Muey <dan@cpanel.net> - 1.21.4-5
 - ZC-9527: set USER_ID for server block if uid given && not zero
