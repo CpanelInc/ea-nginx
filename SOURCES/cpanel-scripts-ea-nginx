@@ -596,14 +596,23 @@ sub _write_global_passenger {
 
 }
 
-sub _write_global_ea_nginx {
-    my $user_settings = Cpanel::JSON::LoadFile($settings_file);
-    my $cur_settings  = {
-        _settings_defaults(),
-        %{$user_settings},
-    };
+my $settings_hr;
 
-    my $ea4_conf_hr = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
+sub _get_settings_hr {
+    if ( !defined $settings_hr ) {
+        my $global_settings = Cpanel::JSON::LoadFile($settings_file);
+        $settings_hr = {
+            _settings_defaults(),
+            %{$global_settings},
+        };
+    }
+
+    return $settings_hr;
+}
+
+sub _write_global_ea_nginx {
+    my $cur_settings = _get_settings_hr();
+    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { ea4conf => $ea4_conf_hr, settings => $cur_settings } );
 }
 
@@ -803,6 +812,8 @@ sub _get_domains_with_ssls {
 
 my $standalone;
 
+my %domain_ips;
+
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
@@ -889,12 +900,14 @@ sub _render_and_append {
     $combined_tls = "" if !-f $combined_tls;
 
     my $ip = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
+    $ip = "" if $ip ne '127.0.0.1' && $domain_ips{$ip}++;                      # avoid `conflicting server name "$ip"` warnings, sans worst case 127 fallback
 
     my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
 
     $cpconf_hr ||= _get_cpconf_hr();
 
-    my $ea4_conf_hr = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
+    my $cur_settings = _get_settings_hr();
+    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     $tt->process(
         \$server_tt,
         {
@@ -920,6 +933,7 @@ sub _render_and_append {
             redirects  => $redirects,
             logging    => $logging_hr,
             ea4conf    => $ea4_conf_hr,
+            settings   => $cur_settings,
             passenger  => {
                 apps => $passenger_apps,
             },

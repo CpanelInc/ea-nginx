@@ -18,8 +18,8 @@ server {
 
     include conf.d/includes-optional/cloudflare.conf;
 
-    set $CPANEL_APACHE_PROXY_IP [% ip %];
-    set $CPANEL_APACHE_PROXY_SSL_IP [% ip %];
+    set $CPANEL_APACHE_PROXY_IP [% ip || settings.apache_port_ip %];
+    set $CPANEL_APACHE_PROXY_SSL_IP [% ip || settings.apache_port_ip %];
     set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_PORT;
     set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_IP;
     if ($scheme = https) {
