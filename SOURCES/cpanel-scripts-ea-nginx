@@ -205,6 +205,8 @@ sub config {
     else {
         _validate_user_arg( $app, $user );
         mkdir "/etc/nginx/conf.d/users/";
+
+        _populate_domain_ips_except($user);
         _write_user_conf($user);
         if ($reload) {
             _reload("/etc/nginx/conf.d/users/$user.conf");
@@ -813,6 +815,22 @@ sub _get_domains_with_ssls {
 my $standalone;
 
 my %domain_ips;
+
+sub _populate_domain_ips_except {
+    my ($user) = @_;
+
+    my %seen_ips;
+    for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
+        my $domain = Cpanel::Config::userdata::Load::load_userdata_main($usr)->{main_domain};
+        my $ip     = Cpanel::DomainIp::getdomainip($domain);
+        if ( $ip && !exists $seen_ips{$ip} ) {
+            $seen_ips{$ip}++;
+            $domain_ips{$ip}++ if $user ne $usr;
+        }
+    }
+
+    return;
+}
 
 sub _render_and_append {
     my ( $user, $domains ) = @_;
