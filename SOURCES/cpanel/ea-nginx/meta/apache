@@ -8,8 +8,9 @@
 use strict;
 use warnings;
 use Path::Tiny;
-use JSON::Syck              ();
-use Cpanel::SafeRun::Object ();
+use JSON::Syck                      ();
+use Cpanel::SafeRun::Object         ();
+use Cpanel::Transaction::File::JSON ();
 
 my $meta_dir = "/etc/nginx/ea-nginx/meta";
 my $settings = "/etc/nginx/ea-nginx/settings.json";
@@ -50,8 +51,8 @@ sub move_apache_to_alt_ports {
             }
 
             my $cur_settings = _get_settings();
-            $ip_part = "127.0.0.1" if !$ip_part || $ip_part eq '0.0.0.0';
-            $cur_settings->{$key} = $new_port;
+            $ip_part                        = "127.0.0.1" if !$ip_part || $ip_part eq '0.0.0.0';
+            $cur_settings->{$key}           = $new_port;
             $cur_settings->{ $key . "_ip" } = $ip_part;
             _set_settings($cur_settings);
         }
@@ -138,7 +139,13 @@ sub _get_settings {
 sub _set_settings {
     my ($hr) = @_;
 
-    eval { JSON::Syck::DumpFile( $settings, $hr ) };
+    my $transaction = Cpanel::Transaction::File::JSON->new( path => $settings, "permissions" => 0644 );
+    $transaction->set_data($hr);
+
+    eval {
+        $transaction->save_pretty_canonical_or_die();
+        $transaction->close_or_die();
+    };
     if ($@) {
         warn "Could not save $settings: $@\n";
         return;

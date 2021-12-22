@@ -1,5 +1,5 @@
 server {
-    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %] mail.[% domain %][% END %][% END %];
+    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %] mail.[% domain %][% END %][% END %][% IF ip %] [% ip %][% END %];
     listen 80;
     [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
 
@@ -18,8 +18,8 @@ server {
 
     include conf.d/includes-optional/cloudflare.conf;
 
-    set $CPANEL_APACHE_PROXY_IP [% ip %];
-    set $CPANEL_APACHE_PROXY_SSL_IP [% ip %];
+    set $CPANEL_APACHE_PROXY_IP [% proxy_ip || settings.apache_port_ip %];
+    set $CPANEL_APACHE_PROXY_SSL_IP [% proxy_ip || settings.apache_port_ip %];
     set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_PORT;
     set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_IP;
     if ($scheme = https) {

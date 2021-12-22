@@ -174,6 +174,7 @@ sub config {
         _write_global_logging();
         _write_global_passenger();
         _write_global_ea_nginx();
+        _write_global_nginx_conf();
         _write_global_default();
         _do_other_global_config();
 
@@ -204,6 +205,8 @@ sub config {
     else {
         _validate_user_arg( $app, $user );
         mkdir "/etc/nginx/conf.d/users/";
+
+        _populate_domain_ips_except($user);
         _write_user_conf($user);
         if ($reload) {
             _reload("/etc/nginx/conf.d/users/$user.conf");
@@ -520,6 +523,26 @@ sub _get_application_paths {
     return;
 }
 
+sub _write_global_nginx_conf {
+    my $val            = "auto";
+    my $local_settings = Cpanel::JSON::LoadFile($settings_file);
+    if ( exists $local_settings->{worker_processes} && $local_settings->{worker_processes} ne "auto" ) {
+        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ ) {
+            $val = $local_settings->{worker_processes};
+        }
+        else {
+            warn "Custom `worker_processes` in “$settings_file” is not a number, falling back to “auto” …\n";
+        }
+    }
+
+    my $main = path("/etc/nginx/nginx.conf");
+    my $cont = $main->slurp;
+    $cont =~ s/^(\s*worker_processes\s+)\S+(\s*;)/$1$val$2/gm;
+    $main->spew($cont);
+
+    return 1;
+}
+
 sub _write_global_default {
     my $ipv6   = _has_ipv6();
     my $prefix = $ipv6 ? "" : "# server does not have IPv6 enabled: ";
@@ -529,6 +552,20 @@ sub _write_global_default {
 
     # toggle IPv6
     $content =~ s/^.*(listen\s+\[::\]:)/    $prefix$1/gm;
+
+    # toggle the pem
+    if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
+
+        # ensure it is /var/cpanel/ssl/cpanel/mycpanel.pem
+        $content =~ s{/var/cpanel/ssl/cpanel/cpanel\.pem}{/var/cpanel/ssl/cpanel/mycpanel.pem}gm;
+    }
+    else {
+        # ensure it is /var/cpanel/ssl/cpanel/cpanel.pem
+        $content =~ s{/var/cpanel/ssl/cpanel/mycpanel\.pem}{/var/cpanel/ssl/cpanel/cpanel.pem}gm;
+    }
+
+    # ¿YAGNI? we could check and warn if there ia an ssl_certificate_key or ssl_certificate
+    #   that is not /var/cpanel/ssl/cpanel/mycpanel.pem or /var/cpanel/ssl/cpanel/cpanel.pem
 
     $dflt->spew($content);
 
@@ -561,14 +598,23 @@ sub _write_global_passenger {
 
 }
 
-sub _write_global_ea_nginx {
-    my $user_settings = Cpanel::JSON::LoadFile($settings_file);
-    my $cur_settings  = {
-        _settings_defaults(),
-        %{$user_settings},
-    };
+my $settings_hr;
 
-    my $ea4_conf_hr = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
+sub _get_settings_hr {
+    if ( !defined $settings_hr ) {
+        my $global_settings = Cpanel::JSON::LoadFile($settings_file);
+        $settings_hr = {
+            _settings_defaults(),
+            %{$global_settings},
+        };
+    }
+
+    return $settings_hr;
+}
+
+sub _write_global_ea_nginx {
+    my $cur_settings = _get_settings_hr();
+    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { ea4conf => $ea4_conf_hr, settings => $cur_settings } );
 }
 
@@ -768,6 +814,24 @@ sub _get_domains_with_ssls {
 
 my $standalone;
 
+my %domain_ips;
+
+sub _populate_domain_ips_except {
+    my ($user) = @_;
+
+    my %seen_ips;
+    for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
+        my $domain = Cpanel::Config::userdata::Load::load_userdata_main($usr)->{main_domain};
+        my $ip     = Cpanel::DomainIp::getdomainip($domain);
+        if ( $ip && !exists $seen_ips{$ip} ) {
+            $seen_ips{$ip}++;
+            $domain_ips{$ip}++ if $user ne $usr;
+        }
+    }
+
+    return;
+}
+
 sub _render_and_append {
     my ( $user, $domains ) = @_;
 
@@ -853,13 +917,15 @@ sub _render_and_append {
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     $combined_tls = "" if !-f $combined_tls;
 
-    my $ip = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
+    my $ip           = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
+    my $severname_ip = $ip ne '127.0.0.1' && $domain_ips{$ip}++ ? "" : $ip;              # avoid `conflicting server name "$ip"` warnings, sans worst case 127 fallback
 
     my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
 
     $cpconf_hr ||= _get_cpconf_hr();
 
-    my $ea4_conf_hr = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
+    my $cur_settings = _get_settings_hr();
+    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     $tt->process(
         \$server_tt,
         {
@@ -873,7 +939,8 @@ sub _render_and_append {
             user                => $user,
             group               => $group,
             ( defined $uid ? ( uid => $uid ) : () ),
-            ip                           => $ip,
+            proxy_ip                     => $ip,
+            ip                           => $severname_ip,
             ipv6                         => $ipv6,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
@@ -885,6 +952,7 @@ sub _render_and_append {
             redirects  => $redirects,
             logging    => $logging_hr,
             ea4conf    => $ea4_conf_hr,
+            settings   => $cur_settings,
             passenger  => {
                 apps => $passenger_apps,
             },
@@ -1317,7 +1385,7 @@ sub _update_global_ea_nginx_settings {
 
     my $user_settings_hr = Cpanel::JSON::LoadFile($settings_file);
     $user_settings_hr->{$key} = $value;
-    Cpanel::JSON::DumpFile( $settings_file, $user_settings_hr );
+    _write_json( $settings_file, $user_settings_hr );
 
     print "Updated ‘$key’ to ‘$value’ since the current value is too low\n";
     return;
