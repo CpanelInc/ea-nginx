@@ -331,6 +331,16 @@ sub reload { _reload(); clear_cache(); }
 #### helpers ##
 ###############
 
+my $wants_http2;
+
+sub _wants_http2 {
+    if ( !defined $wants_http2 ) {
+        $wants_http2 = -e "/etc/nginx/conf.d/http2.conf" ? 1 : 0;
+    }
+
+    return $wants_http2;
+}
+
 my $has_ipv6;
 
 sub _has_ipv6 {
@@ -566,6 +576,13 @@ sub _write_global_default {
 
     # ¿YAGNI? we could check and warn if there ia an ssl_certificate_key or ssl_certificate
     #   that is not /var/cpanel/ssl/cpanel/mycpanel.pem or /var/cpanel/ssl/cpanel/cpanel.pem
+
+    if ( _wants_http2() ) {
+        $content =~ s{443 ssl;}{443 ssl http2;}gm;
+    }
+    else {
+        $content =~ s{443 ssl http2;}{443 ssl;}gm;
+    }
 
     $dflt->spew($content);
 
@@ -856,9 +873,9 @@ sub _render_and_append {
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
 
-    my $ipv6 = _has_ipv6();
-
-    my $gid = ( Cpanel::PwCache::getpwnam($user) )[3];
+    my $ipv6  = _has_ipv6();
+    my $http2 = _wants_http2();
+    my $gid   = ( Cpanel::PwCache::getpwnam($user) )[3];
 
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
@@ -942,6 +959,7 @@ sub _render_and_append {
             proxy_ip                     => $ip,
             ip                           => $severname_ip,
             ipv6                         => $ipv6,
+            http2                        => $http2,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
             wordpress                    => {
