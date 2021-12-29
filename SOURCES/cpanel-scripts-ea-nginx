@@ -341,13 +341,6 @@ sub _wants_http2 {
     return $wants_http2;
 }
 
-my $has_ipv6;
-
-sub _has_ipv6 {
-    $has_ipv6 //= -f '/proc/net/if_inet6' ? 1 : 0;
-    return $has_ipv6;
-}
-
 sub ensure_valid_nginx_config {
     my ($depth) = @_;
     $depth //= 0;
@@ -554,14 +547,8 @@ sub _write_global_nginx_conf {
 }
 
 sub _write_global_default {
-    my $ipv6   = _has_ipv6();
-    my $prefix = $ipv6 ? "" : "# server does not have IPv6 enabled: ";
-
     my $dflt    = path("/etc/nginx/conf.d/default.conf");
     my $content = $dflt->slurp;
-
-    # toggle IPv6
-    $content =~ s/^.*(listen\s+\[::\]:)/    $prefix$1/gm;
 
     # toggle the pem
     if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
@@ -873,7 +860,6 @@ sub _render_and_append {
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
 
-    my $ipv6  = _has_ipv6();
     my $http2 = _wants_http2();
     my $gid   = ( Cpanel::PwCache::getpwnam($user) )[3];
 
@@ -958,7 +944,7 @@ sub _render_and_append {
             ( defined $uid ? ( uid => $uid ) : () ),
             proxy_ip                     => $ip,
             ip                           => $severname_ip,
-            ipv6                         => $ipv6,
+            ipv6                         => 1,
             http2                        => $http2,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
