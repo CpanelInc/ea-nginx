@@ -702,6 +702,7 @@ fi
 %changelog
 * Tue Dec 28 2021 Dan Muey <dan@cpanel.net> - 1.21.4-7
 - ZC-9428: Configure http2 support
+- ZC-9615: IPv6 support for proxy subdomain redirect to https
 
 * Fri Dec 16 2021 Dan Muey <dan@cpanel.net> - 1.21.4-6
 - ZC-9343: Change worker_processes to auto
