@@ -163,10 +163,12 @@ describe "ea-nginx script" => sub {
                 local $mi{cmd} = "config";
                 local @glob_res = ();
                 no warnings "redefine";
-                local *File::Glob::bsd_glob                         = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
-                local *scripts::ea_nginx::_write_global_ea_nginx    = sub { };
-                local *scripts::ea_nginx::ensure_valid_nginx_config = sub { };
-                local *scripts::ea_nginx::_write_global_default     = sub { };
+                local *File::Glob::bsd_glob                                  = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
+                local *scripts::ea_nginx::_write_global_nginx_conf           = sub { };
+                local *scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl = sub { };
+                local *scripts::ea_nginx::_write_global_ea_nginx             = sub { };
+                local *scripts::ea_nginx::ensure_valid_nginx_config          = sub { };
+                local *scripts::ea_nginx::_write_global_default              = sub { };
                 yield;
             };
             it_should_behave_like "any sub command that takes a cpanel user";
@@ -998,12 +1000,12 @@ describe "ea-nginx script" => sub {
                 dies_ok { scripts::ea_nginx::_update_global_ea_nginx_settings(42) };
             };
 
-            it "should call ‘Cpanel::JSON::DumpFile’ with the updated key/value pair" => sub {
+            it "should call ‘_write_json’ with the updated key/value pair" => sub {
                 my $hr = {};
 
                 no warnings 'redefine';
-                local *Cpanel::JSON::LoadFile = sub { return; };
-                local *Cpanel::JSON::DumpFile = sub { $hr = $_[1]; };
+                local *Cpanel::JSON::LoadFile         = sub { return; };
+                local *scripts::ea_nginx::_write_json = sub { $hr = $_[1]; };
 
                 scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 );
                 is_deeply( $hr, { universe => 42 } );
@@ -1011,8 +1013,8 @@ describe "ea-nginx script" => sub {
 
             it "should return undef if called correctly" => sub {
                 no warnings 'redefine';
-                local *Cpanel::JSON::LoadFile = sub { return; };
-                local *Cpanel::JSON::DumpFile = sub { return; };
+                local *Cpanel::JSON::LoadFile         = sub { return; };
+                local *scripts::ea_nginx::_write_json = sub { return; };
 
                 is( scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 ), undef );
             };
