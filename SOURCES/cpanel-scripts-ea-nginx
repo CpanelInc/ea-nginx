@@ -183,7 +183,8 @@ sub config {
         if ( $user eq '--all' ) {
             mkdir "/etc/nginx/conf.d/users/";
             unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
-            for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
+            my $user_lookup = _get_user_domains();
+            for my $usr ( sort keys %$user_lookup ) {
                 eval { _write_user_conf($usr); };
                 $errors{$usr} = $@ if $@;
             }
@@ -853,7 +854,8 @@ sub _populate_domain_ips_except {
     my ($user) = @_;
 
     my %seen_ips;
-    for my $usr ( sort keys %{ Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 ) } ) {
+    my $user_lookup = _get_user_domains();
+    for my $usr ( sort keys %$user_lookup ) {
         my $domain = Cpanel::Config::userdata::Load::load_userdata_main($usr)->{main_domain};
         my $ip     = Cpanel::DomainIp::getdomainip($domain);
         if ( $ip && !exists $seen_ips{$ip} ) {
@@ -1276,14 +1278,12 @@ sub _get_wordpress_info_from_wpmanager {
     return $res;
 }
 
-my $user_lookup;
-
 sub _validate_user_arg {
     my ( $app, $user ) = @_;
 
     _bail( $app, "The user argument is missing." ) if !$user;
 
-    $user_lookup //= Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 );
+    my $user_lookup = _get_user_domains();
     _bail( $app, "The given user is not a cPanel user.\n" ) if !$user_lookup->{$user};
 
     return 1;
@@ -1428,6 +1428,13 @@ sub _update_global_ea_nginx_settings {
 sub _get_num_current_users {
     return unless ( eval { require Cpanel::Config::LoadUserDomains::Count; 1; } );
     return Cpanel::Config::LoadUserDomains::Count::counttrueuserdomains();
+}
+
+my $user_domains;
+
+sub _get_user_domains {
+    $user_domains //= Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 );
+    return $user_domains;
 }
 
 1;
