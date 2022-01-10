@@ -43,8 +43,8 @@ server {
     [% END -%]
     [% END -%]
 
-    listen 443 ssl;
-    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl;
+    listen 443 ssl[% IF http2 %] http2[% END %];
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF http2 %] http2[% END %];
 
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
@@ -241,8 +241,8 @@ server {
     -%]
     [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
 server {
-    listen 443 ssl;
-    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl;
+    listen 443 ssl[% IF http2 %] http2[% END %];
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF http2 %] http2[% END %];
 
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
