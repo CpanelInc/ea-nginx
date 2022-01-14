@@ -703,6 +703,9 @@ fi
 * Thu Jan 13 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-1
 - EA-10428: Update ea-nginx from v1.21.4 to v1.21.5
 
+* Thu Jan 13 2022 Stephen Bee <stephen@cpanel.net> - 1.21.4-10
+- SEC-612: Deny access to /whm-server-status
+
 * Tue Jan 11 2022 Tim Mullin <tim@cpanel.net> - 1.21.4-8
 - SEC-611: Set the server_tokens directive to off in nginx.conf
 
