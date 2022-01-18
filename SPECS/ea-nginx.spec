@@ -96,7 +96,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.21.4
+%define main_version 1.21.5
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 8
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -700,6 +700,9 @@ fi
 
 
 %changelog
+* Thu Jan 13 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-1
+- EA-10428: Update ea-nginx from v1.21.4 to v1.21.5
+
 * Tue Jan 11 2022 Tim Mullin <tim@cpanel.net> - 1.21.4-8
 - SEC-611: Set the server_tokens directive to off in nginx.conf
 
