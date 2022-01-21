@@ -103,6 +103,13 @@ server {
         proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
     }
 
+    [%- IF has_wordpress %]
+    if ( $http_cookie ~ "wordpress_logged_in_[a-zA-Z0-9]+" ) {
+        set $CPANEL_PROXY_CACHE off;
+        set $CPANEL_SKIP_PROXY 1;
+    }
+    [% END -%]
+
         [%- IF basic_auth.locations %]
 
             [%- FOREACH location IN basic_auth.locations.keys.sort %]
