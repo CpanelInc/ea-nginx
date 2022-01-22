@@ -707,6 +707,7 @@ fi
 
 * Fri Jan 21 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-2
 - EA-10283: Only perform regex check for WordPress login for domains that have at least one WordPress site installed
+- EA-XXXXX: Do not use predictable cPanel-localhost header
 
 * Thu Jan 13 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-1
 - EA-10428: Update ea-nginx from v1.21.4 to v1.21.5
