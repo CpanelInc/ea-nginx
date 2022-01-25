@@ -956,6 +956,7 @@ sub _render_and_append {
     my $severname_ip = $ip ne '127.0.0.1' && $domain_ips{$ip}++ ? "" : $ip;              # avoid `conflicting server name "$ip"` warnings, sans worst case 127 fallback
 
     my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
+    my $has_wordpress = ( $wordpress_hr->{docroot_install} || scalar @{ $wordpress_hr->{non_docroot_uris} } ) ? 1 : 0;
 
     $cpconf_hr ||= _get_cpconf_hr();
 
@@ -980,6 +981,7 @@ sub _render_and_append {
             http2                        => $http2,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
+            has_wordpress                => $has_wordpress,
             wordpress                    => {
                 docroot_install  => $wordpress_hr->{docroot_install},
                 non_docroot_uris => $wordpress_hr->{non_docroot_uris},

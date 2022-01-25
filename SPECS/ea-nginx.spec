@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -390,7 +390,6 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-redirect-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-static-locations.conf
-%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes/cpanel-proxy-bypass-regex.conf
 %config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/ea-nginx.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/users.conf
 
@@ -700,6 +699,9 @@ fi
 
 
 %changelog
+* Fri Jan 21 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-2
+- EA-10283: Only perform regex check for WordPress login for domains that have at least one WordPress site installed
+
 * Thu Jan 13 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-1
 - EA-10428: Update ea-nginx from v1.21.4 to v1.21.5
 
