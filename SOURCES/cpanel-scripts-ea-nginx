@@ -938,24 +938,20 @@ sub _render_and_append {
 
     $domains_with_ssl ||= _get_domains_with_ssls();
 
-    my $has_ssl = 0;
-    if ( defined $domains_with_ssl ) {
-        foreach my $domain (@$domains) {
-            $has_ssl = 1 if $domains_with_ssl->{$domain};
-            last         if $has_ssl;
+    my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
+    if ( !-f $combined_tls ) {
+        if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
+            $combined_tls = "/var/cpanel/ssl/cpanel/mycpanel.pem";
+        }
+        else {
+            $combined_tls = "/var/cpanel/ssl/cpanel/cpanel.pem";
         }
     }
-    else {
-        $has_ssl = 1;    # default to enabled if $domains_with_ssl is undefined in order to mimic the previous behavior
-    }
-
-    my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
-    $combined_tls = "" if !-f $combined_tls;
 
     my $ip           = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
     my $severname_ip = $ip ne '127.0.0.1' && $domain_ips{$ip}++ ? "" : $ip;              # avoid `conflicting server name "$ip"` warnings, sans worst case 127 fallback
 
-    my $wordpress_hr = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
+    my $wordpress_hr  = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
     my $has_wordpress = ( $wordpress_hr->{docroot_install} || scalar @{ $wordpress_hr->{non_docroot_uris} } ) ? 1 : 0;
 
     $cpconf_hr ||= _get_cpconf_hr();
@@ -966,7 +962,6 @@ sub _render_and_append {
         \$server_tt,
         {
             docroot             => $docroot,
-            has_ssl             => $has_ssl,
             ssl_certificate     => $combined_tls,
             ssl_certificate_key => $combined_tls,
             ssl_redirect        => $ssl_redirect,

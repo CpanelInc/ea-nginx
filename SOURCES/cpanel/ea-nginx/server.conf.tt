@@ -32,7 +32,7 @@ server {
     set $CPANEL_SKIP_PROXY_CACHING 0;
     [% END -%]
 
-    [%- IF has_ssl && ssl_certificate && ssl_certificate_key %]
+    [%- IF ssl_certificate && ssl_certificate_key %]
     [%- IF behavior.standalone %]
     [%- IF ssl_redirect %]
     location ~ ^/(?!(?:\.well-known/(?:pki-validation|cpanel-dcv))) {
