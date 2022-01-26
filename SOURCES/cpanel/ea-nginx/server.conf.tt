@@ -32,7 +32,7 @@ server {
     set $CPANEL_SKIP_PROXY_CACHING 0;
     [% END -%]
 
-    [%- IF has_ssl && ssl_certificate && ssl_certificate_key %]
+    [%- IF ssl_certificate && ssl_certificate_key %]
     [%- IF behavior.standalone %]
     [%- IF ssl_redirect %]
     location ~ ^/(?!(?:\.well-known/(?:pki-validation|cpanel-dcv))) {
@@ -102,6 +102,13 @@ server {
         include conf.d/includes-optional/cpanel-proxy.conf;
         proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
     }
+
+    [%- IF has_wordpress %]
+    if ( $http_cookie ~ "wordpress_logged_in_[a-zA-Z0-9]+" ) {
+        set $CPANEL_PROXY_CACHE off;
+        set $CPANEL_SKIP_PROXY 1;
+    }
+    [% END -%]
 
         [%- IF basic_auth.locations %]
 
