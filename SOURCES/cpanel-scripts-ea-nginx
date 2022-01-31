@@ -46,11 +46,6 @@ our $settings_file                     = '/etc/nginx/ea-nginx/settings.json';
 our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
-our $var_cache_ea_nginx                = '/var/cache/ea-nginx';
-our $var_cpanel_userdata               = '/var/cpanel/userdata';
-our $etc_nginx                         = '/etc/nginx';
-our $settings_file                     = '/etc/nginx/ea-nginx/settings.json';
-our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $proxy_header_file                 = '/etc/nginx/ea-nginx/cpanel_localhost_header.json';
 our $cpanel_proxy_file                 = '/etc/nginx/conf.d/includes-optional/cpanel-proxy.conf';
 
