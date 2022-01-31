@@ -54,6 +54,8 @@ mkdir -p $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/server-includes/
 mkdir -p $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/server-includes-standalone/
 mkdir cpanel && cd cpanel && tar xzf $SOURCE14  && cd ..
 cp -r cpanel/conf.d/* $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d
+chomd 600 $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/includes-optional/cpanel-proxy.conf
+
 mkdir -p $DEB_INSTALL_ROOT$_sysconfdir/nginx/ea-nginx
 cp -r cpanel/ea-nginx/* $DEB_INSTALL_ROOT$_sysconfdir/nginx/ea-nginx
 

@@ -379,7 +379,7 @@ rm -rf %{bdir}/_passenger_source_code
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
-%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
+%attr(600, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
 %config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf

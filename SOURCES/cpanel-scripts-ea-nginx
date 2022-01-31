@@ -570,7 +570,8 @@ sub _write_cpanel_localhost_header {
     );
 
     _write_json( $proxy_header_file, \%headers );
-    _rebuild_and_restart_apache();    # needed so that apache can pick up the new header file
+    chmod 0600, $proxy_header_file;    # in case it is reset out form under the package
+    _rebuild_and_restart_apache();     # needed so that apache can pick up the new header file
     return $headers{"cPanel-localhost"};
 }
 
