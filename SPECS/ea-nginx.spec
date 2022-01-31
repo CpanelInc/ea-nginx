@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -699,6 +699,10 @@ fi
 
 
 %changelog
+* Mon Jan 31 2022 Dan Muey <dan@cpanel.net> - 1.21.5-5
+- ZC-9700: Do not use predictable cPanel-localhost header
+- ZC-9700: ensure random value is regenerated if missing or older than 30 minutes; ensure users can not see the value
+
 * Wed Jan 26 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-4
 - EA-10294: Add caching mechanism for wordpress info
 
@@ -707,8 +711,6 @@ fi
 
 * Fri Jan 21 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-2
 - EA-10283: Only perform regex check for WordPress login for domains that have at least one WordPress site installed
-- ZC-9700: Do not use predictable cPanel-localhost header
-- ZC-9700: ensure random value is regenerated if missing or older than 30 minutes; ensure users can not see the value
 
 * Thu Jan 13 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-1
 - EA-10428: Update ea-nginx from v1.21.4 to v1.21.5
