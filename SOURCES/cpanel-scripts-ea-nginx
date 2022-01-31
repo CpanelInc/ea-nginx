@@ -549,16 +549,17 @@ sub _get_application_paths {
 
 sub _write_global_cpanel_localhost {
 
-    _write_cpanel_localhost_header() unless -e $proxy_header_file;
+    # regen new value if its not set or if its been at least half an hour
+    _write_cpanel_localhost_header() if !-e $proxy_header_file || ( stat(_) )[9] < ( time() - 1800 );
 
     my $conf = Cpanel::JSON::LoadFile($proxy_header_file);
-    _write_cpanel_localhost_header() unless exists $conf->{'cPanel-localhost'} && $conf->{'cPanel-localhost'};
+    my $val  = $conf->{'cPanel-localhost'} || _write_cpanel_localhost_header();
 
-    my $val      = $conf->{'cPanel-localhost'};
     my $path     = Path::Tiny::path($cpanel_proxy_file);
     my $contents = $path->slurp();
     $contents =~ s/^(\s*proxy_set_header\s+cPanel-localhost\s+)\S+(\s*;)/$1$val$2/gm;
     $path->spew($contents);
+    $path->chmod(0600);
 
     return;
 }
@@ -570,7 +571,7 @@ sub _write_cpanel_localhost_header {
 
     _write_json( $proxy_header_file, \%headers );
     _rebuild_and_restart_apache();    # needed so that apache can pick up the new header file
-    return;
+    return $headers{"cPanel-localhost"};
 }
 
 sub _write_global_nginx_conf {
