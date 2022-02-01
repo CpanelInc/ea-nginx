@@ -702,6 +702,7 @@ fi
 * Mon Jan 31 2022 Dan Muey <dan@cpanel.net> - 1.21.5-5
 - ZC-9700: Do not use predictable cPanel-localhost header
 - ZC-9700: ensure random value is regenerated if missing or older than 30 minutes; ensure users can not see the value
+- EA-10464: Avoid redirect to https for service subdomain DCV validation
 
 * Wed Jan 26 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-4
 - EA-10294: Add caching mechanism for wordpress info
