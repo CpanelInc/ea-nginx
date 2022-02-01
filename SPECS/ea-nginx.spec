@@ -691,6 +691,8 @@ fi
 #  at this point and reinstalling should regen config so do we care?
 rm -rf  /etc/nginx/conf.d/global-logging.conf
 
+rm -rf /etc/nginx/ea-nginx/cpanel_localhost_header.json
+
 if [ $1 -ge 1 ]; then
     /sbin/service nginx status  >/dev/null 2>&1 || exit 0
     /sbin/service nginx upgrade >/dev/null 2>&1 || echo \
