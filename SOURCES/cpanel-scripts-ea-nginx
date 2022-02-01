@@ -37,11 +37,13 @@ use Whostmgr::TweakSettings                 ();
 
 use Path::Tiny;
 
-our $var_cache_ea_nginx  = '/var/cache/ea-nginx';
-our $var_cpanel_userdata = '/var/cpanel/userdata';
-our $etc_nginx           = '/etc/nginx';
-our $settings_file       = '/etc/nginx/ea-nginx/settings.json';
-our $wp_toolkit_bin      = '/usr/local/bin/wp-toolkit';
+our $var_cache_ea_nginx                = '/var/cache/ea-nginx';
+our $var_cpanel_userdata               = '/var/cpanel/userdata';
+our $etc_nginx                         = '/etc/nginx';
+our $settings_file                     = '/etc/nginx/ea-nginx/settings.json';
+our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
+our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
+our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
 
 my $nginxroot = "/etc/nginx";
 
@@ -1237,7 +1239,17 @@ sub _get_wp_toolkit_list_for_user {
 sub _get_wordpress_info {
     my ( $user, $docroot ) = @_;
 
-    my $res = {
+    my $res;
+
+    my $docroot_underscore = $docroot;
+    $docroot_underscore =~ s{/}{_}g;
+    my $cache_file = "$wordpress_cache_dir/${user}_${docroot_underscore}_wordpress_info.json";
+
+    # Returns undef if the cache_file fails to load or does not contain the required keys
+    $res = _get_wordpress_info_from_cache($cache_file) if _is_wordpress_info_cache_valid($cache_file);
+    return $res                                        if defined $res;
+
+    $res = {
         docroot_install  => 0,
         non_docroot_uris => [],
     };
@@ -1249,6 +1261,10 @@ sub _get_wordpress_info {
         $wordpress_lu->{$user} ||= _get_wp_uapi($user);
         $res = _get_wordpress_info_from_wpmanager( $docroot, $wordpress_lu->{$user}{result}{data}{instances}, $res );
     }
+
+    # cache wordpress info
+    _ensure_wordpress_info_cache_directory();
+    _write_json( $cache_file, $res );
 
     return $res;
 }
@@ -1270,6 +1286,40 @@ sub _get_wordpress_info_from_wpmanager {
                 $res->{docroot_install} = 1;
             }
         }
+    }
+
+    return $res;
+}
+
+sub _ensure_wordpress_info_cache_directory {
+    mkdir $wordpress_cache_dir;
+    return;
+}
+
+sub _is_wordpress_info_cache_valid {
+    my ($cache_file) = @_;
+
+    return 0 if -e $disable_wordpress_info_cache_file;
+
+    my $now   = time();
+    my $ttl   = 18000;                      # Cache it for 5 days
+    my $mtime = ( stat($cache_file) )[9];
+
+    return ( -s $cache_file && $mtime > ( $now - $ttl ) ) ? 1 : 0;
+}
+
+sub _get_wordpress_info_from_cache {
+    my ($cache_file) = @_;
+
+    my $res;
+    unless ( eval { $res = Cpanel::JSON::LoadFile($cache_file); 1; } ) {
+        warn "Failed to load cache file:  ‘$cache_file’\n";
+        return;
+    }
+
+    if ( !exists $res->{docroot_install} || !exists $res->{non_docroot_uris} ) {
+        warn "The cache file ‘$cache_file’ has missing data\n";
+        return;
     }
 
     return $res;
