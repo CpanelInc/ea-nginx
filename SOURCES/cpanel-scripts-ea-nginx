@@ -19,11 +19,13 @@ use Cpanel::DomainIp                        ();
 use Cpanel::DomainLookup::DocRoot           ();
 use Cpanel::FileUtils::TouchFile            ();
 use Cpanel::HTTP::Client                    ();
+use Cpanel::HttpUtils::ApRestart::BgSafe    ();
 use Cpanel::Hostname                        ();
 use Cpanel::JSON                            ();
 use Cpanel::PHP::Config                     ();
 use Cpanel::PHPFPM::Get                     ();
 use Cpanel::PwCache                         ();
+use Cpanel::Rand::Get                       ();
 use Cpanel::SafeRun::Object                 ();
 use Cpanel::Transaction::File::JSON         ();
 use Cpanel::Validate::URL                   ();
@@ -44,6 +46,8 @@ our $settings_file                     = '/etc/nginx/ea-nginx/settings.json';
 our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
+our $proxy_header_file                 = '/etc/nginx/ea-nginx/cpanel_localhost_header.json';
+our $cpanel_proxy_file                 = '/etc/nginx/conf.d/includes-optional/cpanel-proxy.conf';
 
 my $nginxroot = "/etc/nginx";
 
@@ -173,6 +177,7 @@ sub config {
     my $reload = grep( { $_ eq '--no-reload' } @args ) ? 0 : 1;
 
     if ( $user eq '--all' || $user eq '--global' ) {
+        _write_global_cpanel_localhost();
         _write_global_logging();
         _write_global_passenger();
         _write_global_ea_nginx();
@@ -535,6 +540,34 @@ sub _get_application_paths {
     }
 
     return;
+}
+
+sub _write_global_cpanel_localhost {
+
+    # regen new value if its not set or if its been at least half an hour
+    _write_cpanel_localhost_header() if !-e $proxy_header_file || ( stat(_) )[9] < ( time() - 1800 );
+
+    my $conf = Cpanel::JSON::LoadFile($proxy_header_file);
+    my $val  = $conf->{'cPanel-localhost'} || _write_cpanel_localhost_header();
+
+    my $path     = Path::Tiny::path($cpanel_proxy_file);
+    my $contents = $path->slurp();
+    $contents =~ s/^(\s*proxy_set_header\s+cPanel-localhost\s+)\S+(\s*;)/$1$val$2/gm;
+    $path->spew($contents);
+    $path->chmod(0600);
+
+    return;
+}
+
+sub _write_cpanel_localhost_header {
+    my %headers = (
+        'cPanel-localhost' => Cpanel::Rand::Get::getranddata(64),
+    );
+
+    _write_json( $proxy_header_file, \%headers );
+    chmod 0600, $proxy_header_file;    # in case it is reset out form under the package
+    _rebuild_and_restart_apache();     # needed so that apache can pick up the new header file
+    return $headers{"cPanel-localhost"};
 }
 
 sub _write_global_nginx_conf {
@@ -1482,6 +1515,21 @@ my $user_domains;
 sub _get_user_domains {
     $user_domains //= Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 );
     return $user_domains;
+}
+
+sub _rebuild_and_restart_apache {
+    my $run = Cpanel::SafeRun::Object->new(
+        program => '/usr/local/cpanel/scripts/rebuildhttpdconf',
+        args    => [],
+    );
+
+    if ( $run->CHILD_ERROR() ) {
+        my $out = $run->stdout() . $run->stderr();
+        warn "Failed to rebuild apache configuration:  $out\n";
+    }
+
+    Cpanel::HttpUtils::ApRestart::BgSafe::restart();
+    return;
 }
 
 1;
