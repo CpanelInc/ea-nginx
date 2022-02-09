@@ -248,6 +248,9 @@ server {
     -%]
     [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
 server {
+    listen 80;
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
+
     listen 443 ssl[% IF http2 %] http2[% END %];
     [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF http2 %] http2[% END %];
 
@@ -279,6 +282,11 @@ server {
     }
 
     location / {
+        # Force https for service subdomains
+        if ($scheme = http) {
+            return 301 https://$host$request_uri;
+        }
+
         [%- IF proxy_subdomain.match('^(?:cpanel|webmail|whm)$') %]
         # since proxy_set_header can not be done inside an if block we jump though hoops
         # default value is empty because the header will be only sent if $value is not empty

@@ -164,6 +164,7 @@ describe "ea-nginx script" => sub {
                 local @glob_res = ();
                 no warnings "redefine";
                 local *File::Glob::bsd_glob                                  = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
+                local *scripts::ea_nginx::_write_global_cpanel_localhost     = sub { };
                 local *scripts::ea_nginx::_write_global_nginx_conf           = sub { };
                 local *scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl = sub { };
                 local *scripts::ea_nginx::_write_global_ea_nginx             = sub { };

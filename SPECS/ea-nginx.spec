@@ -122,7 +122,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -379,7 +379,7 @@ rm -rf %{bdir}/_passenger_source_code
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
-%attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
+%attr(600, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
 %config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
@@ -691,6 +691,8 @@ fi
 #  at this point and reinstalling should regen config so do we care?
 rm -rf  /etc/nginx/conf.d/global-logging.conf
 
+rm -rf /etc/nginx/ea-nginx/cpanel_localhost_header.json
+
 if [ $1 -ge 1 ]; then
     /sbin/service nginx status  >/dev/null 2>&1 || exit 0
     /sbin/service nginx upgrade >/dev/null 2>&1 || echo \
@@ -699,6 +701,11 @@ fi
 
 
 %changelog
+* Mon Jan 31 2022 Dan Muey <dan@cpanel.net> - 1.21.5-5
+- ZC-9700: Do not use predictable cPanel-localhost header
+- ZC-9700: ensure random value is regenerated if missing or older than 30 minutes; ensure users can not see the value
+- EA-10464: Avoid redirect to https for service subdomain DCV validation
+
 * Wed Jan 26 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.5-4
 - EA-10294: Add caching mechanism for wordpress info
 
