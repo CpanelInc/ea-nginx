@@ -37,6 +37,7 @@ BuildRequires: %{ruby_version}-ruby-devel
 # because they both provide and conflict with apache24-passenger
 Requires: %{ruby_version}
 Requires: apache24-passenger
+Requires: ea-apache24-mod_remoteip
 
 %if 0%{?rhel} >= 8
 # In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
