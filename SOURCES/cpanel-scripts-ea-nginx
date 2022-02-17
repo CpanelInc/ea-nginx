@@ -558,6 +558,7 @@ sub _write_global_cpanel_localhost {
 
     my $path     = Path::Tiny::path($cpanel_proxy_file);
     my $contents = $path->slurp();
+    $contents =~ s/^(\s*proxy_set_header\s+X-Forwarded-For-)\S+(.*;)/$1$val$2/pm;
     $contents =~ s/^(\s*proxy_set_header\s+cPanel-localhost\s+)\S+(\s*;)/$1$val$2/gm;
     $path->spew($contents);
     $path->chmod(0600);
@@ -566,8 +567,14 @@ sub _write_global_cpanel_localhost {
 }
 
 sub _write_cpanel_localhost_header {
+    my $rand = Cpanel::Rand::Get::getranddata(64);
+
+    # Though technically legal, NGINX does not like _ in header names (for good reason honestly)
+    # and we want to do things like: proxy_set_header X-Forwarded-For-<RAND> …;
+    $rand =~ s/_/-/g;
+
     my %headers = (
-        'cPanel-localhost' => Cpanel::Rand::Get::getranddata(64),
+        'cPanel-localhost' => $rand,
     );
 
     _write_json( $proxy_header_file, \%headers );
