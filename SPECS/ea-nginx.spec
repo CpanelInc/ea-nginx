@@ -703,6 +703,7 @@ fi
 %changelog
 * Thu Feb 17 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-2
 - EA-10503: Update standalone config to ensure 404 for non-existent php files
+- EA-10285: Have 'ea-nginx config --all' update user configs in parallel
 
 * Wed Feb 09 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-1
 - EA-10489: Update ea-nginx from v1.21.5 to v1.21.6
