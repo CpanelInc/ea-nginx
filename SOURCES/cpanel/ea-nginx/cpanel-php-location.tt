@@ -1,5 +1,6 @@
 [%- IF fpm_socket %]
 location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _ "?" : "" %]$ {
+    try_files $uri =404;
     include conf.d/includes-optional/cpanel-fastcgi.conf;
     fastcgi_pass unix:[% fpm_socket %];
 
@@ -7,6 +8,7 @@ location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _
 }
 [% ELSE %]
 location ~ \.php[0-9]?$ {
+    try_files $uri =404;
     error_page 502 503 /FPM_50x.html;
     return 502;
 }
