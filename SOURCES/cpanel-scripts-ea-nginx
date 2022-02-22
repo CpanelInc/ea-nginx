@@ -38,6 +38,7 @@ use Template                                ();
 use Whostmgr::TweakSettings                 ();
 
 use Path::Tiny;
+use MCE::Loop;
 
 our $var_cache_ea_nginx                = '/var/cache/ea-nginx';
 our $var_cpanel_userdata               = '/var/cpanel/userdata';
@@ -191,10 +192,15 @@ sub config {
             mkdir "/etc/nginx/conf.d/users/";
             unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
             my $user_lookup = _get_user_domains();
-            for my $usr ( sort keys %$user_lookup ) {
-                eval { _write_user_conf($usr); };
-                $errors{$usr} = $@ if $@;
+            mce_loop {
+                my ( $mce, $chunk_ref ) = @_;
+
+                foreach my $usr (@$chunk_ref) {
+                    eval { _write_user_conf($usr); };
+                    MCE->gather( $usr, $@ ) if $@;
+                }
             }
+            keys %$user_lookup;
         }
 
         if ($reload) {
