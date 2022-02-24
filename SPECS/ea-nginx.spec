@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -702,6 +702,9 @@ fi
 
 
 %changelog
+* Thu Feb 24 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-4
+- EA-10515: Add symlink protection for DCV validation folders for service subdomains
+
 * Thu Feb 17 2022 Dan Muey <dan@cpanel.net> - 1.21.6-3
 - ZC-9750: Add support for secure use of proxying to Apache w/ mod_remoteip
 

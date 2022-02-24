@@ -271,14 +271,17 @@ server {
 
     location /.well-known/cpanel-dcv {
         root [% docroot %];
+        disable_symlinks if_not_owner;
     }
 
     location /.well-known/pki-validation {
         root [% docroot %];
+        disable_symlinks if_not_owner;
     }
 
     location /.well-known/acme-challenge {
         root [% docroot %];
+        disable_symlinks if_not_owner;
     }
 
     location / {
