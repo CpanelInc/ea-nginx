@@ -2,7 +2,7 @@
 
 source debian/vars.sh
 
-set -x 
+set -x
 
 export bdir=`pwd`
 echo "PWD" `pwd`
@@ -35,29 +35,31 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
 #sed -i '42iecho ""; echo "SHOW"; cat -n $NGX_AUTOTEST.c; echo "END SHOW"' auto/feature
 #sed -i '51iecho "ERR"; cat $NGX_AUTOCONF_ERR; echo ""; echo "XXX: 001"; echo $ngx_test; echo "XXX: 002"; echo ""; echo "XXX: 003"' auto/feature
 
-echo "CREATEDEBUG: 001"
+#build debug
 ./configure $BASE_CONFIGURE_ARGS \
     --with-cc-opt="$WITH_CC_OPT" \
     --with-debug \
     --with-ipv6 \
     --add-module=$bdir/_passenger_source_code/src/nginx_module \
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+    --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
     --add-dynamic-module=ngx_http_pipelog_module
 
-make 
+make
 
 mv $bdir/objs/nginx $bdir/objs/nginx-debug
-echo "CREATEDEBUG: 002"
 
+# build actual
 ./configure $BASE_CONFIGURE_ARGS \
     --with-cc-opt="$WITH_CC_OPT" \
     --with-ld-opt="$WITH_LD_OPT" \
     --with-ipv6 \
     --add-module=$bdir/_passenger_source_code/src/nginx_module \
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+    --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
     --add-dynamic-module=ngx_http_pipelog_module
 
-make 
+make
 
 cp -f $SOURCE22 .
 cp -f $SOURCE23 .

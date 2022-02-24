@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 7
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -169,6 +169,11 @@ BuildRoot: %{_tmppath}/%{upstream_name}-%{main_version}-%{release}-root
 BuildRequires: zlib-devel
 BuildRequires: pcre-devel
 
+%if 0%{?rhel} > 6
+BuildRequires: ea-ngx-brotli-src
+BuildRequires: ea-brotli
+%endif
+
 Provides: webserver
 
 %description
@@ -212,10 +217,12 @@ export EXTRA_CXXFLAGS=$CFLAGS
 export EXTRA_LDFLAGS=$LDFLAGS
 
 %if 0%{?rhel} > 6
+export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
 export MODSECURITY_LIB=/opt/cpanel/ea-modsec30/lib
 export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
 %endif
 
+# build debug
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
@@ -224,11 +231,13 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+    --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
     --add-dynamic-module=ngx_http_pipelog_module
 make %{?_smp_mflags}
-%{__mv} %{bdir}/objs/nginx \
-    %{bdir}/objs/nginx-debug
+%{__mv} %{bdir}/objs/nginx %{bdir}/objs/nginx-debug
+
+# build actual
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
@@ -236,6 +245,7 @@ make %{?_smp_mflags}
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
+    --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
     --add-dynamic-module=ngx_http_pipelog_module
 make %{?_smp_mflags}
@@ -460,6 +470,8 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_pipelog_module.so
 %if 0%{?rhel} > 6
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_modsecurity_module.so
+%attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_brotli_filter_module.so
+%attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_brotli_static_module.so
 %endif
 
 %dir %{_datadir}/nginx
@@ -709,6 +721,9 @@ fi
 
 
 %changelog
+* Wed Mar 09 2022 Dan Muey <dan@cpanel.net> - 1.21.6-7
+- ZC-9756: build brotli module
+
 * Thu Mar 03 2022 Dan Muey <dan@cpanel.net> - 1.21.6-6
 - ZC-9800: change edit of cpanel-proxy conf to include (akin to how we do cloudflare.conf)
 
