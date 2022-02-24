@@ -37,6 +37,7 @@ BuildRequires: %{ruby_version}-ruby-devel
 # because they both provide and conflict with apache24-passenger
 Requires: %{ruby_version}
 Requires: apache24-passenger
+Requires: ea-apache24-mod_remoteip
 
 %if 0%{?rhel} >= 8
 # In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
@@ -122,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -701,6 +702,9 @@ fi
 
 
 %changelog
+* Thu Feb 17 2022 Dan Muey <dan@cpanel.net> - 1.21.6-3
+- ZC-9750: Add support for secure use of proxying to Apache w/ mod_remoteip
+
 * Thu Feb 17 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-2
 - EA-10503: Update standalone config to ensure 404 for non-existent php files
 - EA-10285: Have 'ea-nginx config --all' update user configs in parallel
