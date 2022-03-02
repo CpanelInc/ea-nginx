@@ -1,6 +1,6 @@
 #!/usr/local/cpanel/3rdparty/bin/perl
 
-# cpanel - t/SOURCES-cpanel-scripts-ea-nginx.t     Copyright 2020 cPanel, L.L.C.
+# cpanel - t/SOURCES-cpanel-scripts-ea-nginx.t     Copyright 2022 cPanel, L.L.C.
 #                                                           All rights Reserved.
 # copyright@cpanel.net                                         http://cpanel.net
 # This code is subject to the cPanel license. Unauthorized copying is prohibited
@@ -39,8 +39,9 @@ require $conf{require};
 spec_helper "/usr/local/cpanel/t/small/.spec_helpers/App-CmdDispatch_based_modulinos.pl";
 
 use App::CmdDispatch ();
-use Test::MockFile   ();
 use Test::MockModule ();
+
+use Test::MockFile qw< nostrict >;
 
 use Test::Fatal qw( dies_ok lives_ok );
 
@@ -194,22 +195,22 @@ describe "ea-nginx script" => sub {
             };
 
             it "should delete no-longer existing users’ conf given --all" => sub {
-                my $mock     = Test::MockFile->dir( '/etc/nginx/conf.d/users/', ["iamnomore$$.conf"] );
+                my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile = Test::MockFile->file( "/etc/nginx/conf.d/users/iamnomore$$.conf", "i am conf hear me rawr" );
                 local @glob_res = ("/etc/nginx/conf.d/users/iamnomore$$.conf");
                 modulino_run_trap( config => "--all" );
-                ok !-e $mockfile->filename;
+                ok !-e $mockfile->path();
             };
 
             it "should not do user config given --global" => sub {
-                my $mock     = Test::MockFile->dir( '/etc/nginx/conf.d/users/', ["iamnomore$$.conf"] );
+                my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile = Test::MockFile->file( "/etc/nginx/conf.d/users/iamnomore$$.conf", "i am conf hear me rawr" );
                 modulino_run_trap( config => "--global" );
-                ok -e $mockfile->filename;
+                ok -e $mockfile->path();
             };
 
             it "should do /etc/nginx/ea-nginx/config-scripts/global/ given --global" => sub {
-                my $mock     = Test::MockFile->dir( '/etc/nginx/ea-nginx/config-scripts/global/', ["$$.ima.script"] );
+                my $mock     = Test::MockFile->dir('/etc/nginx/ea-nginx/config-scripts/global/');
                 my $mockfile = Test::MockFile->file( "/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script", "i am script hear me rawr", { mode => 0755 } );
                 local @glob_res = ("/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script");
                 no warnings "redefine";
@@ -219,7 +220,7 @@ describe "ea-nginx script" => sub {
             };
 
             it "should do /etc/nginx/ea-nginx/config-scripts/global/ given --all" => sub {
-                my $mock     = Test::MockFile->dir( '/etc/nginx/ea-nginx/config-scripts/global/', ["$$.ima.script"] );
+                my $mock     = Test::MockFile->dir('/etc/nginx/ea-nginx/config-scripts/global/');
                 my $mockfile = Test::MockFile->file( "/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script", "i am script hear me rawr", { mode => 0755 } );
                 local @glob_res = ("/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script");
                 no warnings "redefine";
@@ -232,7 +233,7 @@ describe "ea-nginx script" => sub {
                 my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile = Test::MockFile->dir("/etc/nginx/conf.d/users/cpuser$$.conf");
                 modulino_run_trap( config => "cpuser$$" );
-                is_deeply \@_reload, [ [ $mockfile->filename ] ];
+                is_deeply \@_reload, [ [ $mockfile->path() ] ];
             };
 
             it "should not reload nginx if --no-reload is given (user)" => sub {
@@ -261,7 +262,7 @@ describe "ea-nginx script" => sub {
             it "should have an alias `conf`" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 modulino_run_trap( conf => "cpuser$$" );
-                ok -d $mock->filename;
+                ok -d $mock->path();
                 is_deeply \@_write_user_conf, [ ["cpuser$$"] ];
             };
 
@@ -604,7 +605,7 @@ describe "ea-nginx script" => sub {
             it "should remove the file if it exists" => sub {
                 my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/cpuser$$.conf", "# i am a config file" );
                 modulino_run_trap( remove => "cpuser$$" );
-                ok !-e $mock->filename;
+                ok !-e $mock->path();
             };
 
             it "should have a msg if it does not exist" => sub {
@@ -620,7 +621,8 @@ describe "ea-nginx script" => sub {
             };
 
             it "should warn if user dir exists" => sub {
-                my $mock = Test::MockFile->dir( "/etc/nginx/conf.d/users/cpuser$$/", [] );
+                my $mock      = Test::MockFile->dir("/etc/nginx/conf.d/users/cpuser$$/");
+                my $mock_file = Test::MockFile->file( "/etc/nginx/conf.d/users/cpuser$$/stuff.conf", "config stuff 42" );
                 modulino_run_trap( remove => "cpuser$$" );
                 like $trap->stderr, qr{Customization path /etc/nginx/conf.d/users/cpuser$$/ exists, you will need to manually move/remove/reconfigure that\.\n};
             };
@@ -675,12 +677,12 @@ describe "ea-nginx script" => sub {
                     it "should try unlinking the given file" => sub {
                         my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/derp$$.conf", "oh hai" );
                         trap { scripts::ea_nginx::_reload( $mock->filename ) };
-                        ok !-e $mock->filename;
+                        ok !-e $mock->path();
                     };
 
                     it "should warn about unlinking the given file" => sub {
                         my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/derp$$.conf", "oh hai" );
-                        trap { scripts::ea_nginx::_reload( $mock->filename ) };
+                        trap { scripts::ea_nginx::_reload( $mock->path() ) };
                         is $trap->stderr, "Could not reload generated nginx config, removing and attempting reload without it: 1\n";
                     };
 
@@ -959,7 +961,7 @@ describe "ea-nginx script" => sub {
             };
 
             it "should return 0 if the line with an error does match any known patterns" => sub {
-                my $mockdir  = Test::MockFile->dir( '/etc/nginx/conf.d/', ['duplicate.conf'] );
+                my $mockdir  = Test::MockFile->dir('/etc/nginx/conf.d/');
                 my $mockfile = Test::MockFile->file( '/etc/nginx/conf.d/duplicate.conf', 'doit' );
                 my $mock     = Test::MockModule->new('Path::Tiny');
                 $mock->redefine(
@@ -973,7 +975,7 @@ describe "ea-nginx script" => sub {
             };
 
             it "should return 1 if it comments out a duplicate key" => sub {
-                my $mockdir  = Test::MockFile->dir( '/etc/nginx/conf.d/', ['duplicate.conf'] );
+                my $mockdir  = Test::MockFile->dir('/etc/nginx/conf.d/');
                 my $mockfile = Test::MockFile->file( '/etc/nginx/conf.d/duplicate.conf', 'doit' );
                 my $mock     = Test::MockModule->new('Path::Tiny');
                 $mock->redefine(
