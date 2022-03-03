@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -387,6 +387,7 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-non-www.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/force-www.conf
 %config %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cloudflare.conf
+%config %attr(600, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy-xt.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-dcv.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-mailman-locations.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/server-includes-standalone/cpanel-redirect-locations.conf
@@ -702,6 +703,9 @@ fi
 
 
 %changelog
+* Thu Mar 03 2022 Dan Muey <dan@cpanel.net> - 1.21.6-6
+- ZC-9800: change edit of cpanel-proxy conf to include (akin to how we do cloudflare.conf)
+
 * Mon Feb 28 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-5
 - EA-10493: The server_name directive needs the public/external IP on systems configured to use a NAT
 
