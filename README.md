@@ -30,6 +30,18 @@ To have a global configuration file regenerated have your package drop a script 
 
 If an external package needs some specific proxy configuration beyond what `cpanel-proxy.conf` provides they can drop config files in `conf.d/includes-optional/cpanel-proxy-vendors/*.conf`.
 
+# Correcting Apache’s `REMOTE_ADDR`
+
+As of `ea-nginx` version 1.21.6-3 (and `ea-apache24-config-runtime` version 1.0-185) it will bring in Apache’s `mod_remoteip` and configure it securely to correct `REMOTE_ADDR` for hits that are proxied from the local NGINX.
+
+## If you use a custom `/var/cpanel/templates/apache2_4/ea4_main.local`
+
+You **must** update it based on the latest version of `/var/cpanel/templates/apache2_4/ea4_main.default` to get the security benefits.
+
+## If you already have Apache’s `mod_remoteip` configured
+
+We **strongly** suggest removing your `RemoteIPHeader` and `RemoteIPInternalProxy` so that the global and **secure** `RemoteIPHeader` and `RemoteIPInternalProxy` that this package does wil be in effect.
+
 # dev notes
 
 ## Re-create SOURCES/cpanel.tar.gz before building!

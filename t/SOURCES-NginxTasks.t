@@ -1,6 +1,6 @@
 #!/usr/local/cpanel/3rdparty/bin/perl
 
-# cpanel - t/SOURCES-cpanel-scripts-ea-nginx.t     Copyright 2019 cPanel, L.L.C.
+# cpanel - t/SOURCES-cpanel-scripts-ea-nginx.t     Copyright 2012 cPanel, L.L.C.
 #                                                           All rights Reserved.
 # copyright@cpanel.net                                         http://cpanel.net
 # This code is subject to the cPanel license. Unauthorized copying is prohibited
@@ -14,7 +14,8 @@ use Cpanel::ServerTasks ();
 use Cpanel::Debug       ();
 
 use Test::MockModule;
-use Test::MockFile;
+
+use Test::MockFile qw< nostrict >;
 
 use File::Temp;
 use Path::Tiny;
