@@ -1,0 +1,3 @@
+#!groovy
+library('ea4')
+ea4_lib.runSyncJob()
