@@ -54,7 +54,13 @@ mkdir -p $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/server-includes/
 mkdir -p $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/server-includes-standalone/
 mkdir cpanel && cd cpanel && tar xzf $SOURCE14  && cd ..
 cp -r cpanel/conf.d/* $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d
-chmod 600 $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/includes-optional/cpanel-proxy.conf
+
+# ZC-9800: deb conf file madness
+mkdir -p $DEB_INSTALL_ROOT/var/nginx/conf.d/includes-optional/
+mv $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/includes-optional/cpanel-proxy.conf $DEB_INSTALL_ROOT/var/nginx/conf.d/includes-optional/cpanel-proxy.conf
+ln -fs /var/nginx/conf.d/includes-optional/cpanel-proxy.conf $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/includes-optional/cpanel-proxy.conf
+
+chmod 600 $DEB_INSTALL_ROOT$_sysconfdir/nginx/conf.d/includes-optional/cpanel-proxy-xt.conf
 
 mkdir -p $DEB_INSTALL_ROOT$_sysconfdir/nginx/ea-nginx
 cp -r cpanel/ea-nginx/* $DEB_INSTALL_ROOT$_sysconfdir/nginx/ea-nginx
