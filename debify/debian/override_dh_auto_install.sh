@@ -20,6 +20,14 @@ echo "BDIR" $bdir
 mkdir -p $DEB_INSTALL_ROOT$_sysconfdir/nginx
 mkdir -p $DEB_INSTALL_ROOT/usr/share/doc/$upstream_name-$main_version
 
+mkdir -p $DEB_INSTALL_ROOT/opt/cpanel/ea-nginx-ngxdev
+export SPACE_ESCAPED_WITH_CC_OPT=$(echo $WITH_CC_OPT | sed 's/ /+/g')
+export SPACE_ESCAPED_WITH_LD_OPT=$(echo $WITH_LD_OPT | sed 's/ /+/g')
+echo "$BASE_CONFIGURE_ARGS --with-cc-opt=\"$SPACE_ESCAPED_WITH_CC_OPT\" --with-ld-opt=\"$SPACE_ESCAPED_WITH_LD_OPT\" --with-ipv6" > $DEB_INSTALL_ROOT/opt/cpanel/ea-nginx-ngxdev/ngx-configure-args
+echo -n $version > $DEB_INSTALL_ROOT/opt/cpanel/ea-nginx-ngxdev/nginx-ver
+/bin/cp -f $SOURCE0 $DEB_INSTALL_ROOT/opt/cpanel/ea-nginx-ngxdev/
+install -p $SOURCE29 $DEB_INSTALL_ROOT/opt/cpanel/ea-nginx-ngxdev/
+
 make DESTDIR=$DEB_INSTALL_ROOT INSTALLDIRS=vendor install
 
 mkdir -p $DEB_INSTALL_ROOT$_datadir/nginx
