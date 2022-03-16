@@ -12,11 +12,18 @@ perl -pi -e 's{(#include <sys/types.h>)}{#include <stdio.h>\n$1}' auto/feature
 export NGINX_CONFIGURE=();
 for flag in $(cat /opt/cpanel/ea-nginx-ngxdev/ngx-configure-args)
 do
+   if [[ $flag == --with-http_ssl_module* ]]; then
+      # OBS has no /usr/bin/apt
+      if [[ -v DEB_INSTALL_ROOT ]]; then
+          continue
+      fi
+   fi
+
    export SPACE_UNESCAPED_FLAG=$(echo $flag|sed 's/+/ /g')
    NGINX_CONFIGURE+=("$SPACE_UNESCAPED_FLAG");
 done
 
 # OBS has no /usr/bin/apt
 if [[ -v DEB_INSTALL_ROOT ]]; then
-   NGINX_CONFIGURE+=("--with-pcre=/usr/include", "--with-openssl=/usr/include/openssl", "--with-zlib=/usr/include");
+   NGINX_CONFIGURE+=(--without-http_rewrite_module --without-http_gzip_module);
 fi
