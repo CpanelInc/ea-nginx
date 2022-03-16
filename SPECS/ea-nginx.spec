@@ -190,8 +190,9 @@ and often less load on a busy server.
 %package ngxdev
 Group: Development/Tools
 Summary: Simplify making EA4 pkgs of NGINX modules
-Requires:  pcre-devel
-Requires:  openssl, openssl-devel
+Requires: pcre-devel
+Requires: openssl, openssl-devel
+Requires: zlib-devel
 
 %description -n ea-nginx-ngxdev
 Provides tools to make it easier to make an EA4 pkg for an nginx module.

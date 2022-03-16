@@ -23,7 +23,7 @@ That means an NGINX module package can simply:
 ```
 # You will be in ./nginx-build after this source()
 #    so that configure and make etc can happen.
-# We probbaly want to popd back when we are done in there
+# We probably want to popd back when we are done in there
 . /opt/cpanel/ea-nginx-ngxdev/set_NGINX_CONFIGURE_array.sh
 ./configure "${NGINX_CONFIGURE[@]}" --add-dynamic-module=../nginx
 make %{?_smp_mflags}
