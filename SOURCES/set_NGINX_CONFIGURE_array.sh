@@ -13,5 +13,5 @@ export NGINX_CONFIGURE=();
 for flag in $(cat /opt/cpanel/ea-nginx-ngxdev/ngx-configure-args)
 do
    export SPACE_UNESCAPED_FLAG=$(echo $flag|sed 's/+/ /g')
-   NGINX_CONFIGURE+=($SPACE_UNESCAPED_FLAG);
+   NGINX_CONFIGURE+=("$SPACE_UNESCAPED_FLAG");
 done
