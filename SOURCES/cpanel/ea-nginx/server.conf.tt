@@ -106,7 +106,7 @@ server {
     [%- IF has_wordpress %]
     if ( $http_cookie ~ "wordpress_logged_in_[a-zA-Z0-9]+" ) {
         set $CPANEL_PROXY_CACHE off;
-        set $CPANEL_SKIP_PROXY 1;
+        set $CPANEL_SKIP_PROXY_CACHING 1;
     }
     [% END -%]
 

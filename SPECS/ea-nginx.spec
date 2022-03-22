@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -721,6 +721,9 @@ fi
 
 
 %changelog
+* Fri Mar 18 2022 Tim Mullin <tim@cpanel.net> - 1.21.6-8
+- EA-10576: Fix server configuration template proxy caching setting
+
 * Wed Mar 09 2022 Dan Muey <dan@cpanel.net> - 1.21.6-7
 - ZC-9756: build brotli module
 
