@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 8
+%define release_prefix 9
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -160,6 +160,7 @@ Source25: nginx-adminbin.conf
 Source26: cpanel-scripts-ea-nginx-logrotate
 Source27: 007-restartsrv_nginx
 Source28: whm_feature_addon
+Source29: set_NGINX_CONFIGURE_array.sh
 
 Patch1: 0001-Fix-auto-feature-test-C-code-to-not-fail-due-to-its-.patch
 
@@ -185,6 +186,16 @@ and often less load on a busy server.
 %if 0%{?suse_version} >= 1315
 %debug_package
 %endif
+
+%package ngxdev
+Group: Development/Tools
+Summary: Simplify making EA4 pkgs of NGINX modules
+Requires: pcre-devel
+Requires: openssl, openssl-devel
+Requires: zlib-devel
+
+%description -n ea-nginx-ngxdev
+Provides tools to make it easier to make an EA4 pkg for an nginx module.
 
 %prep
 %setup -q -n nginx-%{version}
@@ -254,9 +265,19 @@ cp -f %{SOURCE22} .
 cp -f %{SOURCE23} .
 cp -f %{SOURCE24} .
 cp -f %{SOURCE25} .
+cp -f %{SOURCE29} .
 
 %install
 %{__rm} -rf $RPM_BUILD_ROOT
+
+%{__mkdir} -p $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev
+export SPACE_ESCAPED_WITH_CC_OPT=$(echo "%{WITH_CC_OPT}" | sed 's/ /+/g')
+export SPACE_ESCAPED_WITH_LD_OPT=$(echo "%{WITH_LD_OPT}" | sed 's/ /+/g')
+echo "%{BASE_CONFIGURE_ARGS} --with-cc-opt=$SPACE_ESCAPED_WITH_CC_OPT --with-ld-opt=$SPACE_ESCAPED_WITH_LD_OPT --with-ipv6" > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/ngx-configure-args
+echo -n %{version} > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/nginx-ver
+/bin/cp -f %{SOURCE0} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
+%{__install} -p %{SOURCE29} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
+
 %{__make} DESTDIR=$RPM_BUILD_ROOT INSTALLDIRS=vendor install
 
 %{__mkdir} -p $RPM_BUILD_ROOT%{_datadir}/nginx
@@ -498,6 +519,9 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(0755,root,root) /usr/local/cpanel/bin/admin/Cpanel/nginx
 %attr(0644,root,root) /usr/local/cpanel/bin/admin/Cpanel/nginx.conf
 
+%files ngxdev
+/opt/cpanel/ea-nginx-ngxdev
+
 %pre
 # Other nginx implementations can leave behind stray config files when they are removed.
 # As such, we make a best effort to ensure a clean config when ea-nginx is installed
@@ -721,6 +745,9 @@ fi
 
 
 %changelog
+* Wed Mar 23 2022 Dan Muey <dan@cpanel.net> - 1.21.6-9
+- ZC-9645: Added ea-nginx-ngxdev to make it easier to make a pkg for an nginx modules
+
 * Fri Mar 18 2022 Tim Mullin <tim@cpanel.net> - 1.21.6-8
 - EA-10576: Fix server configuration template proxy caching setting
 
@@ -773,7 +800,7 @@ fi
 - ZC-9428: Configure http2 support
 - ZC-9615: IPv6 support for proxy subdomain redirect to https
 
-* Fri Dec 16 2021 Dan Muey <dan@cpanel.net> - 1.21.4-6
+* Thu Dec 16 2021 Dan Muey <dan@cpanel.net> - 1.21.4-6
 - ZC-9343: Change worker_processes to auto
 - ZC-9343: Allow setting `worker_processes` via /etc/nginx/ea-nginx/settings.json
 - ZC-9343: When writing settings.json make it human readable

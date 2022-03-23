@@ -1,4 +1,5 @@
 {
+    "put_source0_in_sources" : true,
     "override_vars": {
         "use_systemd": 1,
         "BASE_WITH_CC_OPT": "-I/opt/cpanel/ea-passenger-src/passenger-release-6.0.10/src/nginx_module",
