@@ -191,6 +191,11 @@ and often less load on a busy server.
 Group: Development/Tools
 Summary: Simplify making EA4 pkgs of NGINX modules
 Requires: pcre-devel
+%if 0%{?rhel} == 7
+Requires: ea-openssl11, ea-openssl11-devel
+%else
+Requires: openssl, openssl-devel
+%endif
 Requires: openssl, openssl-devel
 Requires: zlib-devel
 
