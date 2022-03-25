@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 9
+%define release_prefix 10
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -608,6 +608,7 @@ if [ $1 -eq 1 ]; then
     /usr/bin/systemctl preset nginx.service >/dev/null 2>&1 ||:
     /usr/bin/systemctl preset nginx-debug.service >/dev/null 2>&1 ||:
     /usr/bin/systemctl enable nginx.service >/dev/null 2>&1 ||:
+    /usr/bin/systemctl disable nginx-debug.service >/dev/null 2>&1 ||:
 %else
     /sbin/chkconfig --add nginx
     /sbin/chkconfig --add nginx-debug
@@ -750,6 +751,9 @@ fi
 
 
 %changelog
+* Fri Mar 25 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-10
+- EA-10590: Disable nginx-debug service on Ubuntu
+
 * Wed Mar 23 2022 Dan Muey <dan@cpanel.net> - 1.21.6-9
 - ZC-9645: Added ea-nginx-ngxdev to make it easier to make a pkg for an nginx modules
 
