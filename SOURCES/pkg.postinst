@@ -9,6 +9,7 @@ if test -x "/usr/bin/apt"; then
     /usr/bin/systemctl preset nginx.service >/dev/null 2>&1 ||:
     /usr/bin/systemctl preset nginx-debug.service >/dev/null 2>&1 ||:
     /usr/bin/systemctl enable nginx.service >/dev/null 2>&1 ||:
+    /usr/bin/systemctl disable nginx-debug.service >/dev/null 2>&1 ||:
     # print site info
     cat <<BANNER
 ----------------------------------------------------------------------
