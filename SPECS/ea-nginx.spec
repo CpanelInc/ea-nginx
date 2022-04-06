@@ -749,10 +749,10 @@ if [ $1 -ge 1 ]; then
         "Binary upgrade failed, please check nginx's error.log"
 fi
 
-
 %changelog
 * Wed Apr 06 2022 Dan Muey <dan@cpanel.net> - 1.21.6-11
 - ZC-9698: Proxy robots.txt (and favicon) since it can be dynamic (e.g. wordpress + .htaccess)
+- ZC-9844: Add flag file to use micro caching as the cache defaults
 
 * Fri Mar 25 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-10
 - EA-10590: Disable nginx-debug service on Ubuntu
