@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 10
+%define release_prefix 11
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -751,6 +751,9 @@ fi
 
 
 %changelog
+* Wed Apr 06 2022 Dan Muey <dan@cpanel.net> - 1.21.6-11
+- ZC-9698: Proxy robots.txt (and favicon) since it can be dynamic (e.g. wordpress + .htaccess)
+
 * Fri Mar 25 2022 Travis Holloway <t.holloway@cpanel.net> - 1.21.6-10
 - EA-10590: Disable nginx-debug service on Ubuntu
 
