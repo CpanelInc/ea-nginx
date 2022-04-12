@@ -400,18 +400,34 @@ sub ensure_valid_nginx_config {
 
 sub caching_defaults {    # do not want `our %caching_defaults` or a hash reference so that no one can accidentally change it
 
-    # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/cache.json
-    return (
-        enabled           => 1,
-        logging           => 0,
-        x_cache_header    => 0,
-        zone_size         => "10m",
-        inactive_time     => "60m",
-        levels            => "1:2",
+    # non-micro
+    my %defaults = (
         proxy_cache_valid => {
             "200 301 302" => "60m",
             "404"         => "1m",
         },
+    );
+
+    if ( -e '/etc/nginx/ea-nginx/enable.micro-cache-defaults' ) {
+
+        # micro
+        %defaults = (
+            proxy_cache_valid => {
+                "301 302" => "5m",
+                "404"     => "1m",
+            },
+        );
+    }
+
+    # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/cache.json
+    return (
+        %defaults,
+        enabled                       => 1,
+        logging                       => 0,
+        x_cache_header                => 0,
+        zone_size                     => "10m",
+        inactive_time                 => "60m",
+        levels                        => "1:2",
         proxy_cache_use_stale         => "error timeout http_429 http_500 http_502 http_503 http_504",
         proxy_cache_background_update => "on",
         proxy_cache_revalidate        => "on",
@@ -825,13 +841,51 @@ sub _write_user_conf {
 
 our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
 
+sub caching_global {
+    my $caching_global = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+
+    # UGMO :/ clean it up if the touch file exists and they have the defaults
+    # if they happen to edit it and make it the default and they really want that then they should not have this touchfile
+    if ( -e '/etc/nginx/ea-nginx/enable.micro-cache-defaults' ) {
+
+        # only change it if its the non-micro default
+        if (   keys %{ $caching_global->{proxy_cache_valid} } == 2
+            && exists $caching_global->{proxy_cache_valid}{"200 301 302"}
+            && $caching_global->{proxy_cache_valid}{"200 301 302"} eq "60m"
+            && exists $caching_global->{proxy_cache_valid}{404}
+            && $caching_global->{proxy_cache_valid}{404} eq "1m" ) {
+
+            warn "Changing default `proxy_cache_valid` to micro-cache version per the existance of the `/etc/nginx/ea-nginx/enable.micro-cache-defaults` touch-file\n";
+            delete $caching_global->{proxy_cache_valid}{"200 301 302"};
+            $caching_global->{proxy_cache_valid}{"301 302"} = "5m";
+            _write_json( "/etc/nginx/ea-nginx/cache.json", $caching_global );
+        }
+    }
+    else {
+        # only change it back if its the micro default
+        if (   keys %{ $caching_global->{proxy_cache_valid} } == 2
+            && exists $caching_global->{proxy_cache_valid}{"301 302"}
+            && $caching_global->{proxy_cache_valid}{"301 302"} eq "5m"
+            && exists $caching_global->{proxy_cache_valid}{404}
+            && $caching_global->{proxy_cache_valid}{404} eq "1m" ) {
+
+            warn "Changing default `proxy_cache_valid` to non-micro-cache version per the absence of the `/etc/nginx/ea-nginx/enable.micro-cache-defaults` touch-file\n";
+            $caching_global->{proxy_cache_valid}{"200 301 302"} = "60m";
+            delete $caching_global->{proxy_cache_valid}{"301 302"};
+            _write_json( "/etc/nginx/ea-nginx/cache.json", $caching_global );
+        }
+    }
+
+    return $caching_global;
+}
+
 sub _get_caching_hr {
     my ($user) = @_;
 
     if ( !exists $caching_cache->{$user} ) {
 
         # at this point that file should exist; if it does not we want this to barf so we know about it
-        $global_caching //= Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+        $global_caching //= caching_global();
 
         my $user_caching = eval { Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/nginx-cache.json") } || {};
         $caching_cache->{$user} = {
@@ -851,7 +905,7 @@ sub _get_logging_hr {
     $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
     $logging_hr->{loglevel}            = "warn";
 
-    $global_caching //= Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+    $global_caching //= caching_global();
     $logging_hr->{enable_cache_log} = $global_caching->{logging};
 
     if ( $logging_hr->{default_format_name} ne "combined" && $logging_hr->{default_format_name} ne "common" ) {
