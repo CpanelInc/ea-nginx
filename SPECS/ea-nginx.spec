@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 11
+%define release_prefix 12
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -750,6 +750,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Apr 12 2022 Tim Mullin <tim@cpanel.net> - 1.21.6-12
+- EA-10535: Fix SSL certificate handling for custom mail subdomains
+
 * Wed Apr 06 2022 Dan Muey <dan@cpanel.net> - 1.21.6-11
 - ZC-9698: Proxy robots.txt (and favicon) since it can be dynamic (e.g. wordpress + .htaccess)
 - ZC-9844: Add flag file to use micro caching as the cache defaults

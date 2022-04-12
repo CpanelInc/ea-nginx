@@ -795,6 +795,8 @@ sub _write_user_conf {
     @addon_subdomains{ values %{ $domains_data->{addon_domains} } } = ();
     my @actual_subdomains = grep { !exists $addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
 
+    my $mail_subdomain_exists = scalar grep { $_ eq 'mail.' . $domains_data->{main_domain} } @actual_subdomains;
+
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
 
     print "Setting up $userconf …\n";
@@ -819,7 +821,7 @@ sub _write_user_conf {
     }
 
     path($userconf)->spew( $pre_server . "#### main domain for $user ##\n" );
-    _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ] );
+    _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ], $mail_subdomain_exists );
 
     if (@actual_subdomains) {
         path($userconf)->append("\n#### sub domains for $user ##\n");
@@ -975,7 +977,7 @@ sub _populate_domain_ips_except {
 }
 
 sub _render_and_append {
-    my ( $user, $domains ) = @_;
+    my ( $user, $domains, $mail_subdomain_exists ) = @_;
 
     my $group = _get_group_for($user);
 
@@ -1105,6 +1107,7 @@ sub _render_and_append {
                 caching    => $caching_hr,
             },
             proxysubdomains_enabled => $cpconf_hr->{proxysubdomains},
+            mail_subdomain_exists   => $mail_subdomain_exists,
         },
         sub {
             my ($out) = @_;
