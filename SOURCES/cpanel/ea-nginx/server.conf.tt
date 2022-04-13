@@ -1,5 +1,5 @@
 server {
-    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %] mail.[% domain %][% END %][% END %][% IF ip %] [% ip %][% END %];
+    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% IF !mail_subdomain_exists %] mail.[% domain %][% END %][% END %][% END %][% IF ip %] [% ip %][% END %];
     listen 80;
     [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
 
@@ -69,6 +69,26 @@ server {
     location /Microsoft-Server-ActiveSync {
         include conf.d/includes-optional/cpanel-proxy.conf;
         proxy_pass http://127.0.0.1:2090/Microsoft-Server-ActiveSync;
+    }
+
+    location = /favicon.ico {
+        allow all;
+        log_not_found off;
+        access_log off;
+        [%- IF !behavior.standalone %]
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        [%- END %]
+    }
+
+    location = /robots.txt {
+        allow all;
+        log_not_found off;
+        access_log off;
+        [%- IF !behavior.standalone %]
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        [%- END %]
     }
 
     [%- IF !behavior.standalone %]
