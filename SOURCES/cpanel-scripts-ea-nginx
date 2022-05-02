@@ -45,6 +45,7 @@ our $var_cache_ea_nginx                = '/var/cache/ea-nginx';
 our $var_cpanel_userdata               = '/var/cpanel/userdata';
 our $etc_nginx                         = '/etc/nginx';
 our $settings_file                     = '/etc/nginx/ea-nginx/settings.json';
+our $cache_file                        = '/etc/nginx/ea-nginx/cache.json';
 our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
@@ -131,6 +132,22 @@ sub run {
     use warnings 'once';
 
     # ^^^ /need to have App::CmdDispatch do this automatically see CPANEL-22328
+
+    my $custom_settings_path = path("/var/nginx/ea-nginx/settings.json");
+    if ( $custom_settings_path->exists ) {
+
+        # do not allow specifying apache_ ones
+        my $new = Cpanel::JSON::LoadFile("/var/nginx/ea-nginx/settings.json");
+        my $cur = Cpanel::JSON::LoadFile($settings_file);
+        for my $key (qw(apache_port apache_port_ip apache_ssl_port apache_ssl_port_ip)) {
+            $new->{$key} = $cur->{$key};
+        }
+        _write_json( "/var/nginx/ea-nginx/settings.json", $new );
+        $custom_settings_path->move($settings_file);
+    }
+
+    my $custom_cache_path = path("/var/nginx/ea-nginx/cache.json");
+    $custom_cache_path->move($cache_file) if $custom_cache_path->exists;
 
     return App::CmdDispatch->new( $cmds, $opts )->run(@argv);
 }
@@ -237,7 +254,7 @@ sub cache_config {
     my ( $app, $which, @flags ) = @_;
     die "First argument to `cache` must be `--system` or a cPanel user name\n" if !length $which;
 
-    my $file       = $etc_nginx . "/ea-nginx/cache.json";
+    my $file       = $cache_file;
     my $config_arg = "--all";
 
     if ( $which ne "--system" ) {
@@ -844,7 +861,7 @@ sub _write_user_conf {
 our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
 
 sub caching_global {
-    my $caching_global = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+    my $caching_global = Cpanel::JSON::LoadFile($cache_file);
 
     # UGMO :/ clean it up if the touch file exists and they have the defaults
     # if they happen to edit it and make it the default and they really want that then they should not have this touchfile
@@ -860,7 +877,7 @@ sub caching_global {
             warn "Changing default `proxy_cache_valid` to micro-cache version per the existance of the `/etc/nginx/ea-nginx/enable.micro-cache-defaults` touch-file\n";
             delete $caching_global->{proxy_cache_valid}{"200 301 302"};
             $caching_global->{proxy_cache_valid}{"301 302"} = "5m";
-            _write_json( "/etc/nginx/ea-nginx/cache.json", $caching_global );
+            _write_json( $cache_file, $caching_global );
         }
     }
     else {
@@ -874,7 +891,7 @@ sub caching_global {
             warn "Changing default `proxy_cache_valid` to non-micro-cache version per the absence of the `/etc/nginx/ea-nginx/enable.micro-cache-defaults` touch-file\n";
             $caching_global->{proxy_cache_valid}{"200 301 302"} = "60m";
             delete $caching_global->{proxy_cache_valid}{"301 302"};
-            _write_json( "/etc/nginx/ea-nginx/cache.json", $caching_global );
+            _write_json( $cache_file, $caching_global );
         }
     }
 
