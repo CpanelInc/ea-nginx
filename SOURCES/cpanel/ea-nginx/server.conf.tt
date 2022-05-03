@@ -18,14 +18,11 @@ server {
 
     include conf.d/includes-optional/cloudflare.conf;
 
+    set $CPANEL_APACHE_PROXY_PASS $scheme://apache_backend_${scheme}_[% proxy_ip ? proxy_ip.replace("\\.", "_") : settings.apache_port_ip.replace("\\.", "_") %];
+
+    # For includes:
     set $CPANEL_APACHE_PROXY_IP [% proxy_ip || settings.apache_port_ip %];
     set $CPANEL_APACHE_PROXY_SSL_IP [% proxy_ip || settings.apache_port_ip %];
-    set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_PORT;
-    set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_IP;
-    if ($scheme = https) {
-        set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_SSL_PORT;
-        set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_SSL_IP;
-    }
 
     [%- IF behavior.caching.enabled %]
     set $CPANEL_PROXY_CACHE [% user %];
@@ -77,7 +74,7 @@ server {
         access_log off;
         [%- IF !behavior.standalone %]
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
         [%- END %]
     }
 
@@ -87,7 +84,7 @@ server {
         access_log off;
         [%- IF !behavior.standalone %]
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+	proxy_pass $CPANEL_APACHE_PROXY_PASS;
         [%- END %]
     }
 
@@ -120,7 +117,7 @@ server {
         [%- END %]
 
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
     }
 
     [%- IF has_wordpress %]
@@ -141,7 +138,7 @@ server {
         proxy_cache_bypass 1;
 
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
     }
             [% END -%]
         [% END -%]
