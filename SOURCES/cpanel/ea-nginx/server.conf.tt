@@ -1,5 +1,5 @@
 server {
-    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% IF !mail_subdomain_exists %] mail.[% domain %][% END %][% END %][% END %][% IF ip %] [% ip %][% END %][% FOREACH svc_sub IN service_subdomains %] [% svc_sub %][% END %];
+    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% IF !mail_subdomain_exists %] mail.[% domain %][% END %][% END %][% END %][% IF ip %] [% ip %][% END %];
     listen 80;
     [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
 
@@ -251,3 +251,64 @@ server {
     include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     [% END -%]
 }
+[%- IF ssl_certificate && ssl_certificate_key && proxysubdomains_enabled && service_subdomains.size %]
+server {
+    listen 80;
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
+
+    listen 443 ssl[% IF http2 %] http2[% END %];
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF http2 %] http2[% END %];
+
+    ssl_certificate [% ssl_certificate %];
+    ssl_certificate_key [% ssl_certificate_key %];
+
+    server_name [% FOREACH svc_sub IN service_subdomains %] [% svc_sub %][% END %];
+
+    [%- IF secruleengineoff %]
+    modsecurity off;
+    [% END -%]
+
+    [%- IF uid %]
+    set $USER_ID [% uid %];
+    [% END -%]
+
+    include conf.d/includes-optional/cloudflare.conf;
+
+    set $CPANEL_APACHE_PROXY_PASS $scheme://apache_backend_${scheme}_[% proxy_ip ? proxy_ip.replace("\\.", "_") : settings.apache_port_ip.replace("\\.", "_") %];
+
+    # For includes:
+    set $CPANEL_APACHE_PROXY_IP [% proxy_ip || settings.apache_port_ip %];
+    set $CPANEL_APACHE_PROXY_SSL_IP [% proxy_ip || settings.apache_port_ip %];
+
+    location /.well-known/cpanel-dcv {
+        root [% docroot %];
+        disable_symlinks if_not_owner;
+    }
+
+    location /.well-known/pki-validation {
+        root [% docroot %];
+        disable_symlinks if_not_owner;
+    }
+
+    location /.well-known/acme-challenge {
+        root [% docroot %];
+        disable_symlinks if_not_owner;
+    }
+
+    location / {
+        # Force https for service subdomains
+        if ($scheme = http) {
+            return 301 https://$host$request_uri;
+        }
+
+        # no cache
+        proxy_cache off;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+
+        # pass to Apache
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
+    }
+}
+[%- END %]
