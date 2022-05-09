@@ -1077,6 +1077,14 @@ sub _render_and_append {
 
     $domains_with_ssl ||= _get_domains_with_ssls();
 
+    my @service_subdomains;
+    $httpd_vhosts_hr ||= _get_httpd_vhosts_hash();
+    if ( exists $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains} ) {
+        for my $sub ( sort keys %{ $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains} } ) {
+            push @service_subdomains, map { "$sub.$_" } @{ $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains}{$sub} };
+        }
+    }
+
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     if ( !-f $combined_tls ) {
         if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
@@ -1110,6 +1118,7 @@ sub _render_and_append {
             ssl_redirect        => $ssl_redirect,
             secruleengineoff    => $secruleengineoff,
             domains             => $domains,
+            service_subdomains  => \@service_subdomains,
             user                => $user,
             group               => $group,
             ( defined $uid ? ( uid => $uid ) : () ),
