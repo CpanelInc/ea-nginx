@@ -636,6 +636,19 @@ sub _write_global_nginx_conf {
     my $main = path("/etc/nginx/nginx.conf");
     my $cont = $main->slurp;
     $cont =~ s/^(\s*worker_processes\s+)\S+(\s*;)/$1$val$2/gm;
+
+    if ( exists $local_settings->{worker_shutdown_timeout} && length( $local_settings->{worker_shutdown_timeout} ) ) {
+        if ( $cont =~ m/^\s*worker_shutdown_timeout\s+/m ) {
+            $cont =~ s/^(\s*worker_shutdown_timeout\s+)\S+(\s*;)/$1$local_settings->{worker_shutdown_timeout}$2/gm;
+        }
+        else {
+            $cont =~ s/^((\s*)worker_processes(\s+)\S+.*\n)/$1$2worker_shutdown_timeout$3$local_settings->{worker_shutdown_timeout};\n/gm;
+        }
+    }
+    else {
+        $cont =~ s/^\s*worker_shutdown_timeout\s+.*\n?//gm;
+    }
+
     $main->spew($cont);
 
     return 1;
