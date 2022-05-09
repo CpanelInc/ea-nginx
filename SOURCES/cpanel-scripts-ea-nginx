@@ -735,9 +735,15 @@ sub _get_settings_hr {
 sub _write_global_ea_nginx {
     my $cur_settings = _get_settings_hr();
     my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
-    return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { ea4conf => $ea4_conf_hr, settings => $cur_settings } );
-}
 
+    my $vhosts = _get_httpd_vhosts_hash();
+    my %ips    = map { $vhosts->{$_}{ip} => 1 } keys %{$vhosts};
+
+    return _render_tt_to_file(
+        'ea-nginx.conf.tt' => 'ea-nginx.conf',
+        { ea4conf => $ea4_conf_hr, settings => $cur_settings, ips => [ sort keys %ips ] }
+    );
+}
 our $cpconf_hr;
 
 sub _settings_defaults {
@@ -961,15 +967,22 @@ sub _get_group_for {
 our $domains_with_ssl;
 
 sub _get_domains_with_ssls {
-    return unless ( eval { require Cpanel::ConfigFiles::Apache::Config; 1; } );
-
-    my $vhosts_hr  = Cpanel::ConfigFiles::Apache::Config::get_httpd_vhosts_hash();
     my %ssl_vhosts = map {
         $_ =~ s/_SSL$//;
         $_ => 1
-    } grep { substr( $_, -4 ) eq '_SSL' ? 1 : 0 } keys %$vhosts_hr;
+    } grep { substr( $_, -4 ) eq '_SSL' ? 1 : 0 } keys %{ _get_httpd_vhosts_hash() };
 
     return \%ssl_vhosts;
+}
+
+our $httpd_vhosts_hr;
+
+sub _get_httpd_vhosts_hash {
+    return unless ( eval { require Cpanel::ConfigFiles::Apache::Config; 1; } );
+
+    $httpd_vhosts_hr ||= Cpanel::ConfigFiles::Apache::Config::get_httpd_vhosts_hash();
+
+    return $httpd_vhosts_hr;
 }
 
 my $standalone;

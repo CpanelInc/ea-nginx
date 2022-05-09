@@ -28,3 +28,29 @@ ssl_ciphers [% ea4conf.sslciphersuite %];
 proxy_ssl_ciphers [% ea4conf.sslciphersuite %];
 [% END -%]
 ssl_dhparam /usr/local/cpanel/etc/dhparam_from_cpanel.pem;
+
+################################################################
+#### This is to support keepalive; this is not load balancing ##
+################################################################
+[%- BLOCK keepalives %]
+    [%- IF ea4conf.keepalive == "On" %]
+    keepalive [% settings.keepalive || 42 %];
+    keepalive_timeout [% ea4conf.keepalivetimeout %];
+    keepalive_requests [% ea4conf.maxkeepaliverequests || 100 %]; # Apache being set to Unlimited results in 100 here for safety
+        [%- IF settings.keepalive_time %]
+    keepalive_time [% settings.keepalive_time %];
+        [%- END %]
+    [%- ELSE %]
+    # Keepalive is disabled
+    [%- END %]
+[%- END %]
+[%- FOREACH ip IN ips %]
+upstream apache_backend_https_[% ip.replace("\\.", "_") %] {
+    server [% ip %]:[% settings.apache_ssl_port %];
+    [%- INCLUDE keepalives %]
+}
+upstream apache_backend_http_[% ip.replace("\\.", "_") %] {
+    server [% ip %]:[% settings.apache_port %];
+    [%- INCLUDE keepalives %]
+}
+[% END %]

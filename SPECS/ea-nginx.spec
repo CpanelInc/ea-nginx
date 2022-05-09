@@ -752,6 +752,7 @@ fi
 %changelog
 * Mon May 02 2022 Dan Muey <dan@cpanel.net> - 1.21.6-13
 - ZC-9931: Ensure that a pre-existing cache.json/settings.json is respected when ea-nginx is installed
+- ZC-9371: enable keepalive support
 
 * Tue Apr 12 2022 Tim Mullin <tim@cpanel.net> - 1.21.6-12
 - EA-10535: Fix SSL certificate handling for custom mail subdomains
