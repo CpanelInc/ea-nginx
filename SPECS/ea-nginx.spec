@@ -755,6 +755,7 @@ fi
 - ZC-9371: enable keepalive support
 - ZC-9939: optimize proxy sub-domain configuration
 - ZC-9952: Allow setting `worker_shutdown_timeout` via /etc/nginx/ea-nginx/settings.json
+- EA-10673: Increase `proxy_headers_hash_bucket_size` to 128 in cpanel-proxy-xt.conf
 
 * Tue Apr 12 2022 Tim Mullin <tim@cpanel.net> - 1.21.6-12
 - EA-10535: Fix SSL certificate handling for custom mail subdomains
