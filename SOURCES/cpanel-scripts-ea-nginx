@@ -595,7 +595,7 @@ sub _write_global_cpanel_localhost {
 proxy_set_header cPanel-localhost $val;
 
 # for secure use of proxying to Apache w/ mod_remoteip
-proxy_headers_hash_bucket_size 80;
+proxy_headers_hash_bucket_size 128;
 proxy_set_header X-Forwarded-For-$val \$proxy_add_x_forwarded_for;
 CPANEL_PROXY
     $path->spew($contents);
