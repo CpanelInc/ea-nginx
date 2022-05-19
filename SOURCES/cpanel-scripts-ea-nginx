@@ -45,6 +45,7 @@ our $var_cache_ea_nginx                = '/var/cache/ea-nginx';
 our $var_cpanel_userdata               = '/var/cpanel/userdata';
 our $etc_nginx                         = '/etc/nginx';
 our $settings_file                     = '/etc/nginx/ea-nginx/settings.json';
+our $cache_file                        = '/etc/nginx/ea-nginx/cache.json';
 our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
@@ -131,6 +132,22 @@ sub run {
     use warnings 'once';
 
     # ^^^ /need to have App::CmdDispatch do this automatically see CPANEL-22328
+
+    my $custom_settings_path = path("/var/nginx/ea-nginx/settings.json");
+    if ( $custom_settings_path->exists ) {
+
+        # do not allow specifying apache_ ones
+        my $new = Cpanel::JSON::LoadFile("/var/nginx/ea-nginx/settings.json");
+        my $cur = Cpanel::JSON::LoadFile($settings_file);
+        for my $key (qw(apache_port apache_port_ip apache_ssl_port apache_ssl_port_ip)) {
+            $new->{$key} = $cur->{$key};
+        }
+        _write_json( "/var/nginx/ea-nginx/settings.json", $new );
+        $custom_settings_path->move($settings_file);
+    }
+
+    my $custom_cache_path = path("/var/nginx/ea-nginx/cache.json");
+    $custom_cache_path->move($cache_file) if $custom_cache_path->exists;
 
     return App::CmdDispatch->new( $cmds, $opts )->run(@argv);
 }
@@ -237,7 +254,7 @@ sub cache_config {
     my ( $app, $which, @flags ) = @_;
     die "First argument to `cache` must be `--system` or a cPanel user name\n" if !length $which;
 
-    my $file       = $etc_nginx . "/ea-nginx/cache.json";
+    my $file       = $cache_file;
     my $config_arg = "--all";
 
     if ( $which ne "--system" ) {
@@ -578,7 +595,7 @@ sub _write_global_cpanel_localhost {
 proxy_set_header cPanel-localhost $val;
 
 # for secure use of proxying to Apache w/ mod_remoteip
-proxy_headers_hash_bucket_size 80;
+proxy_headers_hash_bucket_size 128;
 proxy_set_header X-Forwarded-For-$val \$proxy_add_x_forwarded_for;
 CPANEL_PROXY
     $path->spew($contents);
@@ -619,6 +636,19 @@ sub _write_global_nginx_conf {
     my $main = path("/etc/nginx/nginx.conf");
     my $cont = $main->slurp;
     $cont =~ s/^(\s*worker_processes\s+)\S+(\s*;)/$1$val$2/gm;
+
+    if ( exists $local_settings->{worker_shutdown_timeout} && length( $local_settings->{worker_shutdown_timeout} ) ) {
+        if ( $cont =~ m/^\s*worker_shutdown_timeout\s+/m ) {
+            $cont =~ s/^(\s*worker_shutdown_timeout\s+)\S+(\s*;)/$1$local_settings->{worker_shutdown_timeout}$2/gm;
+        }
+        else {
+            $cont =~ s/^((\s*)worker_processes(\s+)\S+.*\n)/$1$2worker_shutdown_timeout$3$local_settings->{worker_shutdown_timeout};\n/gm;
+        }
+    }
+    else {
+        $cont =~ s/^\s*worker_shutdown_timeout\s+.*\n?//gm;
+    }
+
     $main->spew($cont);
 
     return 1;
@@ -718,9 +748,15 @@ sub _get_settings_hr {
 sub _write_global_ea_nginx {
     my $cur_settings = _get_settings_hr();
     my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
-    return _render_tt_to_file( 'ea-nginx.conf.tt' => 'ea-nginx.conf', { ea4conf => $ea4_conf_hr, settings => $cur_settings } );
-}
 
+    my $vhosts = _get_httpd_vhosts_hash();
+    my %ips    = map { $vhosts->{$_}{ip} => 1 } keys %{$vhosts};
+
+    return _render_tt_to_file(
+        'ea-nginx.conf.tt' => 'ea-nginx.conf',
+        { ea4conf => $ea4_conf_hr, settings => $cur_settings, ips => [ sort keys %ips ] }
+    );
+}
 our $cpconf_hr;
 
 sub _settings_defaults {
@@ -844,7 +880,7 @@ sub _write_user_conf {
 our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
 
 sub caching_global {
-    my $caching_global = Cpanel::JSON::LoadFile("/etc/nginx/ea-nginx/cache.json");
+    my $caching_global = Cpanel::JSON::LoadFile($cache_file);
 
     # UGMO :/ clean it up if the touch file exists and they have the defaults
     # if they happen to edit it and make it the default and they really want that then they should not have this touchfile
@@ -860,7 +896,7 @@ sub caching_global {
             warn "Changing default `proxy_cache_valid` to micro-cache version per the existance of the `/etc/nginx/ea-nginx/enable.micro-cache-defaults` touch-file\n";
             delete $caching_global->{proxy_cache_valid}{"200 301 302"};
             $caching_global->{proxy_cache_valid}{"301 302"} = "5m";
-            _write_json( "/etc/nginx/ea-nginx/cache.json", $caching_global );
+            _write_json( $cache_file, $caching_global );
         }
     }
     else {
@@ -874,7 +910,7 @@ sub caching_global {
             warn "Changing default `proxy_cache_valid` to non-micro-cache version per the absence of the `/etc/nginx/ea-nginx/enable.micro-cache-defaults` touch-file\n";
             $caching_global->{proxy_cache_valid}{"200 301 302"} = "60m";
             delete $caching_global->{proxy_cache_valid}{"301 302"};
-            _write_json( "/etc/nginx/ea-nginx/cache.json", $caching_global );
+            _write_json( $cache_file, $caching_global );
         }
     }
 
@@ -944,15 +980,22 @@ sub _get_group_for {
 our $domains_with_ssl;
 
 sub _get_domains_with_ssls {
-    return unless ( eval { require Cpanel::ConfigFiles::Apache::Config; 1; } );
-
-    my $vhosts_hr  = Cpanel::ConfigFiles::Apache::Config::get_httpd_vhosts_hash();
     my %ssl_vhosts = map {
         $_ =~ s/_SSL$//;
         $_ => 1
-    } grep { substr( $_, -4 ) eq '_SSL' ? 1 : 0 } keys %$vhosts_hr;
+    } grep { substr( $_, -4 ) eq '_SSL' ? 1 : 0 } keys %{ _get_httpd_vhosts_hash() };
 
     return \%ssl_vhosts;
+}
+
+our $httpd_vhosts_hr;
+
+sub _get_httpd_vhosts_hash {
+    return unless ( eval { require Cpanel::ConfigFiles::Apache::Config; 1; } );
+
+    $httpd_vhosts_hr ||= Cpanel::ConfigFiles::Apache::Config::get_httpd_vhosts_hash();
+
+    return $httpd_vhosts_hr;
 }
 
 my $standalone;
@@ -1047,6 +1090,14 @@ sub _render_and_append {
 
     $domains_with_ssl ||= _get_domains_with_ssls();
 
+    my @service_subdomains;
+    $httpd_vhosts_hr ||= _get_httpd_vhosts_hash();
+    if ( exists $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains} ) {
+        for my $sub ( sort keys %{ $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains} } ) {
+            push @service_subdomains, map { "$sub.$_" } @{ $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains}{$sub} };
+        }
+    }
+
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
     if ( !-f $combined_tls ) {
         if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
@@ -1080,6 +1131,7 @@ sub _render_and_append {
             ssl_redirect        => $ssl_redirect,
             secruleengineoff    => $secruleengineoff,
             domains             => $domains,
+            service_subdomains  => \@service_subdomains,
             user                => $user,
             group               => $group,
             ( defined $uid ? ( uid => $uid ) : () ),

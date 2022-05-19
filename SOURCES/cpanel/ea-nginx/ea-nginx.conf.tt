@@ -28,3 +28,50 @@ ssl_ciphers [% ea4conf.sslciphersuite %];
 proxy_ssl_ciphers [% ea4conf.sslciphersuite %];
 [% END -%]
 ssl_dhparam /usr/local/cpanel/etc/dhparam_from_cpanel.pem;
+
+################################################################
+#### This is to support keepalive; this is not load balancing ##
+################################################################
+[%- BLOCK keepalives %]
+    [%- IF ea4conf.keepalive == "On" %]
+
+    # set in /etc/nginx/ea-nginx/settings.json, default is 32
+    keepalive [% settings.keepalive || 32 %];
+
+    # set in EA4 global config (WHM/Service Configuration/Apache Configuration)
+    keepalive_timeout [% ea4conf.keepalivetimeout %]; # no suffix means seconds
+
+    # set in EA4 global config (WHM/Service Configuration/Apache Configuration)
+    # Apache being set to Unlimited results in 1000 here since NGINX does not have an equivalent to unlimited
+    keepalive_requests [% ea4conf.maxkeepaliverequests || 1000 %];
+
+        [%- IF settings.keepalive_time %]
+    # set in /etc/nginx/ea-nginx/settings.json
+    keepalive_time [% settings.keepalive_time %];
+        [%- ELSE %]
+    # keepalive_time can be set in /etc/nginx/ea-nginx/settings.json
+        [%- END %]
+    [%- ELSE %]
+    # Keepalive is disabled
+    [%- END %]
+
+    # To see how your keepalive config tuning behaves:
+    #    1. Ensure NGINX caching is disabled
+    #    2. Ensure NGINX `worker_processes` is 1
+    #    3. make sure Apache and NGINX are restarted fully
+    #       * There should be no lingering TCP connections between NGINX to Apache.
+    #    4. Monitor TCP connections between NGINX to Apache:
+    #       * `netstat -an | grep -c :[% port %]`
+    #    5. Generate traffic with `ab` with various concurrent connections to various
+    #       * Using step 4 to see if the number of connections is what you are aiming for
+[%- END %]
+[%- FOREACH ip IN ips %]
+upstream apache_backend_https_[% ip.replace("\\.", "_") %] {
+    server [% ip %]:[% settings.apache_ssl_port %]; # needs to be before keepalive configs
+    [%- PROCESS keepalives port=settings.apache_ssl_port %]
+}
+upstream apache_backend_http_[% ip.replace("\\.", "_") %] {
+    server [% ip %]:[% settings.apache_port %]; # needs to be before keepalive configs
+    [%- PROCESS keepalives port=settings.apache_port %]
+}
+[% END %]

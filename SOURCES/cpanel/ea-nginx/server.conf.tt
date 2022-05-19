@@ -18,14 +18,11 @@ server {
 
     include conf.d/includes-optional/cloudflare.conf;
 
+    set $CPANEL_APACHE_PROXY_PASS $scheme://apache_backend_${scheme}_[% proxy_ip ? proxy_ip.replace("\\.", "_") : settings.apache_port_ip.replace("\\.", "_") %];
+
+    # For includes:
     set $CPANEL_APACHE_PROXY_IP [% proxy_ip || settings.apache_port_ip %];
     set $CPANEL_APACHE_PROXY_SSL_IP [% proxy_ip || settings.apache_port_ip %];
-    set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_PORT;
-    set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_IP;
-    if ($scheme = https) {
-        set $CPANEL_APACHE_PROXY_REQ_PORT $CPANEL_APACHE_PROXY_SSL_PORT;
-        set $CPANEL_APACHE_PROXY_REQ_IP $CPANEL_APACHE_PROXY_SSL_IP;
-    }
 
     [%- IF behavior.caching.enabled %]
     set $CPANEL_PROXY_CACHE [% user %];
@@ -77,7 +74,7 @@ server {
         access_log off;
         [%- IF !behavior.standalone %]
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
         [%- END %]
     }
 
@@ -87,7 +84,7 @@ server {
         access_log off;
         [%- IF !behavior.standalone %]
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+	proxy_pass $CPANEL_APACHE_PROXY_PASS;
         [%- END %]
     }
 
@@ -120,7 +117,7 @@ server {
         [%- END %]
 
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
     }
 
     [%- IF has_wordpress %]
@@ -141,7 +138,7 @@ server {
         proxy_cache_bypass 1;
 
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass $scheme://$CPANEL_APACHE_PROXY_REQ_IP:$CPANEL_APACHE_PROXY_REQ_PORT;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
     }
             [% END -%]
         [% END -%]
@@ -254,19 +251,7 @@ server {
     include conf.d/includes-optional/cpanel-server-parsed-location.conf;
     [% END -%]
 }
-
-# nginx does not support a subdomain of a wildcard domain
-# Example:  whm.*.mydomain.tld would not be allowed
-[%- SET domains = domains.grep('^[^\*]') %]
-
-[%- IF ssl_certificate && ssl_certificate_key && proxysubdomains_enabled && domains.size %]
-#### SSL Proxies for [% domains.join(', ') %] ##
-    [%- SET subdom_map = {
-            cpanel  = 2082, webmail    = 2095, whm        = 2086,
-            webdisk = 2077, cpcontacts = 2079, cpcalendars = 2079,
-        }
-    -%]
-    [%- FOREACH proxy_subdomain IN subdom_map.keys.sort %]
+[%- IF ssl_certificate && ssl_certificate_key && proxysubdomains_enabled && service_subdomains.size %]
 server {
     listen 80;
     [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
@@ -277,7 +262,7 @@ server {
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
 
-    server_name [% FOREACH domain IN domains %] [% proxy_subdomain %].[% domain %][% END %];
+    server_name [% FOREACH svc_sub IN service_subdomains %] [% svc_sub %][% END %];
 
     [%- IF secruleengineoff %]
     modsecurity off;
@@ -288,6 +273,12 @@ server {
     [% END -%]
 
     include conf.d/includes-optional/cloudflare.conf;
+
+    set $CPANEL_APACHE_PROXY_PASS $scheme://apache_backend_${scheme}_[% proxy_ip ? proxy_ip.replace("\\.", "_") : settings.apache_port_ip.replace("\\.", "_") %];
+
+    # For includes:
+    set $CPANEL_APACHE_PROXY_IP [% proxy_ip || settings.apache_port_ip %];
+    set $CPANEL_APACHE_PROXY_SSL_IP [% proxy_ip || settings.apache_port_ip %];
 
     location /.well-known/cpanel-dcv {
         root [% docroot %];
@@ -310,30 +301,14 @@ server {
             return 301 https://$host$request_uri;
         }
 
-        [%- IF proxy_subdomain.match('^(?:cpanel|webmail|whm)$') %]
-        # since proxy_set_header can not be done inside an if block we jump though hoops
-        # default value is empty because the header will be only sent if $value is not empty
-        set $upgrade_value "";
-        set $connection_value "";
+        # no cache
+        proxy_cache off;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
 
-        if ($http_upgrade ~* ^websocket$) {
-            set $upgrade_value $http_upgrade;
-            set $connection_value "upgrade";
-        }
-
-        # In nginx you still need to use `http` for protocol in your url and not `ws`.
-        # The `ws` and `wss` protocol are required for browser, in the nginx side we add
-        #   the headers below to handle the websockets over `http`.
-        proxy_set_header Upgrade $upgrade_value; # the header will be only sent if $upgrade_value is not empty
-        proxy_set_header Connection $connection_value; # the header will be only sent if $connection_value is not empty
+        # pass to Apache
         include conf.d/includes-optional/cpanel-proxy.conf;
-        proxy_pass_header Upgrade; # this is hidden in cpanel-proxy.conf, but is needed for websockets
-        [%- ELSE %]
-        include conf.d/includes-optional/cpanel-proxy.conf;
-        [%- END %]
-        proxy_pass http://127.0.0.1:[% subdom_map.$proxy_subdomain %];
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
     }
 }
-
-    [%- END -%]
-[%- END -%]
+[%- END %]
