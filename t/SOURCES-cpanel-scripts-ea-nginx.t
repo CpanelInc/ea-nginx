@@ -14,7 +14,9 @@ use File::Glob ();
 use File::Temp;
 use Path::Tiny;
 
-use Cpanel::Config::userdata::Load ();
+use Cpanel::Config::userdata::Load         ();
+use Cpanel::ConfigFiles::Apache::Config    ();
+use Cpanel::Config::LoadUserDomains::Count ();
 
 our $system_calls   = [];
 our $system_rv      = 0;
@@ -178,7 +180,7 @@ describe "ea-nginx script" => sub {
             it "should create the config for the given user if needed" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 modulino_run_trap( config => "cpuser$$" );
-                ok -d $mock->filename;
+                ok -d $mock->path;
                 is_deeply \@_write_user_conf, [ ["cpuser$$"] ];
             };
 
@@ -190,7 +192,7 @@ describe "ea-nginx script" => sub {
             xit "should create a config for all users given --all" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 modulino_run_trap( config => "--all" );
-                ok -d $mock->filename;
+                ok -d $mock->path;
                 is_deeply \@_write_user_conf, [ ["cpuser$$"], ["other$$"] ];
             };
 
@@ -676,7 +678,7 @@ describe "ea-nginx script" => sub {
 
                     it "should try unlinking the given file" => sub {
                         my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/derp$$.conf", "oh hai" );
-                        trap { scripts::ea_nginx::_reload( $mock->filename ) };
+                        trap { scripts::ea_nginx::_reload( $mock->path ) };
                         ok !-e $mock->path();
                     };
 
@@ -688,7 +690,7 @@ describe "ea-nginx script" => sub {
 
                     it "should restart again (exit unclean on success)" => sub {
                         my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/derp$$.conf", "oh hai" );
-                        trap { scripts::ea_nginx::_reload( $mock->filename ) };
+                        trap { scripts::ea_nginx::_reload( $mock->path ) };
                         is_deeply $system_calls, [ ['/usr/local/cpanel/scripts/restartsrv_nginx reload'], ['/usr/local/cpanel/scripts/restartsrv_nginx reload'] ];
                         is $trap->exit, 1;
                     };
@@ -697,7 +699,7 @@ describe "ea-nginx script" => sub {
                         my $rv = 1;
                         local $current_system = sub { push @{$system_calls}, [@_]; $rv-- };
                         my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/derp$$.conf", "oh hai" );
-                        trap { scripts::ea_nginx::_reload( $mock->filename ) };
+                        trap { scripts::ea_nginx::_reload( $mock->path ) };
                         is_deeply $system_calls, [ ['/usr/local/cpanel/scripts/restartsrv_nginx reload'], ['/usr/local/cpanel/scripts/restartsrv_nginx reload'] ];
                         is $trap->exit, undef;
                     };
@@ -1046,6 +1048,7 @@ describe "ea-nginx script" => sub {
 
             local $scripts::ea_nginx::var_cpanel_userdata = $ti{temp_dir} . "/userdata";
             local $scripts::ea_nginx::etc_nginx           = $ti{temp_dir} . "/etc_nginx";
+            local $scripts::ea_nginx::cache_file          = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
 
             mkdir $scripts::ea_nginx::var_cpanel_userdata;
             mkdir $scripts::ea_nginx::var_cpanel_userdata . "/ipman";
@@ -1089,10 +1092,7 @@ describe "ea-nginx script" => sub {
                 scripts::ea_nginx::cache_config( {}, "ipman" );
             };
 
-            is(
-                $trap->stdout, q/{}
-/
-            );
+            is( $trap->stdout, "{}\n" );
         };
 
         it "should show users config file if no flags passed after user" => sub {
@@ -1137,7 +1137,7 @@ describe "ea-nginx script" => sub {
             };
 
             # load the file, it should match the caching_defaults
-            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $file      = $scripts::ea_nginx::cache_file;
             my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
 
             my %expected = scripts::ea_nginx::caching_defaults();
@@ -1146,7 +1146,7 @@ describe "ea-nginx script" => sub {
             cmp_deeply( $from_file, \%expected );
         };
 
-        it "should user file should be deleted if user passed on reset" => sub {
+        it "should delete user file if user arg also has --reset" => sub {
             my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
             Path::Tiny::path($file)->spew('{ enabled: true }');
 
@@ -1166,7 +1166,7 @@ describe "ea-nginx script" => sub {
         };
 
         it "config should not be called if resetting a user with no rebuild" => sub {
-            my $file = $scripts::ea_nginx::var_cpanel_userdata . "/ipman/nginx-cache.json";
+            my $file = $scripts::ea_nginx::cache_file;
             Path::Tiny::path($file)->spew('{ enabled: true }');
 
             trap {
@@ -1201,7 +1201,7 @@ describe "ea-nginx script" => sub {
             };
 
             # load the file, it should match the caching_defaults
-            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $file      = $scripts::ea_nginx::cache_file;
             my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
 
             my %expected = ( enabled => JSON::PP::true() );
@@ -1215,11 +1215,10 @@ describe "ea-nginx script" => sub {
             };
 
             # load the file, it should match the caching_defaults
-            my $file      = $scripts::ea_nginx::etc_nginx . "/ea-nginx/cache.json";
+            my $file      = $scripts::ea_nginx::cache_file;
             my $from_file = eval { Cpanel::JSON::LoadFile($file) } || {};
 
             my %expected = ( enabled => JSON::PP::false() );
-
             cmp_deeply( $from_file, \%expected );
         };
 
