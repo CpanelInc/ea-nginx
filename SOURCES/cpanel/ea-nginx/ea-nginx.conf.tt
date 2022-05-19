@@ -61,7 +61,7 @@ ssl_dhparam /usr/local/cpanel/etc/dhparam_from_cpanel.pem;
     #    3. make sure Apache and NGINX are restarted fully
     #       * There should be no lingering TCP connections between NGINX to Apache.
     #    4. Monitor TCP connections between NGINX to Apache:
-    #       * `netstat -ab | grep -c :[% port %]`
+    #       * `netstat -an | grep -c :[% port %]`
     #    5. Generate traffic with `ab` with various concurrent connections to various
     #       * Using step 4 to see if the number of connections is what you are aiming for
 [%- END %]
