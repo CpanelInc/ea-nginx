@@ -1,0 +1,45 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - ea4-tool-post-update                 Copyright(c) 2022 cPanel, L.L.C.
+#                                                           All rights Reserved.
+# copyright@cpanel.net                                         http://cpanel.net
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+package ea_nginx::ea4_tool_post_update;
+
+use strict;
+use warnings;
+
+use lib "../ea-tools/lib/ea4_tool";    # assumes ea-tools is checked out next to this repo
+use ea4_tool::util ();
+use File::chdir;
+use Path::Tiny;
+
+exit( run(@ARGV) ? 0 : 1 ) if !caller;
+
+sub run {
+    my ( $old_ver, $new_ver ) = @_;
+
+    # Update the include binary for debian to the newest sourceball version
+    my $file  = 'debify/debian/source/include-binaries';
+    my @lines = path($file)->lines;
+    foreach my $line (@lines) {
+        if ( $line =~ /\Q$old_ver\E/ ) {
+            $line =~ s/\Q$old_ver\E/$new_ver/;
+        }
+    }
+
+    path($file)->spew(@lines);
+
+    print "Committing change to $file …\n";
+    my $git    = ea4_tool::util::git($CWD);
+    my $branch = $git->current_branch();
+
+    $git->run( add    => $file );
+    $git->run( commit => "-m", "$branch: ea4-tool-post-update update include-binaries to new tarball" );
+    ea4_tool::util::pushup( $git, $branch );
+
+    print "Done!\n";
+    return 1;
+}
+
+1;
