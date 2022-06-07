@@ -752,6 +752,7 @@ fi
 %changelog
 * Tue Jun 07 2022 Dan Muey <dan@cpanel.net> - 1.22.0-2
 - ZC-9940: Change worker_processes default back to 1
+- ZC-9940: Have worker_shutdown_timeout default to 10 seconds
 
 * Thu May 26 2022 Cory McIntire <cory@cpanel.net> - 1.22.0-1
 - EA-10736: Update ea-nginx from v1.21.6 to v1.22.0
