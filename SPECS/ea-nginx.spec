@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -750,6 +750,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Jun 07 2022 Dan Muey <dan@cpanel.net> - 1.22.0-2
+- ZC-9940: Change worker_processes default back to 1
+
 * Thu May 26 2022 Cory McIntire <cory@cpanel.net> - 1.22.0-1
 - EA-10736: Update ea-nginx from v1.21.6 to v1.22.0
 

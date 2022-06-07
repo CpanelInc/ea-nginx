@@ -622,14 +622,14 @@ sub _write_cpanel_localhost_header {
 }
 
 sub _write_global_nginx_conf {
-    my $val            = "auto";
+    my $val            = "1";
     my $local_settings = Cpanel::JSON::LoadFile($settings_file);
-    if ( exists $local_settings->{worker_processes} && $local_settings->{worker_processes} ne "auto" ) {
-        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ ) {
+    if ( exists $local_settings->{worker_processes} ) {
+        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ || $local_settings->{worker_processes} eq "1" ) {
             $val = $local_settings->{worker_processes};
         }
         else {
-            warn "Custom `worker_processes` in “$settings_file” is not a number, falling back to “auto” …\n";
+            warn "Custom `worker_processes` in “$settings_file” is not a number (and is not “auto”), falling back to “1” …\n";
         }
     }
 
