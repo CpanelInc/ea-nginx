@@ -622,32 +622,34 @@ sub _write_cpanel_localhost_header {
 }
 
 sub _write_global_nginx_conf {
-    my $val            = "auto";
+    my $main = path("/etc/nginx/nginx.conf");
+    my $cont = $main->slurp;
+
     my $local_settings = Cpanel::JSON::LoadFile($settings_file);
-    if ( exists $local_settings->{worker_processes} && $local_settings->{worker_processes} ne "auto" ) {
-        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ ) {
+
+    # worker_processes
+    my $val = "1";
+    if ( exists $local_settings->{worker_processes} ) {
+        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ || $local_settings->{worker_processes} eq "1" ) {
             $val = $local_settings->{worker_processes};
         }
         else {
-            warn "Custom `worker_processes` in “$settings_file” is not a number, falling back to “auto” …\n";
+            warn "Custom `worker_processes` in “$settings_file” is not a number (and is not “auto”), falling back to “$val” …\n";
         }
     }
-
-    my $main = path("/etc/nginx/nginx.conf");
-    my $cont = $main->slurp;
     $cont =~ s/^(\s*worker_processes\s+)\S+(\s*;)/$1$val$2/gm;
 
-    if ( exists $local_settings->{worker_shutdown_timeout} && length( $local_settings->{worker_shutdown_timeout} ) ) {
-        if ( $cont =~ m/^\s*worker_shutdown_timeout\s+/m ) {
-            $cont =~ s/^(\s*worker_shutdown_timeout\s+)\S+(\s*;)/$1$local_settings->{worker_shutdown_timeout}$2/gm;
+    # worker_shutdown_timeout
+    $val = "10s";
+    if ( exists $local_settings->{worker_shutdown_timeout} ) {
+        if ( $local_settings->{worker_shutdown_timeout} =~ m/^[1-9][0-9]*(?:ms|[smhdwMy])?$/ ) {
+            $val = $local_settings->{worker_shutdown_timeout};
         }
         else {
-            $cont =~ s/^((\s*)worker_processes(\s+)\S+.*\n)/$1$2worker_shutdown_timeout$3$local_settings->{worker_shutdown_timeout};\n/gm;
+            warn "Custom `worker_shutdown_timeout` in “$settings_file” is not an NGINX time value, falling back to “$val” …\n";
         }
     }
-    else {
-        $cont =~ s/^\s*worker_shutdown_timeout\s+.*\n?//gm;
-    }
+    $cont =~ s/^(\s*worker_shutdown_timeout\s+)\S+(\s*;)/$1$val$2/gm;
 
     $main->spew($cont);
 
