@@ -630,7 +630,7 @@ sub _write_global_nginx_conf {
     # worker_processes
     my $val = "1";
     if ( exists $local_settings->{worker_processes} ) {
-        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ || $local_settings->{worker_processes} eq "1" ) {
+        if ( $local_settings->{worker_processes} =~ m/^[1-9][0-9]*$/ || $local_settings->{worker_processes} eq "auto" ) {
             $val = $local_settings->{worker_processes};
         }
         else {
