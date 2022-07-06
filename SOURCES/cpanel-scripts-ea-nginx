@@ -51,15 +51,16 @@ our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
 our $proxy_header_file                 = '/etc/nginx/ea-nginx/cpanel_localhost_header.json';
 our $cpanel_proxy_file                 = '/etc/nginx/conf.d/includes-optional/cpanel-proxy-xt.conf';
+our $serial_touch_file                 = '/etc/nginx/ea-nginx/serial_config_mode';
 
 my $nginxroot = "/etc/nginx";
 
 my $cmds = {
     config => {
         code     => \&config,
-        clue     => "config [--all|--global|<user>] [--no-reload]",
+        clue     => "config [--all|--global|<user>] [--no-reload] [--serial]",
         abstract => 'Build nginx configuration for users',
-        help     => "Build nginx configuration for one or all users.\n\t--global will only rebuild global configurations and executes anything in /etc/nginx/ea-nginx/config-scripts/global/\n\t--all implies --global and re-does configuration for all users",
+        help     => "Build nginx configuration for one or all users.\n\t--global will only rebuild global configurations and executes anything in /etc/nginx/ea-nginx/config-scripts/global/\n\t--all implies --global and re-does configuration for all users\n\t--serial used with --all will build the config synchronously.  Otherwise, the script default is to build the config in parallel",
     },
     reload => {
         code     => \&reload,
@@ -195,6 +196,9 @@ sub config {
 
     my $reload = grep( { $_ eq '--no-reload' } @args ) ? 0 : 1;
 
+    my $use_serial_mode = grep( { $_ eq '--serial' } @args ) ? 1 : 0;
+    $use_serial_mode = 1 if -e $serial_touch_file;
+
     if ( $user eq '--all' || $user eq '--global' ) {
         _write_global_cpanel_localhost();
         _write_global_logging();
@@ -205,20 +209,14 @@ sub config {
         _write_global_cpanel_proxy_non_ssl();
         _do_other_global_config();
 
-        my %errors;
+        my $errors = {};
         if ( $user eq '--all' ) {
             mkdir "/etc/nginx/conf.d/users/";
             unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
-            my $user_lookup = _get_user_domains();
-            mce_loop {
-                my ( $mce, $chunk_ref ) = @_;
-
-                foreach my $usr (@$chunk_ref) {
-                    eval { _write_user_conf($usr); };
-                    MCE->gather( $usr, $@ ) if $@;
-                }
-            }
-            keys %$user_lookup;
+            my $errors =
+              $use_serial_mode
+              ? _update_user_configs_in_serial_mode()
+              : _update_user_configs_in_parallel_mode();
         }
 
         if ($reload) {
@@ -226,10 +224,10 @@ sub config {
             clear_cache();
         }
 
-        if ( keys %errors ) {
+        if ( keys %$errors ) {
             my $err = "";
-            for my $usr ( sort keys %errors ) {
-                $err .= "\tUser “$usr”: $errors{$usr}\n\n";
+            for my $usr ( sort keys %$errors ) {
+                $err .= "\tUser “$usr”: $errors->{$usr}\n\n";
             }
 
             die "The following user related errors need attention:\n$err";
@@ -1663,6 +1661,42 @@ sub _rebuild_and_restart_apache {
 
     Cpanel::HttpUtils::ApRestart::BgSafe::restart();
     return;
+}
+
+sub _update_user_configs_in_parallel_mode {
+
+    my $user_lookup = _get_user_domains();
+    my %errors      = mce_loop {
+        my ( $mce, $chunk_ref ) = @_;
+
+        my $err_href = _process_users($chunk_ref);
+        MCE->gather( $_, $err_href->{$_} ) for ( keys %$err_href );
+    }
+    keys %$user_lookup;
+
+    return \%errors;
+}
+
+sub _update_user_configs_in_serial_mode {
+    print "Serial mode detected.  User configuration will take longer …\n";
+
+    my $user_lookup = _get_user_domains();
+    my @users       = sort keys %$user_lookup;
+    my $errors      = _process_users( \@users );
+
+    return $errors;
+}
+
+sub _process_users {
+    my ($users) = @_;
+
+    my %errors;
+    foreach my $usr (@$users) {
+        eval { _write_user_conf($usr); };
+        $errors{$usr} = $@ if $@;
+    }
+
+    return \%errors;
 }
 
 1;
