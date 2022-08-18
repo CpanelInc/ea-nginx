@@ -1,5 +1,4 @@
 #!/usr/local/cpanel/3rdparty/bin/perl
-
 # cpanel - t/SOURCES-cpanel-scripts-ea-nginx.t     Copyright 2022 cPanel, L.L.C.
 #                                                           All rights Reserved.
 # copyright@cpanel.net                                         http://cpanel.net
@@ -7,6 +6,7 @@
 
 ## no critic qw(TestingAndDebugging::RequireUseStrict TestingAndDebugging::RequireUseWarnings)
 use Test::Spec;    # automatically turns on strict and warnings
+use Test::FailWarnings;
 
 use FindBin;
 use File::Glob ();
@@ -47,15 +47,23 @@ use Test::MockFile qw< nostrict >;
 
 use Test::Fatal qw( dies_ok lives_ok );
 
-my ( @_write_user_conf, @_reload );
-my $orig__write_user_conf        = \&scripts::ea_nginx::_write_user_conf;
-my $orig__reload                 = \&scripts::ea_nginx::_reload;
-my $orig__do_other_global_config = \&scripts::ea_nginx::_do_other_global_config;
+my ( @_write_user_conf, @_reload, @clear_cache );
+my $orig__write_user_conf           = \&scripts::ea_nginx::_write_user_conf;
+my $orig__reload                    = \&scripts::ea_nginx::_reload;
+my $orig_clear_cache                = \&scripts::ea_nginx::clear_cache;
+my $orig__do_other_global_config    = \&scripts::ea_nginx::_do_other_global_config;
+my $orig__update_for_custom_configs = \&scripts::ea_nginx::_update_for_custom_configs;
+my $orig__write_global_logging      = \&scripts::ea_nginx::_write_global_logging;
+my $orig__write_global_passenger    = \&scripts::ea_nginx::_write_global_passenger;
 
 no warnings "redefine";
-*scripts::ea_nginx::_write_user_conf        = sub { push @_write_user_conf, [@_] };
-*scripts::ea_nginx::_do_other_global_config = sub { };
-*scripts::ea_nginx::_reload                 = sub { push @_reload, [@_] };
+*scripts::ea_nginx::_write_user_conf           = sub { push @_write_user_conf, [@_] };
+*scripts::ea_nginx::_do_other_global_config    = sub { };
+*scripts::ea_nginx::_reload                    = sub { push @_reload,     [@_] };
+*scripts::ea_nginx::clear_cache                = sub { push @clear_cache, [@_] };
+*scripts::ea_nginx::_update_for_custom_configs = sub { };
+*scripts::ea_nginx::_write_global_logging      = sub { };
+*scripts::ea_nginx::_write_global_passenger    = sub { };
 use warnings "redefine";
 
 our $cpanel_json_loadfiles_string = "";
@@ -144,9 +152,7 @@ describe "ea-nginx script" => sub {
     share my %mi;
     around {
         no warnings "redefine", "once";
-        local $ENV{"scripts::ea_nginx::bail_die"}         = 1;
-        local *scripts::ea_nginx::_write_global_logging   = sub { };
-        local *scripts::ea_nginx::_write_global_passenger = sub { };
+        local $ENV{"scripts::ea_nginx::bail_die"} = 1;
         use warnings "redefine", "once";
 
         %mi = %conf;
@@ -154,7 +160,7 @@ describe "ea-nginx script" => sub {
         yield;
     };
 
-    before each => sub { @{$system_calls} = (); @_write_user_conf = (); @_reload = (); };
+    before each => sub { @{$system_calls} = (); @_write_user_conf = (); @_reload = (); @clear_cache = (); };
 
     it_should_behave_like "all App::CmdDispatch modulino scripts";
 
@@ -162,36 +168,71 @@ describe "ea-nginx script" => sub {
 
     describe "sub-command" => sub {
         describe "`config`" => sub {
+            my $called = 0;
+            my @_populate_domain_ips_except;
+
             around {
                 local $mi{cmd} = "config";
                 local @glob_res = ();
+
+                my $mock_lock_dir = Test::MockFile->dir('/var/cpanel/locks');
+
                 no warnings "redefine";
-                local *File::Glob::bsd_glob                                  = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
+                local *File::Glob::bsd_glob = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
+
+                my $mock_cpanel_fileguard = Test::MockModule->new('Cpanel::FileGuard');
+                $mock_cpanel_fileguard->redefine( new => sub { $called++; }, );
+
                 local *scripts::ea_nginx::_write_global_cpanel_localhost     = sub { };
-                local *scripts::ea_nginx::_write_global_nginx_conf           = sub { };
-                local *scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl = sub { };
                 local *scripts::ea_nginx::_write_global_ea_nginx             = sub { };
-                local *scripts::ea_nginx::ensure_valid_nginx_config          = sub { };
+                local *scripts::ea_nginx::_write_global_nginx_conf           = sub { };
                 local *scripts::ea_nginx::_write_global_default              = sub { };
+                local *scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl = sub { };
+                local *scripts::ea_nginx::ensure_valid_nginx_config          = sub { };
+
+                local *scripts::ea_nginx::_populate_domain_ips_except = sub { push @_populate_domain_ips_except, [@_]; };
                 yield;
             };
+
+            before each => sub { @_populate_domain_ips_except = (); };
+
             it_should_behave_like "any sub command that takes a cpanel user";
+
+            it 'should create aquire a lock via Cpanel::FileGuard before continuing' => sub {
+                modulino_run_trap( config => "--all", "--serial" );
+                is( $called, 1 );
+            };
+
+            it 'should call _update_user_configs_in_serial_mode() when give the --all and --serial flags' => sub {
+                no warnings 'redefine';
+                my $called_serial = 0;
+                local *scripts::ea_nginx::_update_user_configs_in_serial_mode = sub { $called_serial++; };
+                use warnings 'redefine';
+
+                modulino_run_trap( config => "--all", "--serial" );
+                is( $called_serial, 1 );
+            };
+
+            it 'should call _update_user_configs_in_parallel_mode() when given the --all flag (default)' => sub {
+                no warnings 'redefine';
+                my $called_parallel = 0;
+                local *scripts::ea_nginx::_update_user_configs_in_parallel_mode = sub { $called_parallel++; };
+                use warnings 'redefine';
+
+                modulino_run_trap( config => "--all" );
+                is( $called_parallel, 1 );
+            };
 
             it "should create the config for the given user if needed" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
-                modulino_run_trap( config => "cpuser$$" );
+                modulino_run_trap( config => "cpuser$$", "--serial" );
                 ok -d $mock->path;
                 is_deeply \@_write_user_conf, [ ["cpuser$$"] ];
             };
 
-            # I am not sure how to test this with MCE::Loop
-            # without a major redesign of this test
-            # @_write_user_conf is going out of scope now since
-            # it is being written to in a forked child process
-            # so the parent process still sees it as undef
-            xit "should create a config for all users given --all" => sub {
+            it "should create a config for all users given --all" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
-                modulino_run_trap( config => "--all" );
+                modulino_run_trap( config => "--all", "--serial" );
                 ok -d $mock->path;
                 is_deeply \@_write_user_conf, [ ["cpuser$$"], ["other$$"] ];
             };
@@ -200,14 +241,14 @@ describe "ea-nginx script" => sub {
                 my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile = Test::MockFile->file( "/etc/nginx/conf.d/users/iamnomore$$.conf", "i am conf hear me rawr" );
                 local @glob_res = ("/etc/nginx/conf.d/users/iamnomore$$.conf");
-                modulino_run_trap( config => "--all" );
+                modulino_run_trap( config => "--all", "--serial" );
                 ok !-e $mockfile->path();
             };
 
             it "should not do user config given --global" => sub {
                 my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile = Test::MockFile->file( "/etc/nginx/conf.d/users/iamnomore$$.conf", "i am conf hear me rawr" );
-                modulino_run_trap( config => "--global" );
+                modulino_run_trap( config => "--global", "--serial" );
                 ok -e $mockfile->path();
             };
 
@@ -217,7 +258,7 @@ describe "ea-nginx script" => sub {
                 local @glob_res = ("/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script");
                 no warnings "redefine";
                 local *scripts::ea_nginx::_do_other_global_config = $orig__do_other_global_config;
-                modulino_run_trap( config => "--global" );
+                modulino_run_trap( config => "--global", "--serial" );
                 like $trap->stdout, qr{Running \(global\) “/etc/nginx/ea-nginx/config-scripts/global/$$\.ima\.script” …};
             };
 
@@ -227,21 +268,21 @@ describe "ea-nginx script" => sub {
                 local @glob_res = ("/etc/nginx/ea-nginx/config-scripts/global/$$.ima.script");
                 no warnings "redefine";
                 local *scripts::ea_nginx::_do_other_global_config = $orig__do_other_global_config;
-                modulino_run_trap( config => "--all" );
+                modulino_run_trap( config => "--all", "--serial" );
                 like $trap->stdout, qr{Running \(global\) “/etc/nginx/ea-nginx/config-scripts/global/$$\.ima\.script” …};
             };
 
             it "should reload nginx (w/ new conf file) if --no-reload is not given (user)" => sub {
                 my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile = Test::MockFile->dir("/etc/nginx/conf.d/users/cpuser$$.conf");
-                modulino_run_trap( config => "cpuser$$" );
+                modulino_run_trap( config => "cpuser$$", "--serial" );
                 is_deeply \@_reload, [ [ $mockfile->path() ] ];
             };
 
             it "should not reload nginx if --no-reload is given (user)" => sub {
                 my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile = Test::MockFile->file("/etc/nginx/conf.d/users/cpuser$$.conf");
-                modulino_run_trap( config => "cpuser$$", "--no-reload" );
+                modulino_run_trap( config => "cpuser$$", "--no-reload", "--serial" );
                 is_deeply \@_reload, [];
             };
 
@@ -249,7 +290,7 @@ describe "ea-nginx script" => sub {
                 my $mock       = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile_a = Test::MockFile->file("/etc/nginx/conf.d/users/cpuser$$.conf");
                 my $mockfile_b = Test::MockFile->file("/etc/nginx/conf.d/users/other$$.conf");
-                modulino_run_trap( config => "--all" );
+                modulino_run_trap( config => "--all", "--serial" );
                 is_deeply \@_reload, [ [] ];
             };
 
@@ -257,18 +298,64 @@ describe "ea-nginx script" => sub {
                 my $mock       = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 my $mockfile_a = Test::MockFile->file("/etc/nginx/conf.d/users/cpuser$$.conf");
                 my $mockfile_b = Test::MockFile->file("/etc/nginx/conf.d/users/other$$.conf");
-                modulino_run_trap( config => "--all", "--no-reload" );
+                modulino_run_trap( config => "--all", "--no-reload", "--serial" );
                 is_deeply \@_reload, [];
+            };
+
+            it "should clear_cache if --no-reload is not given (user)" => sub {
+                my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
+                my $mockfile = Test::MockFile->dir("/etc/nginx/conf.d/users/cpuser$$.conf");
+                modulino_run_trap( config => "cpuser$$", "--serial" );
+                is_deeply \@clear_cache, [ ["cpuser$$"] ];
+            };
+
+            it "should not clear_cache if --no-reload is given (user)" => sub {
+                my $mock     = Test::MockFile->dir('/etc/nginx/conf.d/users/');
+                my $mockfile = Test::MockFile->file("/etc/nginx/conf.d/users/cpuser$$.conf");
+                modulino_run_trap( config => "cpuser$$", "--no-reload", "--serial" );
+                is_deeply \@clear_cache, [];
+            };
+
+            it "should clear_cache if --no-reload is not given (--all)" => sub {
+                my $mock       = Test::MockFile->dir('/etc/nginx/conf.d/users/');
+                my $mockfile_a = Test::MockFile->file("/etc/nginx/conf.d/users/cpuser$$.conf");
+                my $mockfile_b = Test::MockFile->file("/etc/nginx/conf.d/users/other$$.conf");
+                modulino_run_trap( config => "--all", "--serial" );
+                is_deeply \@clear_cache, [ [] ];
+            };
+
+            it "should not clear_cache if --no-reload is given (--all)" => sub {
+                my $mock       = Test::MockFile->dir('/etc/nginx/conf.d/users/');
+                my $mockfile_a = Test::MockFile->file("/etc/nginx/conf.d/users/cpuser$$.conf");
+                my $mockfile_b = Test::MockFile->file("/etc/nginx/conf.d/users/other$$.conf");
+                modulino_run_trap( config => "--all", "--no-reload", "--serial" );
+                is_deeply \@clear_cache, [];
+            };
+
+            it "should die if errors are found while updating user configs (--all)" => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_update_user_configs_in_parallel_mode = sub {
+                    return { "cpuser$$" => "bad things happened" };
+                };
+                use warnings 'redefine';
+
+                modulino_run_trap( config => "--all" );
+                $trap->did_die();
+            };
+
+            it "should _populate_domain_ips_except() for the given user" => sub {
+                modulino_run_trap( config => "cpuser$$" );
+                is_deeply \@_populate_domain_ips_except, [ ["cpuser$$"] ];
             };
 
             it "should have an alias `conf`" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
-                modulino_run_trap( conf => "cpuser$$" );
+                modulino_run_trap( conf => "cpuser$$", "--serial" );
                 ok -d $mock->path();
                 is_deeply \@_write_user_conf, [ ["cpuser$$"] ];
             };
 
-            describe "cPanel Password protected directories" => sub { it "should be tested" };
+            describe "cPanel Password protected directories" => sub { it "is tested by smold4r -- nginx-standalone.t and nginx-reverse_proxy.t" };
 
             describe "cPanel Domains -" => sub {
                 around {
@@ -602,6 +689,9 @@ describe "ea-nginx script" => sub {
                 local *scripts::ea_nginx::ensure_valid_nginx_config = sub { };
                 yield;
             };
+
+            before each => sub { @clear_cache = (); };
+
             it_should_behave_like "any sub command that takes a cpanel user";
 
             it "should remove the file if it exists" => sub {
@@ -641,10 +731,22 @@ describe "ea-nginx script" => sub {
                 is_deeply \@_reload, [ [] ];
             };
 
+            it "should clear_cache if --no-reload is not given" => sub {
+                my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/cpuser$$.conf", "# i am a config file" );
+                modulino_run_trap( remove => "cpuser$$" );
+                is_deeply \@clear_cache, [ ["cpuser$$"] ];
+            };
+
             it "should not reload nginx if --no-reload is given" => sub {
                 my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/cpuser$$.conf", "# i am a config file" );
                 modulino_run_trap( remove => "cpuser$$", "--no-reload" );
                 is_deeply \@_reload, [];
+            };
+
+            it "should not clear_cache if --no-reload is given" => sub {
+                my $mock = Test::MockFile->file( "/etc/nginx/conf.d/users/cpuser$$.conf", "# i am a config file" );
+                modulino_run_trap( remove => "cpuser$$", "--no-reload" );
+                is_deeply \@clear_cache, [];
             };
         };
 
@@ -798,6 +900,7 @@ describe "ea-nginx script" => sub {
             local $ti{delete_glob_called} = 0;
 
             no warnings "redefine";
+            local *scripts::ea_nginx::clear_cache        = $orig_clear_cache;
             local *scripts::ea_nginx::_validate_user_arg = sub { 1 };
             local *scripts::ea_nginx::_delete_glob       = sub {
                 my ($glob) = @_;
@@ -930,8 +1033,6 @@ describe "ea-nginx script" => sub {
             };
         };
 
-        describe "_delete_glob" => sub { it "should be tested" };
-
         describe "_get_nginx_bin" => sub {
             it "should die if the nginx binary is not executable" => sub {
                 my $mock = Test::MockFile->file( '/usr/sbin/nginx', 'nginx executable' );
@@ -1014,8 +1115,8 @@ describe "ea-nginx script" => sub {
                 my $hr = {};
 
                 no warnings 'redefine';
-                local *Cpanel::JSON::LoadFile         = sub { return; };
-                local *scripts::ea_nginx::_write_json = sub { $hr = $_[1]; };
+                local *scripts::ea_nginx::_get_settings_hr = sub { return; };
+                local *scripts::ea_nginx::_write_json      = sub { $hr = $_[1]; };
 
                 scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 );
                 is_deeply( $hr, { universe => 42 } );
@@ -1023,8 +1124,8 @@ describe "ea-nginx script" => sub {
 
             it "should return undef if called correctly" => sub {
                 no warnings 'redefine';
-                local *Cpanel::JSON::LoadFile         = sub { return; };
-                local *scripts::ea_nginx::_write_json = sub { return; };
+                local *scripts::ea_nginx::_get_settings_hr = sub { return; };
+                local *scripts::ea_nginx::_write_json      = sub { return; };
 
                 is( scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 ), undef );
             };
@@ -1036,6 +1137,1599 @@ describe "ea-nginx script" => sub {
                 local *Cpanel::Config::LoadUserDomains::Count::counttrueuserdomains = sub { return 42; };
 
                 is( scripts::ea_nginx::_get_num_current_users(), 42 );
+            };
+        };
+
+        describe "_write_global_cpanel_localhost" => sub {
+            my $wrote_new_header = 0;
+            my ( $contents, $perms );
+            around {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_write_cpanel_localhost_header = sub { $wrote_new_header++; };
+
+                local *Cpanel::JSON::LoadFile = sub { return { 'cPanel-localhost' => 'bigbrotheriswatchingyou' }; };
+
+                my $mock_path_tiny = Test::MockModule->new('Path::Tiny');
+                $mock_path_tiny->redefine(
+                    path  => sub { return bless {}, 'Path::Tiny' },
+                    spew  => sub { $contents = $_[1]; },
+                    chmod => sub { $perms    = $_[1]; },
+                );
+                yield;
+            };
+
+            before each => sub { $wrote_new_header = 0; };
+
+            it "should write ‘cpanel-proxy-xt.conf’ with the expected cPanel-localhost header" => sub {
+                scripts::ea_nginx::_write_global_cpanel_localhost();
+                like( $contents, qr/cPanel-localhost\sbigbrotheriswatchingyou/ );
+                like( $contents, qr/X-Forwarded-For-bigbrotheriswatchingyou/ );
+            };
+
+            it "should write ‘cpanel-proxy-xt.conf’ with the expected permissions" => sub {
+                scripts::ea_nginx::_write_global_cpanel_localhost();
+                is( $perms, 0600 );
+            };
+
+            describe 'caching behavior' => sub {
+                around {
+                    my $mock_path_tiny = Test::MockModule->new('Path::Tiny');
+                    $mock_path_tiny->redefine(
+                        path  => sub { return bless {}, 'Path::Tiny' },
+                        spew  => sub { },
+                        chmod => sub { },
+                    );
+                    yield;
+                };
+
+                it "should write the cpanel localhost header file if it does not exist" => sub {
+                    scripts::ea_nginx::_write_global_cpanel_localhost();
+                    is( $wrote_new_header, 1 );
+                };
+
+                it "should NOT write the cpanel localhost header file if it exists and was created in the last 30 minutes" => sub {
+                    my $mock_dir = File::Temp->newdir();
+                    local $scripts::ea_nginx::proxy_header_file = $mock_dir . '/cpanel_localhost_header.json';
+
+                    open( my $fh, '>', $scripts::ea_nginx::proxy_header_file );
+                    print $fh q[{"cPanel-localhost":"bigbrotheriswatchingyou"}];
+                    close $fh;
+
+                    scripts::ea_nginx::_write_global_cpanel_localhost();
+                    is( $wrote_new_header, 0 );
+                };
+
+                it "should write the cpanel localhost header file if it does not contain the ‘cPanel-localhost’ key" => sub {
+                    no warnings 'redefine';
+                    local *Cpanel::JSON::LoadFile = sub { };
+                    use warnings 'redefine';
+
+                    my $mock_dir = File::Temp->newdir();
+                    local $scripts::ea_nginx::proxy_header_file = $mock_dir . '/cpanel_localhost_header.json';
+
+                    open( my $fh, '>', $scripts::ea_nginx::proxy_header_file );
+                    print $fh "corrupted";
+                    close $fh;
+
+                    scripts::ea_nginx::_write_global_cpanel_localhost();
+                    is( $wrote_new_header, 1 );
+                };
+            };
+        };
+
+        describe "_write_cpanel_localhost_header" => sub {
+            my $called_rebuild_and_restart_apache = 0;
+            around {
+                no warnings 'redefine';
+                my $mock_cpanel_rand_get = Test::MockModule->new('Cpanel::Rand::Get');
+                $mock_cpanel_rand_get->redefine(
+                    getranddata => sub { return 'foo_42'; },
+                );
+
+                local *scripts::ea_nginx::_rebuild_and_restart_apache = sub { $called_rebuild_and_restart_apache++; };
+
+                my $mock_dir = File::Temp->newdir();
+                local $scripts::ea_nginx::proxy_header_file = $mock_dir . '/cpanel_localhost_header.json';
+                yield;
+            };
+
+            before each => sub { $called_rebuild_and_restart_apache = 0; };
+
+            it 'should write ‘/etc/nginx/ea-nginx/cpanel_localhost_header.json’' => sub {
+                scripts::ea_nginx::_write_cpanel_localhost_header();
+                my $contents = Cpanel::JSON::LoadFile($scripts::ea_nginx::proxy_header_file);
+                is( $contents->{'cPanel-localhost'}, 'foo-42' );
+            };
+
+            it 'should set ‘/etc/nginx/ea-nginx/cpanel_localhost_header.json’ to 0600 perms' => sub {
+                scripts::ea_nginx::_write_cpanel_localhost_header();
+                my $mode = ( stat $scripts::ea_nginx::proxy_header_file )[2];
+                is( $mode & 0777, 0600 );
+            };
+
+            it 'should rebuild and restart apache' => sub {
+                scripts::ea_nginx::_write_cpanel_localhost_header();
+                is( $called_rebuild_and_restart_apache, 1 );
+            };
+
+            it 'should return the new random cPanel localhost headrer value' => sub {
+                my $val = scripts::ea_nginx::_write_cpanel_localhost_header();
+                is( $val, 'foo-42' );
+            };
+        };
+
+        describe "_write_json" => sub {
+            my $transaction_args = {};
+            my $data             = {};
+            my $called_save      = 0;
+            my $called_close     = 0;
+            around {
+                my $mock_cpanel_transaction_file_json = Test::MockModule->new('Cpanel::Transaction::File::JSON');
+                $mock_cpanel_transaction_file_json->redefine(
+                    new => sub {
+                        shift;
+                        %$transaction_args = @_;
+                        return bless {}, 'Cpanel::Transaction::File::JSON';
+                    },
+                    set_data                     => sub { shift; $data = shift; },
+                    save_pretty_canonical_or_die => sub { $called_save++; },
+                    close_or_die                 => sub { $called_close++; },
+                );
+
+                yield;
+            };
+
+            before each => sub { $transaction_args = {}; $data = {}; $called_save = 0; $called_close = 0; };
+
+            it 'should create Cpanel::Transaction::File::JSON object using the given file and with 0644 perms' => sub {
+                scripts::ea_nginx::_write_json( '/foo/bar.json', { foo => 'bar' } );
+                is_deeply(
+                    $transaction_args,
+                    {
+                        path        => '/foo/bar.json',
+                        permissions => 0644,
+                    },
+                ) or diag explain $transaction_args;
+            };
+
+            it 'should set the data to match the given ref' => sub {
+                scripts::ea_nginx::_write_json( '/foo/bar.json', { foo => 'bar' } );
+                is_deeply(
+                    $data,
+                    {
+                        foo => 'bar',
+                    },
+                ) or diag explain $data;
+            };
+
+            it 'should save the file' => sub {
+                scripts::ea_nginx::_write_json( '/foo/bar.json', { foo => 'bar' } );
+                is( $called_save, 1 );
+            };
+
+            it 'should close the transaction' => sub {
+                scripts::ea_nginx::_write_json( '/foo/bar.json', { foo => 'bar' } );
+                is( $called_close, 1 );
+            };
+        };
+
+        describe "_rebuild_and_restart_apache" => sub {
+            my $mock_cso;
+            my $program;
+            my $called_restart = 0;
+            around {
+                $mock_cso = Test::MockModule->new('Cpanel::SafeRun::Object');
+                $mock_cso->redefine(
+                    new => sub {
+                        shift;
+                        my %args = @_;
+                        $program = $args{program};
+                        return bless {}, 'Cpanel::SafeRun::Object';
+                    },
+                    CHILD_ERROR => sub { return 0; },
+                );
+
+                no warnings 'redefine', 'once';
+                local *Cpanel::HttpUtils::ApRestart::BgSafe::restart = sub { $called_restart++; };
+                yield;
+            };
+
+            before each => sub { $called_restart = 0; };
+
+            it 'should call the script to rebuild httpd.conf' => sub {
+                scripts::ea_nginx::_rebuild_and_restart_apache();
+                is( $program, '/usr/local/cpanel/scripts/rebuildhttpdconf' );
+            };
+
+            it 'should warn if it fails to properly rebuild httpd.conf' => sub {
+                $mock_cso->redefine(
+                    CHILD_ERROR => sub { return 1; },
+                    stdout      => sub { return 'httpd.conf is foobared'; },
+                    stderr      => sub { return ''; },
+                );
+
+                trap { scripts::ea_nginx::_rebuild_and_restart_apache(); };
+                is( $trap->stderr(), "Failed to rebuild apache configuration:  httpd.conf is foobared\n" );
+            };
+
+            it 'should call the module to restart apache' => sub {
+                scripts::ea_nginx::_rebuild_and_restart_apache();
+                is( $called_restart, 1 );
+            };
+        };
+
+        describe "_write_global_logging" => sub {
+            my ( $tt_file, $output_file, $data_hr );
+            around {
+                my $mock_dir = File::Temp->newdir();
+
+                no warnings 'redefine', 'once';
+                local $scripts::ea_nginx::piped_module_conf = $mock_dir . '/ngx_http_pipelog_module.conf';
+
+                local *Cpanel::Hostname::gethostname = sub { };
+
+                local *scripts::ea_nginx::_write_global_logging = $orig__write_global_logging;
+                local *scripts::ea_nginx::_get_logging_hr       = sub { return { piped_logs => 1 }; };
+                local *scripts::ea_nginx::_render_tt_to_file    = sub {
+                    $tt_file     = shift;
+                    $output_file = shift;
+                    $data_hr     = shift;
+                    return;
+                };
+                yield;
+            };
+
+            it 'should process global-logging.tt and write it to global-logging.conf' => sub {
+                scripts::ea_nginx::_write_global_logging();
+                is( $tt_file,     'global-logging.tt' );
+                is( $output_file, 'global-logging.conf' );
+            };
+
+            it 'should spew logging information to ‘ngx_http_pipelog_module.conf’ if piped logging is enabled' => sub {
+                scripts::ea_nginx::_write_global_logging();
+                my $contents = Cpanel::LoadFile::load_if_exists($scripts::ea_nginx::piped_module_conf);
+                is( $contents, 'load_module modules/ngx_http_pipelog_module.so;' );
+            };
+
+            it 'should ensure ‘ngx_http_pipelog_module.conf’ is removed if piped logging is disabled' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_logging_hr = sub { return { piped_logs => 0 }; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_logging();
+                ok !-e $scripts::ea_nginx::piped_module_conf;
+            };
+        };
+
+        describe "_get_logging_hr" => sub {
+            around {
+                no warnings 'redefine', 'once';
+                local *Whostmgr::TweakSettings::get_value               = sub { return 1; };
+                local *Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf = sub { return { LOGSTYLE => 'common' }; };
+                local *scripts::ea_nginx::caching_global                = sub { return { logging  => 0 }; };
+                local *Cpanel::EA4::Conf::Tiny::get_ea4_conf_hr         = sub { return { loglevel => 'info' }; };
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::logging_hr = undef; };
+
+            it 'should set the logstyle to combined if an invalid logstyle is used' => sub {
+                no warnings 'redefine';
+                local *Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf = sub { return {}; };
+                use warnings 'redefine';
+
+                my $hr;
+                trap { $hr = scripts::ea_nginx::_get_logging_hr(); };
+                is( $hr->{default_format_name}, 'combined' );
+            };
+
+            it 'should return a hashref with the users desired logging information in it' => sub {
+                my $hr;
+                trap { $hr = scripts::ea_nginx::_get_logging_hr(); };
+                is_deeply(
+                    $hr,
+                    {
+                        piped_logs          => 1,
+                        default_format_name => 'common',
+                        loglevel            => 'info',
+                        enable_cache_log    => 0,
+                    },
+                ) or diag explain $hr;
+            };
+        };
+
+        describe "caching_global" => sub {
+            around {
+                my $mock_dir = File::Temp->newdir();
+                no warnings 'redefine';
+                $scripts::ea_nginx::cache_file = $mock_dir . '/cache.json';
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::global_caching = undef; };
+
+            it 'should return the contents of ‘cache.json’' => sub {
+                open( my $fh, '>', $scripts::ea_nginx::cache_file );
+                print $fh <<'EOF';
+{
+    "enabled" : 1,
+    "proxy_cache_valid" : {}
+}
+EOF
+                close $fh;
+
+                my $hr = scripts::ea_nginx::caching_global();
+                is_deeply(
+                    $hr,
+                    {
+                        enabled           => 1,
+                        proxy_cache_valid => {},
+                    }
+                ) or diag explain $hr;
+            };
+
+            it 'should update the contents of ‘cache.json’ to the micro-cache-defaults if the touch file is present and the normal cache defaults are present' => sub {
+                my $mockfile = Test::MockFile->file( '/etc/nginx/ea-nginx/enable.micro-cache-defaults', '' );
+
+                open( my $fh, '>', $scripts::ea_nginx::cache_file );
+                print $fh <<'EOF';
+{
+    "enabled" : 1,
+    "proxy_cache_valid" : {
+        "200 301 302" : "60m",
+        "404" : "1m"
+    }
+}
+EOF
+                close $fh;
+
+                my $hr;
+                trap { $hr = scripts::ea_nginx::caching_global(); };
+                is_deeply(
+                    $hr,
+                    {
+                        enabled           => 1,
+                        proxy_cache_valid => {
+                            "301 302" => "5m",
+                            "404"     => "1m",
+                        },
+                    },
+                ) or diag explain $hr;
+            };
+
+            it 'should update the contents of ‘cache.json’ to the normal defaults if the touch file is missing and the micro-cache-defaults are present' => sub {
+                open( my $fh, '>', $scripts::ea_nginx::cache_file );
+                print $fh <<'EOF';
+{
+    "enabled" : 1,
+    "proxy_cache_valid" : {
+        "301 302" : "5m",
+        "404" : "1m"
+    }
+}
+EOF
+                close $fh;
+
+                my $hr;
+                trap { $hr = scripts::ea_nginx::caching_global(); };
+                is_deeply(
+                    $hr,
+                    {
+                        enabled           => 1,
+                        proxy_cache_valid => {
+                            "200 301 302" => "60m",
+                            "404"         => "1m",
+                        },
+                    },
+                ) or diag explain $hr;
+            };
+        };
+
+        describe "_render_tt_to_file" => sub {
+            my $spew;
+            around {
+                my $mock_path_tiny = Test::MockModule->new('Path::Tiny');
+                $mock_path_tiny->redefine(
+                    path      => sub { return bless {}, 'Path::Tiny'; },
+                    touchpath => sub { },
+                    slurp     => sub { return 'I am a tt file, hear me rawr'; },
+                    spew      => sub { $spew = pop @_; return; },
+                );
+
+                yield;
+            };
+
+            before each => sub { $spew = undef; };
+
+            it 'should process the given tt file and render it to the given output file using the given data' => sub {
+                scripts::ea_nginx::_render_tt_to_file( 'tt_file', 'output_file' );
+                is( $spew, 'I am a tt file, hear me rawr' );
+            };
+
+            it 'should die if it encounters any errors processing the tt' => sub {
+                my $mock_template = Test::MockModule->new('Template')->redefine( error => sub { return 'oops, bad template'; } );
+
+                trap { scripts::ea_nginx::_render_tt_to_file( 'tt_file', 'output_file' ); };
+                like( $trap->die(), qr/oops, bad template/ );
+            };
+        };
+
+        describe "_write_global_passenger" => sub {
+            my $data;
+            around {
+                local *scripts::ea_nginx::_write_global_passenger = $orig__write_global_passenger;
+
+                local *scripts::ea_nginx::_get_application_paths = sub {
+                    my ($hr) = @_;
+                    $hr->{ruby} = '/opt/cpanel/ea-ruby24/root/usr/libexec/passenger-ruby24';
+                    return;
+                };
+
+                local *scripts::ea_nginx::_render_tt_to_file = sub { $data = pop @_; };
+                yield;
+            };
+
+            it 'should render ‘ngx_http_passenger_module.conf.tt’ to ‘passenger.conf’ with the expected data' => sub {
+                scripts::ea_nginx::_write_global_passenger();
+                is_deeply(
+                    $data,
+                    {
+                        passenger => {
+                            global => {
+                                passenger_root                  => '/opt/cpanel/ea-ruby24/root/usr/libexec/../share/passenger/phusion_passenger/locations.ini',
+                                passenger_instance_registry_dir => '/opt/cpanel/ea-ruby24/root/usr/libexec/../../var/run/passenger-instreg',
+                                default                         => {
+                                    name => 'global passenger defaults',
+                                    ruby => '/opt/cpanel/ea-ruby24/root/usr/libexec/passenger-ruby24',
+                                },
+                            },
+                        },
+                    },
+                ) or diag explain $data;
+            };
+        };
+
+        describe "_get_application_paths" => sub {
+            it 'should populate the given hashref with the paths to the ruby, python, and nodejs binaries if they exist' => sub {
+                my $hr = {};
+
+                no warnings 'redefine';
+                my $mock = Test::MockModule->new('Cpanel::Config::userdata::PassengerApps')->redefine(
+                    ensure_paths => sub {
+                        $hr->{ruby} = '/path/to/ruby',
+                          $hr->{python} = '/path/to/python',
+                          $hr->{nodejs} = '/path/to/nodejs',
+                          return;
+                    },
+                );
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_get_application_paths($hr);
+                is_deeply(
+                    $hr,
+                    {
+                        ruby   => '/path/to/ruby',
+                        python => '/path/to/python',
+                        nodejs => '/path/to/nodejs',
+                    },
+                );
+            };
+        };
+
+        describe "_write_global_ea_nginx" => sub {
+            it 'should render ‘ea-nginx.conf.tt’ to ‘ea-nginx.conf’ with the expected data' => sub {
+                no warnings 'redefine';
+                my $mock_cpanel_ea4_conf = Test::MockModule->new('Cpanel::EA4::Conf')->redefine(
+                    instance => sub { return bless {}, 'Cpanel::EA4::Conf'; },
+                    as_hr    => sub {
+                        return {
+                            sslprotocol_list_str => 'TLSv1.2 TLSv1.3',
+                            sslciphersuite       => 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256',
+                            keepalive            => 'Off',
+                            keepalivetimeout     => 5,
+                            maxkeepaliverequests => 100,
+                        };
+                    },
+                );
+
+                local *scripts::ea_nginx::_get_settings_hr = sub {
+                    return {
+                        apache_port_ip                => '127.0.0.1',
+                        apache_port                   => 81,
+                        apache_ssl_port               => 444,
+                        server_names_hash_max_size    => 1024,
+                        server_names_hash_bucket_size => 128,
+                        client_max_body_size          => '128m',
+                    };
+                };
+
+                local *scripts::ea_nginx::_get_httpd_vhosts_hash = sub {
+                    return {
+                        'foo.tld' => {
+                            ip => '1.2.3.4',
+                        },
+                        'bar.tld' => {
+                            ip => '5.6.7.8',
+                        },
+                        'baz.tld' => {
+                            ip => '1.2.3.4',
+                        },
+                    };
+                };
+
+                my $data = {};
+                local *scripts::ea_nginx::_render_tt_to_file = sub { $data = pop @_; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_ea_nginx();
+                is_deeply(
+                    $data,
+                    {
+                        ea4conf => {
+                            sslprotocol_list_str => 'TLSv1.2 TLSv1.3',
+                            sslciphersuite       => 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256',
+                            keepalive            => 'Off',
+                            keepalivetimeout     => 5,
+                            maxkeepaliverequests => 100,
+                        },
+                        settings => {
+                            apache_port_ip                => '127.0.0.1',
+                            apache_port                   => 81,
+                            apache_ssl_port               => 444,
+                            server_names_hash_max_size    => 1024,
+                            server_names_hash_bucket_size => 128,
+                            client_max_body_size          => '128m',
+                        },
+                        ips => [
+                            '1.2.3.4',
+                            '5.6.7.8',
+                        ],
+                    },
+                );
+            };
+        };
+
+        describe "_get_settings_hr" => sub {
+            my $hr;
+            around {
+                local *scripts::ea_nginx::_get_cpconf_hr = sub {
+                    return {
+                        apache_port     => '0.0.0.0:81',
+                        apache_ssl_port => '0.0.0.0:444',
+                    };
+                };
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::settings_hr = undef; };
+
+            it 'should return a hashref containing the default settings if ‘settings.json’ does not define anything' => sub {
+                my $mock = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub { return {}; },
+                );
+
+                $hr = scripts::ea_nginx::_get_settings_hr();
+                is_deeply(
+                    $hr,
+                    {
+                        apache_port_ip                => '127.0.0.1',
+                        server_names_hash_bucket_size => 128,
+                        server_names_hash_max_size    => 1024,
+                        apache_ssl_port_ip            => '127.0.0.1',
+                        client_max_body_size          => '128m',
+                        apache_port                   => 81,
+                        apache_ssl_port               => 444,
+                    },
+                ) or diag explain $hr;
+            };
+
+            it 'should return a hashref containing the contents of ‘settings.json’ along with any default settings that it does not define' => sub {
+                my $mock = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub { return { foo => 'bar' }; },
+                );
+
+                $hr = scripts::ea_nginx::_get_settings_hr();
+                is_deeply(
+                    $hr,
+                    {
+                        foo                           => 'bar',
+                        apache_port_ip                => '127.0.0.1',
+                        server_names_hash_bucket_size => 128,
+                        server_names_hash_max_size    => 1024,
+                        apache_ssl_port_ip            => '127.0.0.1',
+                        client_max_body_size          => '128m',
+                        apache_port                   => 81,
+                        apache_ssl_port               => 444,
+                    },
+                ) or diag explain $hr;
+            };
+
+            it 'should return a hashref where the contents of ‘settings.json’ take precendence over the default settings' => sub {
+                my $mock = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub {
+                        return {
+                            bar             => 'foo',
+                            apache_port     => 86,
+                            apache_ssl_port => 468,
+                        };
+                    },
+                );
+
+                $hr = scripts::ea_nginx::_get_settings_hr();
+                is_deeply(
+                    $hr,
+                    {
+                        bar                           => 'foo',
+                        apache_port_ip                => '127.0.0.1',
+                        server_names_hash_bucket_size => 128,
+                        server_names_hash_max_size    => 1024,
+                        apache_ssl_port_ip            => '127.0.0.1',
+                        client_max_body_size          => '128m',
+                        apache_port                   => 86,
+                        apache_ssl_port               => 468,
+                    },
+                ) or diag explain $hr;
+            };
+        };
+
+        describe "_write_global_nginx_conf" => sub {
+            my $content;
+            around {
+                my $mock_path_tiny = Test::MockModule->new('Path::Tiny')->redefine(
+                    path  => sub { return bless {}, 'Path::Tiny'; },
+                    slurp => sub { return "user  nginx;\nworker_processes  1;\nworker_shutdown_timeout 10s;\nworker_rlimit_nofile 16384;\n"; },
+                    spew  => sub { $content = pop @_; },
+                );
+                yield;
+            };
+
+            before each => sub { $content = undef; };
+
+            it 'should default the value of worker_processes to 1 if it is not defined in settings.json' => sub {
+                local *scripts::ea_nginx::_get_settings_hr = sub { };
+
+                scripts::ea_nginx::_write_global_nginx_conf();
+                like( $content, qr/worker_processes\s+1;/ );
+            };
+
+            it 'should update the value of worker_processes to match what is in settings.json if it is valid (integer)' => sub {
+                local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_processes => 42 }; };
+
+                scripts::ea_nginx::_write_global_nginx_conf();
+                like( $content, qr/worker_processes\s+42;/ );
+            };
+
+            it 'should update the value of worker_processes to match what is in settings.json if it is valid (auto)' => sub {
+                local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_processes => 'auto' }; };
+
+                scripts::ea_nginx::_write_global_nginx_conf();
+                like( $content, qr/worker_processes\s+auto;/ );
+            };
+
+            it 'should warn and use the default value of worker_processes if the value set in settings.json is invalid' => sub {
+                local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_processes => 'foo' }; };
+
+                trap { scripts::ea_nginx::_write_global_nginx_conf(); };
+                like( $trap->stderr(), qr/Custom `worker_processes`.*is not a number/ );
+            };
+
+            it 'should default the value of worker_shutdown_timeout to 10s if it is not defined in settings.json' => sub {
+                local *scripts::ea_nginx::_get_settings_hr = sub { };
+
+                scripts::ea_nginx::_write_global_nginx_conf();
+                like( $content, qr/worker_shutdown_timeout\s+10s;/ );
+            };
+
+            it 'should update the value of worker_shutdown_timeout to match what is in settings.json if it is valid' => sub {
+                local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_shutdown_timeout => '42ms' }; };
+
+                scripts::ea_nginx::_write_global_nginx_conf();
+                like( $content, qr/worker_shutdown_timeout\s+42ms;/ );
+            };
+
+            it 'should warn and use the default value of worker_shutdown_timeout if the value set in settings.json is invalid' => sub {
+                local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_shutdown_timeout => 'foo' }; };
+
+                trap { scripts::ea_nginx::_write_global_nginx_conf(); };
+                like( $trap->stderr(), qr/Custom `worker_shutdown_timeout`.*is not an NGINX time value/ );
+            };
+        };
+
+        describe "_write_global_default" => sub {
+            my $content;
+            around {
+                my $mockfile = Test::MockFile->file( "/var/cpanel/ssl/cpanel/mycpanel.pem", "this is an ssl for real though" );
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_has_ipv6    = sub { return 1; };
+                local *scripts::ea_nginx::_wants_http2 = sub { return 0; };
+
+                my $mock_path_tiny = Test::MockModule->new('Path::Tiny')->redefine(
+                    path  => sub { return bless {}, 'Path::Tiny'; },
+                    slurp => sub { return "    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n"; },
+                    spew  => sub { $content = pop @_; },
+                );
+                yield;
+            };
+
+            before each => sub { $content = undef; };
+
+            it 'should add a configuration for IPv6 if it is enabled' => sub {
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/listen \[::\]:80;/ );
+            };
+
+            it 'should add a comment stating that IPv6 is not enabled if it is disabled' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_has_ipv6 = sub { return 0; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/# server does not have IPv6 enabled:/ );
+            };
+
+            it 'should set default.conf to use mycpanel.pem for its ssl certificate if it exists' => sub {
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr{ssl_certificate_key\s+/var/cpanel/ssl/cpanel/mycpanel\.pem} );
+            };
+
+            it 'should set default.conf to use cpanel.pem for its ssl certificate if mycpanel.pem is missing' => sub {
+                unlink '/var/cpanel/ssl/cpanel/mycpanel.pem';
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr{ssl_certificate_key\s+/var/cpanel/ssl/cpanel/cpanel\.pem} );
+            };
+
+            it 'should configure port 443 to use http2 if it is enabled' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/listen 443 ssl http2;/ );
+            };
+
+            it 'should not configure port 443 to use http2 if it is not enabled' => sub {
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/listen 443 ssl;/ );
+            };
+        };
+
+        describe "_has_ipv6" => sub {
+            around {
+                my $mockfile = Test::MockFile->file( '/proc/net/if_inet6', '' );
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::has_ipv6 = undef; };
+
+            it 'should return 1 when IPv6 is enabled on the server' => sub {
+                is( scripts::ea_nginx::_has_ipv6(), 1 );
+            };
+
+            it 'should return 0 when IPv6 is disabled on the server' => sub {
+                unlink '/proc/net/if_inet6';
+                is( scripts::ea_nginx::_has_ipv6(), 0 );
+            };
+        };
+
+        describe "_wants_http2" => sub {
+            around {
+                my $mockfile = Test::MockFile->file( '/etc/nginx/conf.d/http2.conf', '' );
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::wants_http2 = undef; };
+
+            it 'should return 1 when http2 is configured for nginx' => sub {
+                is( scripts::ea_nginx::_wants_http2(), 1 );
+            };
+
+            it 'should return 0 when http2 is NOT configured for nginx' => sub {
+                unlink '/etc/nginx/conf.d/http2.conf';
+                is( scripts::ea_nginx::_wants_http2(), 0 );
+            };
+        };
+
+        describe "_write_global_cpanel_proxy_non_ssl" => sub {
+            my $content;
+            around {
+                my $slurp = <<'EOF';
+server {
+    server_name cpanel.*;
+    listen 80;
+    listen [::]:80;
+    return 301 https://$host$request_uri;
+}
+EOF
+
+                my $mock_path_tiny = Test::MockModule->new('Path::Tiny')->redefine(
+                    path  => sub { return bless {}, 'Path::Tiny'; },
+                    slurp => sub { return $slurp; },
+                    spew  => sub { $content = pop @_; },
+                );
+                yield;
+            };
+
+            before each => sub { $content = undef; };
+
+            it 'should add a configuration for IPv6 if it is enabled' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_has_ipv6 = sub { return 1; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl();
+                like( $content, qr/listen \[::\]:80;/ );
+            };
+
+            it 'should add a comment stating that IPv6 is not enabled if it is disabled' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_has_ipv6 = sub { return 0; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl();
+                like( $content, qr/# server does not have IPv6 enabled:/ );
+            };
+        };
+
+        describe "_update_user_configs_in_serial_mode" => sub {
+            around {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_user_domains = sub {
+                    return {
+                        foo => 1,
+                        bar => 1,
+                        baz => 1,
+                    };
+                };
+                local *scripts::ea_nginx::_process_users = sub { };
+                yield;
+            };
+
+            it 'should print a message saying that the config subcommand is running in serial mode' => sub {
+                my $errors;
+                trap { $errors = scripts::ea_nginx::_update_user_configs_in_serial_mode(); };
+                like( $trap->stdout(), qr/Serial mode detected\.  User configuration will take longer/ );
+                is( $errors, undef );
+            };
+
+            it 'should return a hashref of users that had errors' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_process_users = sub {
+                    return {
+                        foo => 'failed',
+                        bar => 'is bad',
+                    };
+                };
+
+                my $errors;
+                trap { $errors = scripts::ea_nginx::_update_user_configs_in_serial_mode(); };
+                is_deeply(
+                    $errors,
+                    {
+                        foo => 'failed',
+                        bar => 'is bad',
+                    },
+                ) or diag explain $errors;
+            };
+        };
+
+        describe "_process_users" => sub {
+            my @users_called;
+            around {
+                no warnings 'once';
+                local *scripts::ea_nginx::_write_user_conf = sub {
+                    push @users_called, @_;
+                    die "whoops\n" if $_[0] eq 'foo';
+                };
+                yield;
+            };
+
+            it 'should accept an array ref of users to process and call _write_user_conf() for each user' => sub {
+                my $errors = scripts::ea_nginx::_process_users( [ 'foo', 'bar', 'baz' ] );
+                is_deeply(
+                    \@users_called,
+                    [
+                        'foo',
+                        'bar',
+                        'baz',
+                    ],
+                );
+            };
+
+            it 'should return a hashref of users that had errors' => sub {
+                my $errors = scripts::ea_nginx::_process_users( [ 'foo', 'bar', 'baz' ] );
+                is_deeply(
+                    $errors,
+                    {
+                        'foo' => "whoops\n",
+                    },
+                );
+            };
+        };
+
+        describe "_write_user_conf" => sub {
+            my $spewed;
+            my $render_domains = [];
+            around {
+                no warnings 'redefine', 'once';
+                local *scripts::ea_nginx::_write_user_conf = $orig__write_user_conf;
+
+                my $mock_cpanel_config_userdata_load = Test::MockModule->new('Cpanel::Config::userdata::Load')->redefine(
+                    load_userdata_main => sub {
+                        return {
+                            main_domain   => 'foo.tld',
+                            addon_domains => {
+                                'addon1.tld' => 'sub.addon1.tld',
+                                'addon2.tld' => 'sub.addon2.tld',
+                            },
+                            sub_domains => [
+                                'sub.addon1.tld',
+                                'sub.addon2.tld',
+                                'sub1.foo.tld',
+                                'sub2.foo.tld',
+                            ],
+                            parked_domains => [
+                                'parked1.tld',
+                                'parked2.tld',
+                            ],
+                        };
+                    },
+                );
+
+                local *scripts::ea_nginx_userdata::run    = sub { };
+                local *scripts::ea_nginx::_get_caching_hr = sub {
+                    return {
+                        enabled       => 1,
+                        inactive_time => '42m',
+                        zone_size     => '24m',
+                        levels        => '1:2',
+                    };
+                };
+
+                my $mock_path_tiny = Test::MockModule->new('Path::Tiny')->redefine(
+                    path   => sub { return bless {}, 'Path::Tiny'; },
+                    spew   => sub { $spewed = pop @_; },
+                    append => sub { },
+                );
+
+                local *scripts::ea_nginx::_render_and_append = sub { shift; my $domains = shift; push @$render_domains, $domains; };
+                yield;
+            };
+
+            before each => sub { $spewed = undef; };
+
+            it 'should write the cache configuration for the user at the top of its configuration file' => sub {
+                scripts::ea_nginx::_write_user_conf('foo');
+                like( $spewed, qr{^proxy_cache_path /var/cache/ea-nginx/proxy/foo levels=1:2 keys_zone=foo:24m inactive=42m;} );
+            };
+
+            it 'should call _render_and_append() to write the server block for the primary domain for the user' => sub {
+                scripts::ea_nginx::_write_user_conf('foo');
+                is( $render_domains->[0][0], 'foo.tld' );
+            };
+
+            it 'should include the parked domains for the account when calling _render_and_append() for the primary domain for the user' => sub {
+                scripts::ea_nginx::_write_user_conf('foo');
+                is_deeply(
+                    $render_domains->[0],
+                    [ 'foo.tld', 'parked1.tld', 'parked2.tld' ],
+                );
+            };
+
+            it 'should call _render_and_append() for each subdomain for the account' => sub {
+                scripts::ea_nginx::_write_user_conf('foo');
+                is_deeply(
+                    $render_domains->[1],
+                    ['sub1.foo.tld'],
+                );
+                is_deeply(
+                    $render_domains->[2],
+                    ['sub2.foo.tld'],
+                );
+            };
+
+            it 'should call _render_and_append() for each addon domain for the account' => sub {
+                scripts::ea_nginx::_write_user_conf('foo');
+                is_deeply(
+                    $render_domains->[3],
+                    [ 'sub.addon1.tld', 'addon1.tld' ],
+                );
+                is_deeply(
+                    $render_domains->[4],
+                    [ 'sub.addon2.tld', 'addon2.tld' ],
+                );
+            };
+        };
+
+        describe "_render_and_append" => sub {
+            my $mock_template;
+            around {
+                my $mock_modsecurity_module = Test::MockFile->file('/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf');
+                my $mock_log_file           = Test::MockFile->file('/var/log/nginx/domains/foo.tld');
+                my $mock_bytes_log_file     = Test::MockFile->file('/var/log/nginx/domains/foo.tld-bytes_log');
+                my $mock_ssl_log_file       = Test::MockFile->file('/var/log/nginx/domains/foo.tld-ssl_log');
+                my $mock_set_user_id        = Test::MockFile->file('/etc/cpanel/ea4/option-flags/set-USER_ID');
+                my $mock_user_conf          = Test::MockFile->file('/etc/nginx/conf.d/users/foo.conf');
+
+                unlink '/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf';
+                unlink '/etc/cpanel/ea4/option-flags/set-USER_ID';
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_group_for         = sub { };
+                local *scripts::ea_nginx::_is_standalone         = sub { return 1; };
+                local *scripts::ea_nginx::_get_basic_auth        = sub { };
+                local *scripts::ea_nginx::_get_redirects         = sub { };
+                local *scripts::ea_nginx::_get_logging_hr        = sub { };
+                local *scripts::ea_nginx::_get_ssl_redirect      = sub { };
+                local *scripts::ea_nginx::_get_passenger_apps    = sub { };
+                local *scripts::ea_nginx::_get_caching_hr        = sub { };
+                local *scripts::ea_nginx::_has_ipv6              = sub { };
+                local *scripts::ea_nginx::_wants_http2           = sub { };
+                local *scripts::ea_nginx::_get_domains_with_ssls = sub { };
+                local *scripts::ea_nginx::_get_httpd_vhosts_hash = sub { };
+                local *scripts::ea_nginx::_get_cpconf_hr         = sub { };
+                local *scripts::ea_nginx::_get_settings_hr       = sub { };
+                local *scripts::ea_nginx::_get_wordpress_info    = sub {
+                    return {
+                        docroot_install  => undef,
+                        non_docroot_uris => [],
+                    };
+                };
+
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub { },
+                );
+
+                $mock_template = Test::MockModule->new('Template');
+                $mock_template->redefine(
+                    new     => sub { return bless {}, 'Template'; },
+                    process => sub { },
+                    error   => sub { return 0; },
+                );
+
+                my $mock_path_tiny = Test::MockModule->new('Path::Tiny')->redefine(
+                    path  => sub { return bless {}, 'Path::Tiny'; },
+                    slurp => sub { },
+                );
+
+                my $mock_cpanel_domainlookup_docroot = Test::MockModule->new('Cpanel::DomainLookup::DocRoot')->redefine(
+                    getdocroots => sub { return 'foo.tld' => '/home/foo/public_html'; },
+                );
+
+                my $mock_cpanel_pwcache = Test::MockModule->new('Cpanel::PwCache')->redefine(
+                    getpwnam => sub { return ( undef, undef, undef, undef ); },
+                );
+
+                my $mock_cpanel_fileutils_touchfile = Test::MockModule->new('Cpanel::FileUtils::TouchFile')->redefine(
+                    touchfile => sub { },
+                );
+
+                my $mock_cpanel_phpfpm_get = Test::MockModule->new('Cpanel::PHPFPM::Get')->redefine(
+                    get_php_fpm => sub { return 0; },
+                );
+
+                my $mock_cpanel_apache_tls = Test::MockModule->new('Cpanel::Apache::TLS')->redefine(
+                    get_tls_path => sub { },
+                );
+
+                my $mock_cpanel_domainip = Test::MockModule->new('Cpanel::DomainIp')->redefine(
+                    getdomainip => sub { },
+                );
+
+                my $mock_cpanel_nat = Test::MockModule->new('Cpanel::NAT')->redefine(
+                    get_public_ip => sub { return ''; },
+                );
+
+                my $mock_cpanel_ea4_conf = Test::MockModule->new('Cpanel::EA4::Conf')->redefine(
+                    instance => sub { return bless {}, 'Cpanel::EA4::Conf'; },
+                    as_hr    => sub { },
+                );
+
+                yield;
+            };
+
+            it 'should warn if it is in standalone mode, the domain has php fpm enabled, and it is unable to gather the php config settings for the domain' => sub {
+                my $mock_cpanel_phpfpm_get = Test::MockModule->new('Cpanel::PHPFPM::Get')->redefine(
+                    get_php_fpm => sub { return 1; },
+                );
+
+                my $mock_cpanel_php_config = Test::MockModule->new('Cpanel::PHP::Config')->redefine(
+                    get_php_config_for_domains => sub { return {}; },
+                );
+
+                trap { scripts::ea_nginx::_render_and_append( 'foo', ['foo.tld'], 0 ); };
+                like( $trap->stderr(), qr/Could not find PHP configuration for.*it will not be configured to use PHP-FPM/ );
+            };
+
+            it 'should die if it fails to process the template toolkit file' => sub {
+                $mock_template->redefine(
+                    error => sub { return 'no process tt for you'; },
+                );
+
+                trap { scripts::ea_nginx::_render_and_append( 'foo', ['foo.tld'], 0 ); };
+                like( $trap->die(), qr/no process tt for you/ );
+            };
+        };
+
+        describe "_is_standalone" => sub {
+            around {
+                my $mockfile = Test::MockFile->file( '/etc/nginx/ea-nginx/enable.standalone', '' );
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::standalone = undef; };
+
+            it 'should return 1 if nginx is in standalone mode' => sub {
+                is( scripts::ea_nginx::_is_standalone(), 1 );
+            };
+
+            it 'should return 0 if nginx is NOT in standalone mode' => sub {
+                unlink '/etc/nginx/ea-nginx/enable.standalone';
+                is( scripts::ea_nginx::_is_standalone(), 0 );
+            };
+        };
+
+        describe "_get_basic_auth" => sub {
+            around {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_homedir = sub { return '/home/foo'; };
+                yield;
+            };
+
+            it 'should return a hashref containing the auth_file for the docroot if the docroot is the only password protected directory' => sub {
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'docroot',
+                        },
+                    },
+                );
+
+                is_deeply(
+                    $res,
+                    {
+                        realm_name      => 'docroot',
+                        auth_file       => '/home/foo/.htpasswds/public_html/passwd',
+                        _htaccess_mtime => 1234,
+                        locations       => {},
+                    },
+                ) or diag explain $res;
+            };
+
+            it 'should return a hashref containing the auth_file for a directory beneath the docroot if it exists' => sub {
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html/subdomain',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'docroot',
+                        },
+                        '/public_html/nope' => {
+                            '_htaccess_mtime' => 5678,
+                            'realm_name'      => 'nope',
+                        },
+                    },
+                );
+
+                is_deeply(
+                    $res,
+                    {
+                        realm_name      => 'docroot',
+                        auth_file       => '/home/foo/.htpasswds/public_html/passwd',
+                        _htaccess_mtime => 1234,
+                        locations       => {},
+                    },
+                ) or diag explain $res;
+            };
+
+            it 'should return a hashref containing the auth_file for the home directory if only the homedir is protected' => sub {
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'home',
+                        },
+                    },
+                );
+
+                is_deeply(
+                    $res,
+                    {
+                        realm_name      => 'home',
+                        auth_file       => '/home/foo/.htpasswds/passwd',
+                        _htaccess_mtime => 1234,
+                        locations       => {},
+                    },
+                ) or diag explain $res;
+            };
+
+            it 'should populate the locations key for any directories above the protected directory' => sub {
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'home',
+                        },
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'docroot',
+                        },
+                        '/public_html/sub' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'sub',
+                        },
+                        '/public_html/sub/finn/quinn' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'glee',
+                        },
+                    },
+                );
+
+                is_deeply(
+                    $res,
+                    {
+                        realm_name      => 'docroot',
+                        auth_file       => '/home/foo/.htpasswds/public_html/passwd',
+                        _htaccess_mtime => 1234,
+                        locations       => {
+                            '/sub' => {
+                                'auth_file'  => '/home/foo/.htpasswds/public_html/sub/passwd',
+                                'realm_name' => 'sub',
+                            },
+                            '/sub/finn/quinn' => {
+                                'auth_file'  => '/home/foo/.htpasswds/public_html/sub/finn/quinn/passwd',
+                                'realm_name' => 'glee',
+                            },
+                        },
+                    },
+                ) or diag explain $res;
+            };
+        };
+
+        describe "_get_userdata_for" => sub {
+            around {
+                my $mock_cpanel_config_userdata_load = Test::MockModule->new('Cpanel::Config::userdata::Load')->redefine(
+                    load_userdata => sub { return { a => 1, b => 2, c => 3, }; },
+                );
+                yield;
+            };
+
+            it 'should return a hashref of userdata for the given domain' => sub {
+                my $res = scripts::ea_nginx::_get_userdata_for( 'foo', 'bar.tld' );
+                is_deeply(
+                    $res,
+                    {
+                        a => 1,
+                        b => 2,
+                        c => 3,
+                    },
+                );
+            };
+
+            it 'should cache the result for subsequent calls' => sub {
+                my $mock_cpanel_config_userdata_load = Test::MockModule->new('Cpanel::Config::userdata::Load')->redefine(
+                    load_userdata => sub { return { a => 9, b => 42, c => 0, }; },
+                );
+
+                my $res = scripts::ea_nginx::_get_userdata_for( 'foo', 'bar.tld' );
+                is_deeply(
+                    $res,
+                    {
+                        a => 1,
+                        b => 2,
+                        c => 3,
+                    },
+                );
+
+                $res = scripts::ea_nginx::_get_userdata_for( 'foo', 'foo.tld' );
+                is_deeply(
+                    $res,
+                    {
+                        a => 9,
+                        b => 42,
+                        c => 0,
+                    },
+                );
+            };
+        };
+
+        describe "_get_passenger_apps" => sub {
+            around {
+                no warnings 'once';
+                local *scripts::ea_nginx::_get_application_paths = sub { };
+                yield;
+            };
+
+            it 'should return an empty array reference if the user does not have an applications.json file' => sub {
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine( LoadFile => sub { die; }, );
+
+                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', ['foo.tld'] );
+                is_deeply( $res, [] );
+            };
+
+            it 'should return an empty array reference if none of the apps listed in applications.json are enabled' => sub {
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub {
+                        return {
+                            yo => {
+                                enabled => 0,
+                            },
+                        };
+                    },
+                );
+
+                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', ['foo.tld'] );
+                is_deeply( $res, [] );
+            };
+
+            it 'should return an empty array reference if none of the apps listed in applications.json are for one of the domains passed in' => sub {
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub {
+                        return {
+                            yo => {
+                                enabled => 1,
+                                domain  => 'bar.tld',
+                            },
+                        };
+                    },
+                );
+
+                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', ['foo.tld'] );
+                is_deeply( $res, [] );
+            };
+
+            it 'should return array reference of hashes for any apps that are enabled and belong to one of the domains passed in' => sub {
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub {
+                        return {
+                            yo => {
+                                base_uri        => '/bar',
+                                deployment_mode => 'development',
+                                domain          => 'bar.tld',
+                                enabled         => 1,
+                                envvars         => {},
+                                name            => 'yo',
+                                path            => '/home/foo/bar',
+                                python          => '/usr/bin/python',
+                                ruby            => '/opt/cpanel/ea-ruby27/root/usr/libexec/passenger-ruby27',
+                            },
+                        };
+                    },
+                );
+
+                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', [ 'foo.tld', 'bar.tld' ] );
+                is_deeply(
+                    $res,
+                    [
+                        {
+                            envvars         => {},
+                            base_uri        => '/bar',
+                            deployment_mode => 'development',
+                            name            => 'yo',
+                            path            => '/home/foo/bar',
+                            enabled         => 1,
+                            python          => '/usr/bin/python',
+                            domain          => 'bar.tld',
+                            ruby            => '/opt/cpanel/ea-ruby27/root/usr/libexec/passenger-ruby27',
+                        },
+                    ],
+                ) or diag explain $res;
+            };
+        };
+
+        describe "_get_wordpress_info" => sub {
+            around {
+                my $mock_cache_file          = Test::MockFile->file( '/etc/nginx/wordpress_info_cache/foo__home_foo_public_html_wordpress_info.json', '{}' );
+                my $mock_wp_toolkit_bin      = Test::MockFile->file( '/usr/local/bin/wp-toolkit',                                '', { mode => 0700, } );
+                my $mock_wp_instance_manager = Test::MockFile->file( '/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm', '', { mode => 0644 } );
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_is_wordpress_info_cache_valid         = sub { return 0; };
+                local *scripts::ea_nginx::_ensure_wordpress_info_cache_directory = sub { };
+                local *scripts::ea_nginx::_write_json                            = sub { };
+                local *scripts::ea_nginx::_get_wp_uapi                           = sub { };
+                yield;
+            };
+
+            it 'should return the wp info from the cache file if it is valid' => sub {
+                my $called = 0;
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_is_wordpress_info_cache_valid = sub { return 1; };
+                local *scripts::ea_nginx::_get_wordpress_info_from_cache = sub { $called++; };
+                local *scripts::ea_nginx::_write_json                    = sub { die; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_get_wordpress_info( 'foo', '/home/foo/public_html' );
+                is( $called, 1 );
+            };
+
+            it 'should get the wp info from wp-toolkit if the wp-toolkit binary exists' => sub {
+                my $called = 0;
+                unlink '/etc/nginx/wordpress_info_cache/foo__home_foo_public_html_wordpress_info.json';
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_wp_toolkit_list_for_user = sub { $called++; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_get_wordpress_info( 'foo', '/home/foo/public_html' );
+                is( $called, 1 );
+            };
+
+            it 'should get the wp info from wordpress instance manager if it is installed and the wp-toolkit binary does not exist' => sub {
+                my $called = 0;
+                unlink '/etc/nginx/wordpress_info_cache/foo__home_foo_public_html_wordpress_info.json';
+                unlink '/usr/local/bin/wp-toolkit';
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_wordpress_info_from_wpmanager = sub { $called++; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_get_wordpress_info( 'foo', '/home/foo/public_html' );
+                is( $called, 1 );
+            };
+
+            it 'should ensure the cache directory exists' => sub {
+                my $called = 0;
+                unlink '/etc/nginx/wordpress_info_cache/foo__home_foo_public_html_wordpress_info.json';
+                unlink '/usr/local/bin/wp-toolkit';
+                unlink '/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm';
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_ensure_wordpress_info_cache_directory = sub { $called++; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_get_wordpress_info( 'foo', '/home/foo/public_html' );
+                is( $called, 1 );
+            };
+
+            it 'should write the cache file if it was not valid' => sub {
+                my $cache_file;
+                unlink '/etc/nginx/wordpress_info_cache/foo__home_foo_public_html_wordpress_info.json';
+                unlink '/usr/local/bin/wp-toolkit';
+                unlink '/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm';
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_write_json = sub { $cache_file = shift; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_get_wordpress_info( 'foo', '/home/foo/public_html' );
+                is( $cache_file, '/etc/nginx/wordpress_info_cache/foo__home_foo_public_html_wordpress_info.json' );
+            };
+
+            it 'should return the wp info for the user' => sub {
+                unlink '/etc/nginx/wordpress_info_cache/foo__home_foo_public_html_wordpress_info.json';
+                unlink '/usr/local/bin/wp-toolkit';
+                unlink '/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm';
+
+                my $res = scripts::ea_nginx::_get_wordpress_info( 'foo', '/home/foo/public_html' );
+                is_deeply(
+                    $res,
+                    {
+                        docroot_install  => 0,
+                        non_docroot_uris => [],
+                    },
+                );
+            };
+        };
+
+        describe "_get_wordpress_info_from_cache" => sub {
+            it 'should warn if the cache file fails to load' => sub {
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub { die; },
+                );
+
+                my $res;
+                trap { $res = scripts::ea_nginx::_get_wordpress_info_from_cache(''); };
+                like( $trap->stderr(), qr/Failed to load cache file/ );
+                is( $res, undef );
+            };
+
+            it 'should warn if the cache file is missing either of the required keys' => sub {
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub { return {}; },
+                );
+
+                my $res;
+                trap { $res = scripts::ea_nginx::_get_wordpress_info_from_cache(''); };
+                like( $trap->stderr(), qr/The cache file.*has missing data/ );
+                is( $res, undef );
+            };
+
+            it 'should return a hashref if it loads the cache file successfully' => sub {
+                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
+                    LoadFile => sub { return { docroot_install => 1, non_docroot_uris => [], }; },
+                );
+
+                my $res;
+                trap { $res = scripts::ea_nginx::_get_wordpress_info_from_cache(''); };
+                is( $trap->stderr(), '' );
+                is_deeply(
+                    $res,
+                    {
+                        docroot_install  => 1,
+                        non_docroot_uris => [],
+                    },
+                );
+            };
+        };
+
+        describe "_get_wp_toolkit_list_for_user" => sub {
+            it 'should return the wp info for the given user and docroot if there is any' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_wp_toolkit_list = sub {
+                    return [
+                        {
+                            fullPath => '/home/foo/public_html',
+                            siteUrl  => 'https://foo.tld/',
+                        },
+                        {
+                            fullPath => '/home/foo/public_html/finn',
+                            siteUrl  => 'https://foo.tld/finn',
+                        },
+                        {
+                            fullPath => '/home/foo/public_html/rock/roll',
+                            siteUrl  => 'https://foo.tld/rock/roll',
+                        },
+                    ];
+                };
+                use warnings 'redefine';
+
+                my $res = scripts::ea_nginx::_get_wp_toolkit_list_for_user(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        docroot_install  => 0,
+                        non_docroot_uris => [],
+                    },
+                );
+
+                is( $res->{docroot_install}, 1 );
+                cmp_bag(
+                    $res->{non_docroot_uris},
+                    [
+                        'finn',
+                        'rock/roll',
+                    ],
+                );
+            };
+        };
+
+        describe "_update_user_configs_in_parallel_mode" => sub {
+            it 'should return a hashref of users that had errors' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_user_domains = sub {
+                    return {
+                        foo => 1,
+                        bar => 1,
+                        baz => 1,
+                    };
+                };
+                local *scripts::ea_nginx::_process_users = sub {
+                    return {
+                        foo => 'failed',
+                        bar => 'is bad',
+                    };
+                };
+
+                my $errors;
+                trap { $errors = scripts::ea_nginx::_update_user_configs_in_parallel_mode(); };
+                is_deeply(
+                    $errors,
+                    {
+                        foo => 'failed',
+                        bar => 'is bad',
+                    },
+                ) or diag explain $errors;
             };
         };
     };
@@ -1257,6 +2951,135 @@ describe "ea-nginx script" => sub {
             use warnings;
 
             dies_ok { scripts::ea_nginx::ensure_valid_nginx_config() };
+        };
+    };
+
+    describe "_update_for_custom_configs" => sub {
+        my $mock_dir;
+
+        around {
+            $mock_dir = File::Temp->newdir();
+
+            no warnings 'redefine';
+            local *scripts::ea_nginx::_update_for_custom_configs = $orig__update_for_custom_configs;
+
+            local $scripts::ea_nginx::custom_settings_dir = $mock_dir . '/var';
+            local $scripts::ea_nginx::etc_ea_nginx        = $mock_dir . '/etc';
+            local $scripts::ea_nginx::settings_file       = $scripts::ea_nginx::etc_ea_nginx . '/settings.json';
+            local $scripts::ea_nginx::cache_file          = $scripts::ea_nginx::etc_ea_nginx . '/cache.json';
+
+            mkdir $scripts::ea_nginx::custom_settings_dir;
+            mkdir $scripts::ea_nginx::etc_ea_nginx;
+
+            yield;
+        };
+
+        my $called;
+        before each => sub { $called = 0; };
+
+        it 'should call _update_nginx_settings_config_file()' => sub {
+            no warnings 'redefine';
+            local *scripts::ea_nginx::_update_nginx_settings_config_file = sub { $called++; };
+            local *scripts::ea_nginx::_update_nginx_cache_config_file    = sub { };
+            use warnings 'redefine';
+
+            scripts::ea_nginx::_update_for_custom_configs();
+            is( $called, 1 );
+        };
+
+        it 'should call _update_nginx_cache_config_file()' => sub {
+            no warnings 'redefine';
+            local *scripts::ea_nginx::_update_nginx_settings_config_file = sub { };
+            local *scripts::ea_nginx::_update_nginx_cache_config_file    = sub { $called++; };
+            use warnings 'redefine';
+
+            scripts::ea_nginx::_update_for_custom_configs();
+            is( $called, 1 );
+        };
+
+        describe '_update_nginx_settings_config_file' => sub {
+            around {
+                no warnings 'once';
+                open( my $fh, '>', $scripts::ea_nginx::settings_file );
+                print $fh q[{"foo":"bar","apache_port":81,"apache_ssl_port":444,"apache_port_ip":1234,"apache_ssl_port_ip":4321}];
+                close $fh;
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::settings_hr = undef; };
+
+            it 'should not call _write_json if ‘/var/nginx/ea-nginx/settings.json’ does not exist' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_write_json = sub { $called++; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_update_nginx_settings_config_file();
+                is( $called, 0 );
+            };
+
+            it 'should should merge the contents of ‘/var/nginx/ea-nginx/settings.json’ into ‘/etc/nginx/ea-nginx/settings.json’ if it exists' => sub {
+                open( my $fh, '>', $scripts::ea_nginx::custom_settings_dir . '/settings.json' );
+                print $fh q[{"finn":"quinn"}];
+                close $fh;
+
+                scripts::ea_nginx::_update_nginx_settings_config_file();
+                my $after = Cpanel::JSON::LoadFile("$scripts::ea_nginx::etc_ea_nginx/settings.json");
+                cmp_deeply(
+                    $after,
+                    {
+                        apache_port        => 81,
+                        apache_port_ip     => 1234,
+                        apache_ssl_port    => 444,
+                        apache_ssl_port_ip => 4321,
+                        finn               => 'quinn',
+                    },
+                ) or diag explain $after;
+            };
+
+            it 'should NOT allow apache_port or apache_ssl_port to be overwritten' => sub {
+                open( my $fh, '>', $scripts::ea_nginx::custom_settings_dir . '/settings.json' );
+                print $fh q[{"finn":"quinn","apache_port":3306,"apache_ssl_port":22}];
+                close $fh;
+
+                scripts::ea_nginx::_update_nginx_settings_config_file();
+                my $after = Cpanel::JSON::LoadFile("$scripts::ea_nginx::etc_ea_nginx/settings.json");
+                cmp_deeply(
+                    $after,
+                    {
+                        apache_port        => 81,
+                        apache_port_ip     => 1234,
+                        apache_ssl_port    => 444,
+                        apache_ssl_port_ip => 4321,
+                        finn               => 'quinn',
+                    },
+                ) or diag explain $after;
+            };
+        };
+
+        describe '_update_nginx_cache_config_file' => sub {
+            around {
+                no warnings 'once';
+                open( my $fh, '>', $scripts::ea_nginx::cache_file );
+                print $fh "foo bar";
+                close $fh;
+                yield;
+            };
+
+            it 'should NOT overwrite ‘/etc/nginx/ea-nginx/cache.json’ if ‘/var/nginx/ea-nginx/cache.json’ does NOT exist' => sub {
+                scripts::ea_nginx::_update_nginx_cache_config_file();
+                my $contents = Cpanel::LoadFile::load_if_exists($scripts::ea_nginx::cache_file);
+                is( $contents, "foo bar" );
+            };
+
+            it 'should overwrite ‘/etc/nginx/ea-nginx/cache.json’ if ‘/var/nginx/ea-nginx/cache.json’ does exists' => sub {
+                open( my $fh, '>', $scripts::ea_nginx::custom_settings_dir . '/cache.json' );
+                print $fh "customized stuff";
+                close $fh;
+
+                scripts::ea_nginx::_update_nginx_cache_config_file();
+                my $contents = Cpanel::LoadFile::load_if_exists($scripts::ea_nginx::cache_file);
+                is( $contents, "customized stuff" );
+            };
         };
     };
 };
