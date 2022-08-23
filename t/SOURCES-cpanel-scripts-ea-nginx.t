@@ -55,15 +55,17 @@ my $orig__do_other_global_config    = \&scripts::ea_nginx::_do_other_global_conf
 my $orig__update_for_custom_configs = \&scripts::ea_nginx::_update_for_custom_configs;
 my $orig__write_global_logging      = \&scripts::ea_nginx::_write_global_logging;
 my $orig__write_global_passenger    = \&scripts::ea_nginx::_write_global_passenger;
+my $orig__get_global_config_data    = \&scripts::ea_nginx::_get_global_config_data;
 
 no warnings "redefine";
-*scripts::ea_nginx::_write_user_conf           = sub { push @_write_user_conf, [@_] };
+*scripts::ea_nginx::_write_user_conf           = sub { push @_write_user_conf, [ $_[0] ] };
 *scripts::ea_nginx::_do_other_global_config    = sub { };
 *scripts::ea_nginx::_reload                    = sub { push @_reload,     [@_] };
 *scripts::ea_nginx::clear_cache                = sub { push @clear_cache, [@_] };
 *scripts::ea_nginx::_update_for_custom_configs = sub { };
 *scripts::ea_nginx::_write_global_logging      = sub { };
 *scripts::ea_nginx::_write_global_passenger    = sub { };
+*scripts::ea_nginx::_get_global_config_data    = sub { return {}; };
 use warnings "redefine";
 
 our $cpanel_json_loadfiles_string = "";
@@ -168,8 +170,8 @@ describe "ea-nginx script" => sub {
 
     describe "sub-command" => sub {
         describe "`config`" => sub {
-            my $called = 0;
-            my @_populate_domain_ips_except;
+            my $called_cpanel_fileguard   = 0;
+            my $called_global_config_data = 0;
 
             around {
                 local $mi{cmd} = "config";
@@ -181,7 +183,7 @@ describe "ea-nginx script" => sub {
                 local *File::Glob::bsd_glob = sub { return @glob_res };    # necessary because https://github.com/CpanelInc/Test-MockFile/issues/40
 
                 my $mock_cpanel_fileguard = Test::MockModule->new('Cpanel::FileGuard');
-                $mock_cpanel_fileguard->redefine( new => sub { $called++; }, );
+                $mock_cpanel_fileguard->redefine( new => sub { $called_cpanel_fileguard++; }, );
 
                 local *scripts::ea_nginx::_write_global_cpanel_localhost     = sub { };
                 local *scripts::ea_nginx::_write_global_ea_nginx             = sub { };
@@ -190,17 +192,18 @@ describe "ea-nginx script" => sub {
                 local *scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl = sub { };
                 local *scripts::ea_nginx::ensure_valid_nginx_config          = sub { };
 
-                local *scripts::ea_nginx::_populate_domain_ips_except = sub { push @_populate_domain_ips_except, [@_]; };
+                local *scripts::ea_nginx::_get_global_config_data = sub { $called_global_config_data++; };
+
                 yield;
             };
 
-            before each => sub { @_populate_domain_ips_except = (); };
+            before each => sub { $called_cpanel_fileguard = 0; $called_global_config_data = 0; };
 
             it_should_behave_like "any sub command that takes a cpanel user";
 
             it 'should create aquire a lock via Cpanel::FileGuard before continuing' => sub {
                 modulino_run_trap( config => "--all", "--serial" );
-                is( $called, 1 );
+                is( $called_cpanel_fileguard, 1 );
             };
 
             it 'should call _update_user_configs_in_serial_mode() when give the --all and --serial flags' => sub {
@@ -227,7 +230,7 @@ describe "ea-nginx script" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 modulino_run_trap( config => "cpuser$$", "--serial" );
                 ok -d $mock->path;
-                is_deeply \@_write_user_conf, [ ["cpuser$$"] ];
+                is_deeply \@_write_user_conf, [ ["cpuser$$"] ] or diag explain \@_write_user_conf;
             };
 
             it "should create a config for all users given --all" => sub {
@@ -343,16 +346,21 @@ describe "ea-nginx script" => sub {
                 $trap->did_die();
             };
 
-            it "should _populate_domain_ips_except() for the given user" => sub {
-                modulino_run_trap( config => "cpuser$$" );
-                is_deeply \@_populate_domain_ips_except, [ ["cpuser$$"] ];
-            };
-
             it "should have an alias `conf`" => sub {
                 my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
                 modulino_run_trap( conf => "cpuser$$", "--serial" );
                 ok -d $mock->path();
                 is_deeply \@_write_user_conf, [ ["cpuser$$"] ];
+            };
+
+            it 'should call _get_global_config_data() when given the --all option' => sub {
+                modulino_run_trap( config => "--all" );
+                is( $called_global_config_data, 1 );
+            };
+
+            it 'should call _get_global_config_data() when given the a single user to process' => sub {
+                modulino_run_trap( conf => "cpuser$$", "--serial" );
+                is( $called_global_config_data, 1 );
             };
 
             describe "cPanel Password protected directories" => sub { it "is tested by smold4r -- nginx-standalone.t and nginx-reverse_proxy.t" };
@@ -2019,7 +2027,7 @@ EOF
             around {
                 no warnings 'once';
                 local *scripts::ea_nginx::_write_user_conf = sub {
-                    push @users_called, @_;
+                    push @users_called, $_[0];
                     die "whoops\n" if $_[0] eq 'foo';
                 };
                 yield;
@@ -2034,7 +2042,7 @@ EOF
                         'bar',
                         'baz',
                     ],
-                );
+                ) or diag explain \@users_called;
             };
 
             it 'should return a hashref of users that had errors' => sub {
@@ -2093,7 +2101,7 @@ EOF
                     append => sub { },
                 );
 
-                local *scripts::ea_nginx::_render_and_append = sub { shift; my $domains = shift; push @$render_domains, $domains; };
+                local *scripts::ea_nginx::_render_and_append = sub { my ($args) = @_; push @$render_domains, $args->{domains}; };
                 yield;
             };
 
@@ -2139,6 +2147,27 @@ EOF
                     $render_domains->[4],
                     [ 'sub.addon2.tld', 'addon2.tld' ],
                 );
+            };
+
+            it 'should pass global_config_data into _render_and_append()' => sub {
+                my $data = [];
+                local *scripts::ea_nginx::_render_and_append = sub {
+                    my ($args) = @_;
+                    my $config_data = $args->{global_config_data};
+                    push @$data, $config_data;
+                };
+
+                scripts::ea_nginx::_write_user_conf( 'foo', { foo => 'bar', } );
+                cmp_deeply(
+                    $data,
+                    [
+                        { foo => 'bar' },
+                        { foo => 'bar' },
+                        { foo => 'bar' },
+                        { foo => 'bar' },
+                        { foo => 'bar' },
+                    ],
+                ) or diag explain $data;
             };
         };
 
@@ -2238,7 +2267,16 @@ EOF
                     get_php_config_for_domains => sub { return {}; },
                 );
 
-                trap { scripts::ea_nginx::_render_and_append( 'foo', ['foo.tld'], 0 ); };
+                trap {
+                    scripts::ea_nginx::_render_and_append(
+                        {
+                            user                  => 'foo',
+                            domains               => ['foo.tld'],
+                            global_config_data    => {},
+                            mail_subdomain_exists => 0,
+                        }
+                    );
+                };
                 like( $trap->stderr(), qr/Could not find PHP configuration for.*it will not be configured to use PHP-FPM/ );
             };
 
@@ -2247,7 +2285,16 @@ EOF
                     error => sub { return 'no process tt for you'; },
                 );
 
-                trap { scripts::ea_nginx::_render_and_append( 'foo', ['foo.tld'], 0 ); };
+                trap {
+                    scripts::ea_nginx::_render_and_append(
+                        {
+                            user                  => 'foo',
+                            domains               => ['foo.tld'],
+                            global_config_data    => {},
+                            mail_subdomain_exists => 0,
+                        }
+                    );
+                };
                 like( $trap->die(), qr/no process tt for you/ );
             };
         };
@@ -2730,6 +2777,80 @@ EOF
                         bar => 'is bad',
                     },
                 ) or diag explain $errors;
+            };
+        };
+
+        describe "_get_global_config_data" => sub {
+            around {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_global_config_data = $orig__get_global_config_data;
+
+                local *scripts::ea_nginx::_get_domain_ips = sub { return { '1.2.3.4' => 'foo.tld' }; };
+                yield;
+            };
+
+            it 'should return a hashref containing data that all users will need when being configured' => sub {
+                my $data = scripts::ea_nginx::_get_global_config_data();
+                is_deeply(
+                    $data,
+                    {
+                        domain_ips => {
+                            '1.2.3.4' => 'foo.tld',
+                        },
+                    },
+                ) or diag explain $data;
+            };
+        };
+
+        describe "_get_domain_ips" => sub {
+            around {
+                my $mock_cpanel_httputils_vhosts_primaryreader = Test::MockModule->new('Cpanel::HttpUtils::Vhosts::PrimaryReader')->redefine(
+                    new                            => sub { return bless {}, 'Cpanel::HttpUtils::Vhosts::PrimaryReader'; },
+                    get_primary_non_ssl_servername => sub { return 'baz.tld', },
+                );
+
+                my $mock_cpanel_config_userdata_load = Test::MockModule->new('Cpanel::Config::userdata::Load')->redefine(
+                    load_userdata_main => sub {
+                        my ($user) = @_;
+                        my $domain = $user . '.tld';
+                        return {
+                            main_domain => $domain,
+                        };
+                    },
+                );
+
+                my $mock_cpanel_domainip = Test::MockModule->new('Cpanel::DomainIp')->redefine(
+                    getdomainip => sub {
+                        my ($domain) = @_;
+                        return '5.6.7.8' if $domain eq 'bar.tld';
+                        return '1.2.3.4';
+                    },
+                );
+
+                my $mock_cpanel_dip_isdedicated = Test::MockModule->new('Cpanel::DIp::IsDedicated')->redefine(
+                    isdedicatedip => sub { return $_[0] eq '5.6.7.8' ? 1 : 0; },
+                );
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_user_domains = sub {
+                    return {
+                        foo => 1,
+                        bar => 1,
+                        baz => 1,
+                    };
+                };
+                yield;
+            };
+
+            it 'should return a hashref mapping IPs to domains that they will be assigned to' => sub {
+                my $data = scripts::ea_nginx::_get_domain_ips();
+                is_deeply(
+                    $data,
+                    {
+                        '1.2.3.4' => 'baz.tld',
+                        '5.6.7.8' => 'bar.tld',
+                    },
+                ) or diag explain $data;
             };
         };
     };
