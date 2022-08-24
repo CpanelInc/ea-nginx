@@ -45,14 +45,17 @@ use MCE::Loop;
 our $var_cache_ea_nginx                = '/var/cache/ea-nginx';
 our $var_cpanel_userdata               = '/var/cpanel/userdata';
 our $etc_nginx                         = '/etc/nginx';
-our $settings_file                     = '/etc/nginx/ea-nginx/settings.json';
-our $cache_file                        = '/etc/nginx/ea-nginx/cache.json';
+our $etc_ea_nginx                      = "$etc_nginx/ea-nginx";
+our $settings_file                     = "$etc_ea_nginx/settings.json";
+our $cache_file                        = "$etc_ea_nginx/cache.json";
+our $proxy_header_file                 = "$etc_ea_nginx/cpanel_localhost_header.json";
+our $serial_touch_file                 = "$etc_ea_nginx/serial_config_mode";
 our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
-our $proxy_header_file                 = '/etc/nginx/ea-nginx/cpanel_localhost_header.json';
 our $cpanel_proxy_file                 = '/etc/nginx/conf.d/includes-optional/cpanel-proxy-xt.conf';
-our $serial_touch_file                 = '/etc/nginx/ea-nginx/serial_config_mode';
+our $custom_settings_dir               = '/var/nginx/ea-nginx';
+our $piped_module_conf                 = '/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf';
 
 my $nginxroot = "/etc/nginx";
 
@@ -100,6 +103,49 @@ my $opts       = {
 
 run(@ARGV) if !caller;
 
+=encoding utf-8
+
+=head1 NAME
+
+scripts::ea_nginx
+
+=head1 SYNOPSIS
+
+    ea-nginx [ cache|clear_cache|config|reload|remove|help ]
+
+    NOTE: Execute the script with --help for more details or go to https://go.cpanel.net/ea-nginx
+          Can also execute 'ea-nginx [help|hint] subcommand' for targeted details about a subcommand
+
+=head1 DESCRIPTION
+
+This script provides various ea-nginx related admin utilities
+
+=over
+
+=item cache subcommand
+
+View, configure, reset NGINX caching at the system or user level
+
+=item clear_cache subcommand
+
+Clears a cache or caches. Pass the users you want to clear or none for all users
+
+=item config subcommand
+
+Build nginx configuration for one or all users
+
+=item reload subcommand
+
+Reload nginx configuration
+
+=item remove subcommand
+
+Remove the given user’s nginx configuration
+
+=back
+
+=cut
+
 sub run {
     my (@argv) = @_;
     die "This script should only be called as root\n" if $> != 0;
@@ -135,21 +181,8 @@ sub run {
 
     # ^^^ /need to have App::CmdDispatch do this automatically see CPANEL-22328
 
-    my $custom_settings_path = path("/var/nginx/ea-nginx/settings.json");
-    if ( $custom_settings_path->exists ) {
-
-        # do not allow specifying apache_ ones
-        my $new = Cpanel::JSON::LoadFile("/var/nginx/ea-nginx/settings.json");
-        my $cur = Cpanel::JSON::LoadFile($settings_file);
-        for my $key (qw(apache_port apache_port_ip apache_ssl_port apache_ssl_port_ip)) {
-            $new->{$key} = $cur->{$key};
-        }
-        _write_json( "/var/nginx/ea-nginx/settings.json", $new );
-        $custom_settings_path->move($settings_file);
-    }
-
-    my $custom_cache_path = path("/var/nginx/ea-nginx/cache.json");
-    $custom_cache_path->move($cache_file) if $custom_cache_path->exists;
+    # allows customers to set custom configs before ea-nginx is installed
+    _update_for_custom_configs();
 
     return App::CmdDispatch->new( $cmds, $opts )->run(@argv);
 }
@@ -157,6 +190,24 @@ sub run {
 ################
 #### commands ##
 ################
+
+=head2 remove()
+
+Remove the given user’s nginx configuration
+
+=over
+
+=item user - required
+
+A valid cPanel username
+
+=item --no-reload - optional
+
+Whether to reload nginx and clear the cache after removing the user
+
+=back
+
+=cut
 
 sub remove {
     my ( $app, $user, @args ) = @_;
@@ -192,6 +243,42 @@ sub remove {
     return;
 }
 
+=head2 config()
+
+Build nginx configuration for one or all users.
+
+=over
+
+=item --all
+
+--all implies --global and re-does configuration for all users
+
+=item --global
+
+--global will only rebuild global configurations and executes anything in
+/etc/nginx/ea-nginx/config-scripts/global/
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=over
+
+=item --no-reload - optional
+
+Whether to reload nginx and clear the cache after making config changes
+
+=item --serial - optional
+
+--serial used with --all will build the config synchronously.  Otherwise, the
+script default is to build the config in parallel
+
+=back
+
+=cut
+
 sub config {
     my ( $app, $user, @args ) = @_;
 
@@ -208,6 +295,7 @@ sub config {
     my $nginx_config_lock = Cpanel::FileGuard->new("$lock_dir/ea-nginx-config-in-progress");
 
     if ( $user eq '--all' || $user eq '--global' ) {
+
         _write_global_cpanel_localhost();
         _write_global_logging();
         _write_global_passenger();
@@ -221,7 +309,7 @@ sub config {
         if ( $user eq '--all' ) {
             mkdir "/etc/nginx/conf.d/users/";
             unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
-            my $errors =
+            $errors =
               $use_serial_mode
               ? _update_user_configs_in_serial_mode()
               : _update_user_configs_in_parallel_mode();
@@ -255,6 +343,62 @@ sub config {
 
     return 1;
 }
+
+=head2 cache_config()
+
+View, configure, or reset NGINX caching at the system or user level
+
+=over
+
+=item --system
+
+View, configure, or reset the global defaults
+
+=item user
+
+View, configure, or reset the NGINX caching config for the given user
+
+=back
+
+=over
+
+=item --no-rebuild - optional
+
+Will make it skip the config regeneration and NGINX reload necessary to make the
+changes take effect
+
+=item --reset - optional
+
+=over 2
+
+=item with --system
+
+Will reset the system level config to the defaults
+
+=item with a user
+
+Will remove the user’s config effectively resetting it to the system level
+config
+
+=back
+
+=item --enabled=[1|0] - optional
+
+=over 2
+
+=item with --system
+
+Will enable/disable caching for users using the global default
+
+=item with user
+
+Will enable/disable caching for the user
+
+=back
+
+=back
+
+=cut
 
 sub cache_config {
     my ( $app, $which, @flags ) = @_;
@@ -331,6 +475,25 @@ sub cache_config {
 
 }
 
+=head2 clear_cache_cmd()
+
+Clears a cache or caches. Pass the users you want to clear or none for all
+users.
+
+=over
+
+=item --all - optional
+
+Clear the cache for all users
+
+=item user1 user2 user3 …
+
+A list of users to clear the cache for
+
+=back
+
+=cut
+
 sub clear_cache_cmd {
     my ( $app, @users ) = @_;
 
@@ -349,6 +512,21 @@ sub clear_cache_cmd {
     return 1;
 }
 
+=head2 clear_cache()
+
+Clear the cache for a given list of users if received.  Otherwise, clear the
+cache for all users.
+
+=over
+
+=item users - optional
+
+A list of cPanel users to clear the cache for
+
+=back
+
+=cut
+
 sub clear_cache {
     my (@users) = @_;
 
@@ -364,13 +542,29 @@ sub clear_cache {
     return 1;
 }
 
+=head2 reload()
+
+Reload nginx configuration
+
+=cut
+
 sub reload { _reload(); clear_cache(); }
 
 ###############
 #### helpers ##
 ###############
 
-my $wants_http2;
+=head2 _wants_http2()
+
+Returns whether http2 is enabled or not.
+
+=head3 RETURNS
+
+Returns 1 if http2 is enabled.  0 otherwise.
+
+=cut
+
+our $wants_http2;
 
 sub _wants_http2 {
     if ( !defined $wants_http2 ) {
@@ -380,12 +574,33 @@ sub _wants_http2 {
     return $wants_http2;
 }
 
-my $has_ipv6;
+=head2 _has_ipv6()
+
+Returns whether IPv6 is enabled or not.
+
+=head3 RETURNS
+
+Returns 1 if IPv6 is enabled.  0 otherwise.
+
+=cut
+
+our $has_ipv6;
 
 sub _has_ipv6 {
     $has_ipv6 //= -f '/proc/net/if_inet6' ? 1 : 0;
     return $has_ipv6;
 }
+
+=head2 ensure_valid_nginx_config()
+
+Attempt to verify that the nginx binary reports that it has a valid
+configuration in place. Attempt to fix any errors that the nginx binary reports.
+Dies if it is unable to verify a valid nginx configuration.  This effectively
+prevents the script from reloading nginx with a bad configuration and gives a
+warning to the user that they will need to manually resolve the issue before
+reloading nginx.
+
+=cut
 
 sub ensure_valid_nginx_config {
     my ($depth) = @_;
@@ -420,6 +635,21 @@ sub ensure_valid_nginx_config {
 
     return;
 }
+
+=head2 caching_defaults()
+
+Returns a hash with the hardcoded caching fallbacks in case the user / global
+defined files are either missing altogether or missing a setting.  The return
+changes depending on whether micro caching is enabled or not.  Micro caching
+can be enabled by putting the following touch file in place:
+
+/etc/nginx/ea-nginx/enable.micro-cache-defaults
+
+=head3 RETURNS
+
+A hash of hardcoded caching fallbacks.
+
+=cut
 
 sub caching_defaults {    # do not want `our %caching_defaults` or a hash reference so that no one can accidentally change it
 
@@ -479,6 +709,25 @@ sub _jsonify_caching_booleans {
     return;
 }
 
+=head2 _write_json()
+
+Given a filename and a hashref of data to write to it, it will write the data
+to the file in json pretty format.
+
+=over
+
+=item file
+
+A valid filename
+
+=item ref
+
+A hashref containing data to write to the filename
+
+=back
+
+=cut
+
 sub _write_json {
     my ( $file, $ref ) = @_;
 
@@ -490,6 +739,31 @@ sub _write_json {
 
     return 1;
 }
+
+=head2 _render_tt_to_file()
+
+Consume a given template toolkit file and produce a given output file with the
+given data.
+
+=over
+
+=item tt_file
+
+The path to the template toolkit file to consume located within
+'/etc/nginx/ea-nginx/'
+
+=item output_file
+
+The path of the configuration file to output to within the '/etc/nginx/conf.d/'
+directory.
+
+=item tt_data
+
+A hashref of data that will be used by the template toolkit file.
+
+=back
+
+=cut
 
 my $tt;
 
@@ -522,6 +796,15 @@ sub _render_tt_to_file {
     return 1;
 }
 
+=head2 _do_other_global_config()
+
+Allow for integrators to customize the configuration.  It consumes and executes
+any executable scripts within the '/etc/nginx/ea-nginx/config-scripts/global'
+directory.  It also gets called after all other global configurations meaning
+that it can overwrite them if the integrator wishes for the scripts to do so.
+
+=cut
+
 sub _do_other_global_config {
 
     # /etc/nginx/ea-nginx/config-scripts/global/* allows for future
@@ -544,6 +827,22 @@ sub _do_other_global_config {
 
     return;
 }
+
+=head2 _get_application_paths()
+
+Populates a given hashref with the path to the binaries for the global default
+versions of ruby, python, and nodejs.
+
+=over
+
+=item app
+
+A hashref to populate with the paths to the binaries.  Note, the given hashref
+will be altered by this sub.
+
+=back
+
+=cut
 
 sub _get_application_paths {
     my ($app) = @_;
@@ -588,6 +887,14 @@ sub _get_application_paths {
     return;
 }
 
+=head2 _write_global_cpanel_localhost()
+
+Write '/etc/nginx/conf.d/includes-optional/cpanel-proxy-xt.conf' with a unique
+cPanel-localhost header.  The cPanel-localhost will be refreshed if the file
+that it is stored in does not exist or has an mtime more than 30 minutes old.
+
+=cut
+
 sub _write_global_cpanel_localhost {
 
     # regen new value if its not set or if its been at least half an hour
@@ -610,6 +917,19 @@ CPANEL_PROXY
     return;
 }
 
+=head2 _write_cpanel_localhost_header()
+
+Generate a new cPanel-localhost header, write the cPanel-localhost header to
+/etc/nginx/ea-nginx/cpanel_localhost_header.json, and rebuild and restart
+apache so that it can pick up the new cPanel localhost header that nginx will
+send.
+
+=head3 RETURNS
+
+Returns the new cPanel localhost header value.
+
+=cut
+
 sub _write_cpanel_localhost_header {
     my $rand = Cpanel::Rand::Get::getranddata(64);
 
@@ -627,11 +947,19 @@ sub _write_cpanel_localhost_header {
     return $headers{"cPanel-localhost"};
 }
 
+=head2 _write_global_nginx_conf()
+
+Update '/etc/nginx/nginx.conf' with the custom values for 'worker_processes'
+and 'worker_shutdown_timeout' if any.  Otherwise, update it with a default
+value for these two configuration variables.
+
+=cut
+
 sub _write_global_nginx_conf {
     my $main = path("/etc/nginx/nginx.conf");
     my $cont = $main->slurp;
 
-    my $local_settings = Cpanel::JSON::LoadFile($settings_file);
+    my $local_settings = _get_settings_hr();
 
     # worker_processes
     my $val = "1";
@@ -662,6 +990,13 @@ sub _write_global_nginx_conf {
     return 1;
 }
 
+=head2 _write_global_cpanel_proxy_non_ssl()
+
+Update '/etc/nginx/conf.d/cpanel-proxy-non-ssl.conf' with the correct values for
+IPv6.
+
+=cut
+
 sub _write_global_cpanel_proxy_non_ssl {
     my $ipv6   = _has_ipv6();
     my $prefix = $ipv6 ? "" : "# server does not have IPv6 enabled: ";
@@ -676,6 +1011,13 @@ sub _write_global_cpanel_proxy_non_ssl {
 
     return 1;
 }
+
+=head2 _write_global_default()
+
+Update '/etc/nginx/conf.d/default.conf' with the correct values for IPv6, http2,
+and the correct default ssl certificate to use on the system.
+
+=cut
 
 sub _write_global_default {
     my $ipv6   = _has_ipv6();
@@ -713,6 +1055,13 @@ sub _write_global_default {
     return 1;
 }
 
+=head2 _write_global_passenger()
+
+Write '/etc/nginx/conf.d/passenger.conf' with the correct application paths for
+ruby, python, and nodejs
+
+=cut
+
 sub _write_global_passenger {
 
     my $defaults_hr = { name => "global passenger defaults" };
@@ -736,10 +1085,31 @@ sub _write_global_passenger {
             },
         },
     );
-
 }
 
-my $settings_hr;
+=head2 _get_settings_hr()
+
+Returns a hashref containing nginx settings based on the default settings and
+the contents of '/etc/nginx/ea-nginx/settings.json'.  The result of this sub is
+cached and the cached result will be returned after the first call.
+
+=head3 RETURNS
+
+A hashref similar to the following:
+
+{
+    apache_port_ip                => '127.0.0.1',
+    server_names_hash_bucket_size => 128,
+    server_names_hash_max_size    => 1024,
+    apache_ssl_port_ip            => '127.0.0.1',
+    client_max_body_size          => '128m',
+    apache_port                   => 81,
+    apache_ssl_port               => 444,
+}
+
+=cut
+
+our $settings_hr;
 
 sub _get_settings_hr {
     if ( !defined $settings_hr ) {
@@ -753,6 +1123,12 @@ sub _get_settings_hr {
     return $settings_hr;
 }
 
+=head2 _write_global_ea_nginx()
+
+Uses template toolkit file to write '/etc/nginx/conf.d/ea-nginx.conf'
+
+=cut
+
 sub _write_global_ea_nginx {
     my $cur_settings = _get_settings_hr();
     my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
@@ -765,11 +1141,18 @@ sub _write_global_ea_nginx {
         { ea4conf => $ea4_conf_hr, settings => $cur_settings, ips => [ sort keys %ips ] }
     );
 }
-our $cpconf_hr;
+
+=head2 _settings_defaults()
+
+Returns a hash containing the default settings for nginx.  This is needed as a
+fallback in case '/etc/nginx/ea-nginx/settings.json' is missing a crucial
+value needed for rendering the template toolkit for 'ea-nginx.conf'.
+
+=cut
 
 sub _settings_defaults {
 
-    $cpconf_hr ||= _get_cpconf_hr();
+    my $cpconf_hr = _get_cpconf_hr();
 
     my %ports;
     foreach my $key ( 'apache_port', 'apache_ssl_port' ) {
@@ -791,6 +1174,13 @@ sub _settings_defaults {
     );
 }
 
+=head2 _write_global_logging()
+
+Uses template toolkit file to write '/etc/nginx/conf.d/global-logging.conf' and
+enables/disables piped logging based on the global system setting
+
+=cut
+
 sub _write_global_logging {
 
     my $logging_hr = _get_logging_hr();
@@ -802,7 +1192,6 @@ sub _write_global_logging {
         },
     );
 
-    my $piped_module_conf = "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf";
     if ( $logging_hr->{piped_logs} ) {
         path($piped_module_conf)->spew("load_module modules/ngx_http_pipelog_module.so;");
     }
@@ -813,6 +1202,21 @@ sub _write_global_logging {
 
     return 1;
 }
+
+=head2 _reload()
+
+Reload nginx configuration
+
+=over
+
+=item new_file - optional
+
+If nginx fails to reload, then this file will be removed and second attempt to
+reload nginx without this file in place will take place
+
+=back
+
+=cut
 
 sub _reload {
     my ($new_file) = @_;
@@ -830,6 +1234,22 @@ sub _reload {
 
     return 1;
 }
+
+=head2 _write_user_conf()
+
+Writes the configuration for the given user.  This includes the caching
+configuration, server block for the primary and parked domains, and the server
+blocks for any subdomains and/or addon domains belonging to the user.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=cut
 
 sub _write_user_conf {
     my ($user) = @_;
@@ -887,7 +1307,37 @@ sub _write_user_conf {
 
 our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
 
+=head2 caching_global()
+
+Return a hashref containing nginx's global caching settings.  This sub will
+return a cached result after the first call.
+
+=head3 RETURNS
+
+A hashref similar to the following:
+
+{
+    'inactive_time' => '60m',
+    'proxy_cache_use_stale' => 'error timeout http_429 http_500 http_502 http_503 http_504',
+    'proxy_cache_valid' => {
+        '200 301 302' => '60m',
+        '404' => '1m'
+    },
+    'zone_size' => '10m',
+    'proxy_cache_lock' => 'on',
+    'proxy_cache_revalidate' => 'on',
+    'proxy_cache_background_update' => 'on',
+    'levels' => '1:2',
+    'enabled' => bless( do{\(my $o = 1)}, 'JSON::PP::Boolean' ),
+    'proxy_cache_min_uses' => 1,
+    'logging' => bless( do{\(my $o = 0)}, 'JSON::PP::Boolean' ),
+};
+
+=cut
+
 sub caching_global {
+    return $global_caching if $global_caching;
+
     my $caching_global = Cpanel::JSON::LoadFile($cache_file);
 
     # UGMO :/ clean it up if the touch file exists and they have the defaults
@@ -925,13 +1375,40 @@ sub caching_global {
     return $caching_global;
 }
 
+=head2 _get_caching_hr()
+
+Returns the given users cache settings.  The cache settings have the following
+order of precendence:
+
+1.  user specific based on '/var/cpanel/userdata/$user/nginx-cache.json'
+2.  global cache settings based on '/etc/nginx/ea-nginx/cache.json'
+3.  The caching defaults provided by caching_defaults()
+
+NOTE: The results of this sub are cached for each user in the $caching_cache
+hashref and the cached result is returned on subsequent calls to this sub.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=head3 RETURNS
+
+A hashref representing the user's caching configuration.  See caching_global()
+for a detailed example of what this data structure looks like.
+
+=cut
+
 sub _get_caching_hr {
     my ($user) = @_;
 
     if ( !exists $caching_cache->{$user} ) {
 
         # at this point that file should exist; if it does not we want this to barf so we know about it
-        $global_caching //= caching_global();
+        my $global_caching = caching_global();
 
         my $user_caching = eval { Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/nginx-cache.json") } || {};
         $caching_cache->{$user} = {
@@ -944,6 +1421,24 @@ sub _get_caching_hr {
     return $caching_cache->{$user};
 }
 
+=head2 _get_logging_hr()
+
+Return a hashref containing the user's global logging preferences.  This sub
+will return a cached result after the first call.
+
+=head3 RETURNS
+
+This returns a hashref similar to the following:
+
+{
+    'default_format_name' => 'combined',
+    'enable_cache_log' => bless( do{\(my $o = 0)}, 'JSON::PP::Boolean' ),
+    'loglevel' => 'warn',
+    'piped_logs' => '1'
+};
+
+=cut
+
 sub _get_logging_hr {
     return $logging_hr if $logging_hr;
 
@@ -951,7 +1446,7 @@ sub _get_logging_hr {
     $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
     $logging_hr->{loglevel}            = "warn";
 
-    $global_caching //= caching_global();
+    my $global_caching = caching_global();
     $logging_hr->{enable_cache_log} = $global_caching->{logging};
 
     if ( $logging_hr->{default_format_name} ne "combined" && $logging_hr->{default_format_name} ne "common" ) {
@@ -967,6 +1462,25 @@ sub _get_logging_hr {
 
     return $logging_hr;
 }
+
+=head2 _get_group_for()
+
+Returns the group name for the given username.  The result is cached in a hash
+and the cached result will be returned if the given username exists in the hash.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=head3 RETURNS
+
+A string representing the group name of the given username.
+
+=cut
 
 my %group_cache;
 
@@ -985,16 +1499,37 @@ sub _get_group_for {
     return $group_cache{$user};
 }
 
+=head2 _get_domains_with_ssls()
+
+Returns a hashref where the keys are the domains that have SSL enabled and the
+value is 1 for every key.
+
+=cut
+
 our $domains_with_ssl;
 
 sub _get_domains_with_ssls {
+    return $domains_with_ssl if $domains_with_ssl;
+
     my %ssl_vhosts = map {
         $_ =~ s/_SSL$//;
         $_ => 1
     } grep { substr( $_, -4 ) eq '_SSL' ? 1 : 0 } keys %{ _get_httpd_vhosts_hash() };
 
-    return \%ssl_vhosts;
+    $domains_with_ssl = \%ssl_vhosts;
+
+    return $domains_with_ssl;
 }
+
+=head2 _get_httpd_vhosts_hash()
+
+Returns a hashref containing the apache configuration structure for all the
+vhosts that will be configured on the system.  See
+<Cpanel::ConfigFiles::Apache::Config> for more details regarding this data
+structure.  The result of this sub is cached and the cached result will be
+returned after the first call.
+
+=cut
 
 our $httpd_vhosts_hr;
 
@@ -1006,7 +1541,23 @@ sub _get_httpd_vhosts_hash {
     return $httpd_vhosts_hr;
 }
 
-my $standalone;
+=head2 _is_standalone()
+
+Returns whether nginx is currently in standalone mode or not.  The return value
+is cached and the cached value will be returned on subsequent calls to this sub.
+
+=head3 RETURNS
+
+Returns 1 or 0
+
+=cut
+
+our $standalone;
+
+sub _is_standalone {
+    $standalone //= -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0;
+    return $standalone;
+}
 
 my %domain_ips;
 
@@ -1027,6 +1578,35 @@ sub _populate_domain_ips_except {
     return;
 }
 
+=head2 _render_and_append()
+
+Appends the server block for the given domains to the given user's
+configuration file.  Dies if it fails to render the server block for the user.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=item domains
+
+A arrayref of domains names
+
+=item mail_subdomain_exists
+
+Tells the sub whether 'mail' is a separate subdomain or not for the given user
+account.  The value will either be 0 or 1 depending on if it is a separate
+subdomain or not.
+
+=back
+
+=cut
+
+# TODO: Figure out how much of this data is not unique to the user
+#       and pass it into this sub as a hashref.  The reason is that it
+#       will allow us to gather the data before any forking happens (MCE::Loop) meaning
+#       that every fork will have it in advance.
 sub _render_and_append {
     my ( $user, $domains, $mail_subdomain_exists ) = @_;
 
@@ -1036,8 +1616,8 @@ sub _render_and_append {
     my $cpanel_password_protected_directories = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_password_protected_directories.json");
     my $cpanel_redirects                      = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_redirects.json");
 
-    my $userconf = "/etc/nginx/conf.d/users/$user.conf";
-    $standalone //= -e "/etc/nginx/ea-nginx/enable.standalone" ? 1 : 0;
+    my $userconf   = "/etc/nginx/conf.d/users/$user.conf";
+    my $standalone = _is_standalone();
     $tt                ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
     $server_tt         ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
@@ -1055,6 +1635,7 @@ sub _render_and_append {
     my $http2 = _wants_http2();
     my $gid   = ( Cpanel::PwCache::getpwnam($user) )[3];
 
+    # TODO: Move the logging initialization to its own sub and call it after _render_and_append()
     # create no matter what because the are either used directly or via piped logging
     Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
     chmod 0640, "/var/log/nginx/domains/$domains->[0]";
@@ -1116,6 +1697,7 @@ sub _render_and_append {
         }
     }
 
+    # TODO: Make this async safe
     my $ip           = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
     my $severname_ip = $ip ne '127.0.0.1' && $domain_ips{$ip}++ ? "" : $ip;              # avoid `conflicting server name "$ip"` warnings, sans worst case 127 fallback
 
@@ -1126,7 +1708,7 @@ sub _render_and_append {
     my $wordpress_hr  = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
     my $has_wordpress = ( $wordpress_hr->{docroot_install} || scalar @{ $wordpress_hr->{non_docroot_uris} } ) ? 1 : 0;
 
-    $cpconf_hr ||= _get_cpconf_hr();
+    my $cpconf_hr = _get_cpconf_hr();
 
     my $cur_settings = _get_settings_hr();
     my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
@@ -1184,10 +1766,45 @@ sub _render_and_append {
     return 1;
 }
 
+=head2 _get_homedir()
+
+Returns the path to the given cPanel user's homedir
+
+=head3 RETURNS
+
+The path to the user's homedir
+
+=cut
+
 sub _get_homedir {
     my ($user) = @_;
     return ( getpwnam($user) )[7];
 }
+
+=head2 _get_passenger_apps()
+
+Given a user and an array reference of domains, it consumes the applications
+userdatafile for the user, and returns an array reference of hashes for any
+applications that are enabled for one of the given domains.
+
+=over
+
+=item user
+
+A cPanel username
+
+=item domains
+
+A arrayreferences of domains owned by the user
+
+=back
+
+=head3 RETURNS
+
+An array reference of hashes containing application data for any enabled
+passenger applications
+
+=cut
 
 sub _get_passenger_apps {
     my ( $user, $domains ) = @_;
@@ -1209,6 +1826,29 @@ sub _get_passenger_apps {
     return \@apps;
 }
 
+=head2 _get_userdata_for()
+
+Given a cPanel username and a domain that it owns, it returns the userdata for
+the domain.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=item dom
+
+A domain owned by the cPanel user
+
+=back
+
+=head3 RETURNS
+
+A hashref representing the userdata for the user's domain
+
+=cut
+
 our %load_userdata_cache;
 
 sub _get_userdata_for {
@@ -1221,6 +1861,30 @@ sub _get_userdata_for {
     return $load_userdata_cache{$user}{$dom};
 }
 
+=head2 _get_ssl_redirect()
+
+Given a cPanel username and an arrayref of domains that the cpanel user owns,
+return 1 if any of the domains has force ssl redirect enabled.  Otherwise,
+return undef
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=item domains
+
+An arrayref of domain names
+
+=back
+
+=head3 RETURNS
+
+1 or undef
+
+=cut
+
 sub _get_ssl_redirect {
     my ( $user, $domains ) = @_;
 
@@ -1232,6 +1896,29 @@ sub _get_ssl_redirect {
     return;
 }
 
+=head2 _get_secruleengineoff()
+
+Returns 1 if mod_security is enabled for the given user. Otherwise, returns
+undef.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=item domains
+
+An arrayref of domains
+
+=back
+
+=head3 RETURNS
+
+1 or undef
+
+=cut
+
 sub _get_secruleengineoff {
     my ( $user, $domains ) = @_;
 
@@ -1242,6 +1929,58 @@ sub _get_secruleengineoff {
 
     return;
 }
+
+=head2 _get_redirects()
+
+Given an arrayref of domains and an arrayref of hashes describing redirect
+userdata for a cPanel user, it returns an arrayref of hashes describing the
+redirects for each domain.
+
+=over
+
+=item domains
+
+An arrayref of domains
+
+=item cpanel_redirects
+
+An arrayref of hashes describing redirect userdata similar to the following:
+
+[
+    {
+        docroot   => '/home/foo/public_html',
+        domain    => '.*',
+        kind      => 'rewrite',
+        matchwww  => 1,
+        opts      => 'L',
+        sourceurl => '/uri',
+        targeturl => 'https://domain.tld',
+        type      => 'permanent',
+        wildcard  => 0,
+    },
+]
+
+=back
+
+=head3 RETURNS
+
+An arrayref of hashes describing the redirects that need to be configured that
+will appear similar to the following:
+
+[
+    {
+        flag        => 'redirect',
+        replacement => 'https://domain.tld/$1',
+        regex       => '^\\/uri\\/?(.*)$',
+    },
+    {
+        flag        => 'permanent',
+        replacement => 'https://domain.tld',
+        regex       => '^\\/uri$',
+    },
+]
+
+=cut
 
 sub _get_redirects {
     my ( $domains, $cpanel_redirects ) = @_;
@@ -1299,6 +2038,56 @@ sub _get_redirects {
     return \@applicable_redirects;
 }
 
+=head2 _get_basic_auth()
+
+Returns a hashref containing directory privacy information for the domain whose
+docroot is being processed.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=item docroot
+
+The docroot for the domain that is being processed
+
+=item cpanel_password_protected_directories
+
+A hashref of directory privacy userdata similar to the following:
+
+{
+    '/public_html' => {
+        '_htaccess_mtime' => 1234,
+        'realm_name'      => 'docroot',
+    },
+    '/public_html/dir' => {
+        '_htaccess_mtime' => 5678,
+        'realm_name'      => 'dir',
+    },
+}
+
+=back
+
+=head3 RETURNS
+
+A hashref of directory privacy information similar to the following:
+
+{
+    realm_name      => 'docroot',
+    auth_file       => '/home/foo/.htpasswds/public_html/passwd',
+    _htaccess_mtime => 1234,
+    locations       => {
+        '/sub' => {
+            'auth_file'  => '/home/foo/.htpasswds/public_html/sub/passwd',
+            'realm_name' => 'sub',
+        },
+    },
+}
+
+=cut
+
 sub _get_basic_auth {
     my ( $user, $docroot, $cpanel_password_protected_directories ) = @_;
 
@@ -1323,9 +2112,9 @@ sub _get_basic_auth {
     $basic_auth ||= $cpanel_password_protected_directories->{""} || undef;
     if ($basic_auth) {
         $basic_auth->{auth_file} =
-            $auth_file_from ? "$homedir/.htpasswds$auth_file_from/passwd"
-          : $docroot_rel    ? "$homedir/.htpasswds$docroot_rel/passwd"
-          :                   "$homedir/.htpasswds/passwd";
+            $auth_file_from                                        ? "$homedir/.htpasswds$auth_file_from/passwd"
+          : $cpanel_password_protected_directories->{$docroot_rel} ? "$homedir/.htpasswds$docroot_rel/passwd"
+          :                                                          "$homedir/.htpasswds/passwd";
     }
 
     $basic_auth->{locations} = {};
@@ -1408,6 +2197,37 @@ sub _get_wp_toolkit_list_for_user {
     return $res;
 }
 
+=head2 _get_wordpress_info()
+
+Given a user and a docroot, it gathers information the locations of wordpress
+installs relative to the document root and returns a hashref with this info.
+
+=over
+
+=item user
+
+A cPanel username
+
+=item docroot
+
+The path to the user's docroot
+
+=back
+
+=head3 RETURNS
+
+A hashref that appears similar to the following:
+
+{
+    docroot_install  => 1,
+    non_docroot_uris => [
+        'foo',
+        'bar',
+    ],
+}
+
+=cut
+
 sub _get_wordpress_info {
     my ( $user, $docroot ) = @_;
 
@@ -1468,6 +2288,22 @@ sub _ensure_wordpress_info_cache_directory {
     return;
 }
 
+=head2 _is_wordpress_info_cache_valid()
+
+Returns 1 or 0 depending on if the cache file is valid or not.  NOTE: it will
+always return 0 if the '/var/cpanel/nginx_disable_wordpress_info_cache' touch
+file is in place.
+
+=over
+
+=item cache_file
+
+The path of the cache file to check
+
+=back
+
+=cut
+
 sub _is_wordpress_info_cache_valid {
     my ($cache_file) = @_;
 
@@ -1479,6 +2315,22 @@ sub _is_wordpress_info_cache_valid {
 
     return ( -s $cache_file && $mtime > ( $now - $ttl ) ) ? 1 : 0;
 }
+
+=head2 _get_wordpress_info_from_cache()
+
+Loads the given cache file, and returns the data as a hashref.  It will warn and
+return undef if the given cache file is not valid json or if it is missing the
+required keys.
+
+=over
+
+=item cache_file
+
+The path to the cache file to load
+
+=back
+
+=cut
 
 sub _get_wordpress_info_from_cache {
     my ($cache_file) = @_;
@@ -1497,6 +2349,24 @@ sub _get_wordpress_info_from_cache {
     return $res;
 }
 
+=head2 _validate_user_arg()
+
+Validate that the given username is a valid cPanel user
+
+=over
+
+=item user
+
+A cPanel user to validate
+
+=back
+
+=head3 RETURNS
+
+Returns 1 if the give username is valid.  Dies otherwise.
+
+=cut
+
 sub _validate_user_arg {
     my ( $app, $user ) = @_;
 
@@ -1511,6 +2381,12 @@ sub _validate_user_arg {
 sub _get_cmd {
     return $cmds;
 }
+
+=head2 _bail()
+
+Handles unclean script exits.  For example, if an invalid username is given.
+
+=cut
 
 sub _bail {
     my ( $app, $msg ) = @_;
@@ -1540,9 +2416,27 @@ sub _delete_glob {
     return;
 }
 
+=head2 _get_cpconf_hr()
+
+Returns a hashref containing the cPanel settings from
+'/var/cpanel/cpanel.config'.  The result of this sub is cached and the cached
+result will be returned after the first call.
+
+=cut
+
+our $cpconf_hr;
+
 sub _get_cpconf_hr {
-    return Cpanel::Config::LoadCpConf::loadcpconf();
+    $cpconf_hr ||= Cpanel::Config::LoadCpConf::loadcpconf();
+    return $cpconf_hr;
 }
+
+=head2 _get_nginx_bin()
+
+Returns the path to the nginx binary.  Dies if the nginx does not exist or is
+not executable.
+
+=cut
 
 sub _get_nginx_bin {
     my $nginx_bin = '/usr/sbin/nginx';
@@ -1551,6 +2445,26 @@ sub _get_nginx_bin {
     die "Could not find an executable nginx binary\n" unless -x $nginx_bin;
     return $nginx_bin;
 }
+
+=head2 _attempt_to_fix_syntax_errors()
+
+Parses the given output for known nginx configuration syntax errors such as
+duplicate keys and attempts to fix them.  Returns 0 or 1 depending on if it
+resolved an issue or not.
+
+=over
+
+=item combined_output
+
+A multiline string to parse
+
+=back
+
+=head3 RETURNS
+
+Returns 1 if it resolved an issue.  Returns 0 otherwise.
+
+=cut
 
 sub _attempt_to_fix_syntax_errors {
     my ($combined_output) = @_;
@@ -1631,12 +2545,30 @@ sub _attempt_to_fix_syntax_errors {
     return $resolved_issue;
 }
 
+=head2 _update_global_ea_nginx_settings()
+
+Accepts a key/value pair to add/update 'settings.json' with.
+
+=over
+
+=item key
+
+A key to add to the 'settings.json' file
+
+=item value
+
+The value of the key to add to the 'settings.json' file
+
+=back
+
+=cut
+
 sub _update_global_ea_nginx_settings {
     my ( $key, $value ) = @_;
     die "_update_global_ea_nginx_settings: ‘key’ arg is required\n"   unless $key;
     die "_update_global_ea_nginx_settings: ‘value’ arg is required\n" unless $value;
 
-    my $user_settings_hr = Cpanel::JSON::LoadFile($settings_file);
+    my $user_settings_hr = _get_settings_hr();
     $user_settings_hr->{$key} = $value;
     _write_json( $settings_file, $user_settings_hr );
 
@@ -1644,10 +2576,29 @@ sub _update_global_ea_nginx_settings {
     return;
 }
 
+=head2 _get_num_current_users()
+
+Returns an integer representing the number of cPanel user accounts on the
+system.
+
+=cut
+
 sub _get_num_current_users {
     return unless ( eval { require Cpanel::Config::LoadUserDomains::Count; 1; } );
     return Cpanel::Config::LoadUserDomains::Count::counttrueuserdomains();
 }
+
+=head2 _get_user_domains()
+
+This is a wrapper around 'Cpanel::Config::LoadUserDomains::loaduserdomains'. See
+the POD for loaduserdomains for details. The result of this sub is cached and
+the cached result will be returned after the first call.
+
+=head3 RETURNS
+
+This function returns a hash ref with a key/value mapping of users to domains.
+
+=cut
 
 my $user_domains;
 
@@ -1655,6 +2606,12 @@ sub _get_user_domains {
     $user_domains //= Cpanel::Config::LoadUserDomains::loaduserdomains( undef, 0, 1 );
     return $user_domains;
 }
+
+=head2 _rebuild_and_restart_apache()
+
+Rebuild the apache configuration and restart the service
+
+=cut
 
 sub _rebuild_and_restart_apache {
     my $run = Cpanel::SafeRun::Object->new(
@@ -1671,6 +2628,24 @@ sub _rebuild_and_restart_apache {
     return;
 }
 
+=head2 _update_user_configs_in_parallel_mode()
+
+Build the configuration for all users asynchronously.
+
+=head3 RETURNS
+
+A hashref of users that had errors during the configuration process that should
+be similar to the following:
+
+{
+    user1 => 'error message',
+    user2 => 'another error message',
+}
+
+OR undef if all of the users were configured successfully.
+
+=cut
+
 sub _update_user_configs_in_parallel_mode {
 
     my $user_lookup = _get_user_domains();
@@ -1685,6 +2660,24 @@ sub _update_user_configs_in_parallel_mode {
     return \%errors;
 }
 
+=head2 _update_user_configs_in_serial_mode()
+
+Build the configuration for all users synchronously.
+
+=head3 RETURNS
+
+A hashref of users that had errors during the configuration process that should
+be similar to the following:
+
+{
+    user1 => 'error message',
+    user2 => 'another error message',
+}
+
+OR undef if all of the users were configured successfully.
+
+=cut
+
 sub _update_user_configs_in_serial_mode {
     print "Serial mode detected.  User configuration will take longer …\n";
 
@@ -1694,6 +2687,24 @@ sub _update_user_configs_in_serial_mode {
 
     return $errors;
 }
+
+=head2 _process_users()
+
+Accepts an arrayref of users and writes the configuration for each user.
+
+=over
+
+=item users
+
+A arrayref of users to process
+
+=back
+
+=head3 RETURNS
+
+A hashref of users to error messages for any user that configuration fails for.
+
+=cut
 
 sub _process_users {
     my ($users) = @_;
@@ -1705,6 +2716,76 @@ sub _process_users {
     }
 
     return \%errors;
+}
+
+=head2 _update_for_custom_configs()
+
+Should only be called by run().  The idea here is to allow clients to place a
+file in the $custom_settings_dir prior to installing the ea-nginx RPM.  Then,
+this script will pick up the file and place it in the proper location on first
+run.  After which, these subs should become no-ops unless another overwrite
+file is place in the $custom_settings_dir.  Currently, the following two files
+are supported:
+
+settings.json
+cache.json
+
+To add a new file, create a sub to handle moving said file to its proper
+location, then call the sub from _update_for_custom_configs()
+
+=cut
+
+sub _update_for_custom_configs {
+
+    _update_nginx_settings_config_file();
+    _update_nginx_cache_config_file();
+
+    return;
+}
+
+=head2 _update_nginx_settings_config_file()
+
+This reads in a settings.json file from the $custom_settings_dir and moves it
+to '/etc/nginx/ea-nginx/settings.json'.  NOTE: the following keys are not
+honored since they are server specific:
+
+apache_port
+apache_port_ip
+apache_ssl_port
+apache_ssl_port_ip
+
+=cut
+
+sub _update_nginx_settings_config_file {
+    my $custom_settings_file = "$custom_settings_dir/settings.json";
+    my $custom_settings_path = path($custom_settings_file);
+    if ( $custom_settings_path->exists ) {
+
+        # do not allow specifying apache_ ones
+        my $new = Cpanel::JSON::LoadFile($custom_settings_file);
+        my $cur = _get_settings_hr();
+        for my $key (qw(apache_port apache_port_ip apache_ssl_port apache_ssl_port_ip)) {
+            $new->{$key} = $cur->{$key};
+        }
+        _write_json( $custom_settings_file, $new );
+        $custom_settings_path->move($settings_file);
+    }
+
+    return;
+}
+
+=head2 _update_nginx_cache_config_file()
+
+This reads in a cache.json file from the $custom_settings_dir and moves it to
+'/etc/nginx/ea-nginx/cache.json'.
+
+=cut
+
+sub _update_nginx_cache_config_file {
+    my $custom_cache_file = "$custom_settings_dir/cache.json";
+    my $custom_cache_path = path($custom_cache_file);
+    $custom_cache_path->move($cache_file) if $custom_cache_path->exists;
+    return;
 }
 
 1;
