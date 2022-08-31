@@ -9,35 +9,37 @@ use warnings;
 
 package scripts::ea_nginx;
 
-use Cpanel::Apache::TLS                     ();
-use Cpanel::Config::LoadCpConf              ();
-use Cpanel::Config::LoadUserDomains         ();
-use Cpanel::Config::LoadWwwAcctConf         ();
-use Cpanel::Config::userdata                ();
-use Cpanel::Config::userdata::PassengerApps ();
-use Cpanel::DomainIp                        ();
-use Cpanel::DomainLookup::DocRoot           ();
-use Cpanel::FileGuard                       ();
-use Cpanel::FileUtils::TouchFile            ();
-use Cpanel::HTTP::Client                    ();
-use Cpanel::HttpUtils::ApRestart::BgSafe    ();
-use Cpanel::Hostname                        ();
-use Cpanel::JSON                            ();
-use Cpanel::NAT                             ();
-use Cpanel::PHP::Config                     ();
-use Cpanel::PHPFPM::Get                     ();
-use Cpanel::PwCache                         ();
-use Cpanel::Rand::Get                       ();
-use Cpanel::SafeRun::Object                 ();
-use Cpanel::Transaction::File::JSON         ();
-use Cpanel::Validate::URL                   ();
-use Cpanel::Validate::Username              ();
-use File::Glob                              ();
-use File::Path::Tiny                        ();
-use IO::Callback                            ();
-use String::UnicodeUTF8                     ();
-use Template                                ();
-use Whostmgr::TweakSettings                 ();
+use Cpanel::Apache::TLS                      ();
+use Cpanel::Config::LoadCpConf               ();
+use Cpanel::Config::LoadUserDomains          ();
+use Cpanel::Config::LoadWwwAcctConf          ();
+use Cpanel::Config::userdata                 ();
+use Cpanel::Config::userdata::PassengerApps  ();
+use Cpanel::DIp::IsDedicated                 ();
+use Cpanel::DomainIp                         ();
+use Cpanel::DomainLookup::DocRoot            ();
+use Cpanel::FileGuard                        ();
+use Cpanel::FileUtils::TouchFile             ();
+use Cpanel::HTTP::Client                     ();
+use Cpanel::HttpUtils::ApRestart::BgSafe     ();
+use Cpanel::HttpUtils::Vhosts::PrimaryReader ();
+use Cpanel::Hostname                         ();
+use Cpanel::JSON                             ();
+use Cpanel::NAT                              ();
+use Cpanel::PHP::Config                      ();
+use Cpanel::PHPFPM::Get                      ();
+use Cpanel::PwCache                          ();
+use Cpanel::Rand::Get                        ();
+use Cpanel::SafeRun::Object                  ();
+use Cpanel::Transaction::File::JSON          ();
+use Cpanel::Validate::URL                    ();
+use Cpanel::Validate::Username               ();
+use File::Glob                               ();
+use File::Path::Tiny                         ();
+use IO::Callback                             ();
+use String::UnicodeUTF8                      ();
+use Template                                 ();
+use Whostmgr::TweakSettings                  ();
 
 use Path::Tiny;
 use MCE::Loop;
@@ -307,12 +309,13 @@ sub config {
 
         my $errors = {};
         if ( $user eq '--all' ) {
+            my $global_config_data = _get_global_config_data();
             mkdir "/etc/nginx/conf.d/users/";
             unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
             $errors =
               $use_serial_mode
-              ? _update_user_configs_in_serial_mode()
-              : _update_user_configs_in_parallel_mode();
+              ? _update_user_configs_in_serial_mode($global_config_data)
+              : _update_user_configs_in_parallel_mode($global_config_data);
         }
 
         if ($reload) {
@@ -333,8 +336,8 @@ sub config {
         _validate_user_arg( $app, $user );
         mkdir "/etc/nginx/conf.d/users/";
 
-        _populate_domain_ips_except($user);
-        _write_user_conf($user);
+        my $global_config_data = _get_global_config_data();
+        _write_user_conf( $user, $global_config_data );
         if ($reload) {
             _reload("/etc/nginx/conf.d/users/$user.conf");
             clear_cache($user);
@@ -1247,12 +1250,17 @@ blocks for any subdomains and/or addon domains belonging to the user.
 
 A valid cPanel username
 
+=item global_config_data
+
+A hashref containing data that should be treated as read only that all users
+can use to build their configs with.
+
 =back
 
 =cut
 
 sub _write_user_conf {
-    my ($user) = @_;
+    my ( $user, $global_config_data ) = @_;
 
     my $domains_data = Cpanel::Config::userdata::Load::load_userdata_main($user);
     my %addon_subdomains;
@@ -1285,12 +1293,26 @@ sub _write_user_conf {
     }
 
     path($userconf)->spew( $pre_server . "#### main domain for $user ##\n" );
-    _render_and_append( $user => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ], $mail_subdomain_exists );
+    _render_and_append(
+        {
+            user                  => $user,
+            domains               => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ],
+            global_config_data    => $global_config_data,
+            mail_subdomain_exists => $mail_subdomain_exists,
+        }
+    );
 
     if (@actual_subdomains) {
         path($userconf)->append("\n#### sub domains for $user ##\n");
         for my $subdom (@actual_subdomains) {
-            _render_and_append( $user => [$subdom] );
+            _render_and_append(
+                {
+                    user                  => $user,
+                    domains               => [$subdom],
+                    global_config_data    => $global_config_data,
+                    mail_subdomain_exists => $mail_subdomain_exists,
+                }
+            );
         }
     }
 
@@ -1298,7 +1320,14 @@ sub _write_user_conf {
         path($userconf)->append("\n#### addon domains for $user ##\n");
         for my $aod ( sort keys %{ $domains_data->{addon_domains} } ) {
             my $sub = $domains_data->{addon_domains}{$aod};
-            _render_and_append( $user => [ $sub, $aod ] );
+            _render_and_append(
+                {
+                    user                  => $user,
+                    domains               => [ $sub, $aod ],
+                    global_config_data    => $global_config_data,
+                    mail_subdomain_exists => $mail_subdomain_exists,
+                }
+            );
         }
     }
 
@@ -1559,31 +1588,18 @@ sub _is_standalone {
     return $standalone;
 }
 
-my %domain_ips;
-
-sub _populate_domain_ips_except {
-    my ($user) = @_;
-
-    my %seen_ips;
-    my $user_lookup = _get_user_domains();
-    for my $usr ( sort keys %$user_lookup ) {
-        my $domain = Cpanel::Config::userdata::Load::load_userdata_main($usr)->{main_domain};
-        my $ip     = Cpanel::DomainIp::getdomainip($domain);
-        if ( $ip && !exists $seen_ips{$ip} ) {
-            $seen_ips{$ip}++;
-            $domain_ips{$ip}++ if $user ne $usr;
-        }
-    }
-
-    return;
-}
-
 =head2 _render_and_append()
 
 Appends the server block for the given domains to the given user's
 configuration file.  Dies if it fails to render the server block for the user.
 
 =over
+
+=item args
+
+A hashref containing named args to be passed in.
+
+=over 2
 
 =item user
 
@@ -1593,11 +1609,18 @@ A valid cPanel username
 
 A arrayref of domains names
 
+=item global_config_data
+
+A hashref containing data that should be treated as read only that all users
+can use to build their configs with.
+
 =item mail_subdomain_exists
 
 Tells the sub whether 'mail' is a separate subdomain or not for the given user
 account.  The value will either be 0 or 1 depending on if it is a separate
 subdomain or not.
+
+=back
 
 =back
 
@@ -1608,7 +1631,12 @@ subdomain or not.
 #       will allow us to gather the data before any forking happens (MCE::Loop) meaning
 #       that every fork will have it in advance.
 sub _render_and_append {
-    my ( $user, $domains, $mail_subdomain_exists ) = @_;
+    my ($args) = @_;
+
+    my $user                  = $args->{user};
+    my $domains               = $args->{domains};
+    my $global_config_data    = $args->{global_config_data};
+    my $mail_subdomain_exists = $args->{mail_subdomain_exists};
 
     my $group = _get_group_for($user);
 
@@ -1697,13 +1725,12 @@ sub _render_and_append {
         }
     }
 
-    # TODO: Make this async safe
-    my $ip           = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';    # juuust in case so we don’t break nginx w/ syntax error
-    my $severname_ip = $ip ne '127.0.0.1' && $domain_ips{$ip}++ ? "" : $ip;              # avoid `conflicting server name "$ip"` warnings, sans worst case 127 fallback
+    my $ip            = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';                              # juuust in case so we don’t break nginx w/ syntax error
+    my $servername_ip = $ip ne '127.0.0.1' && $global_config_data->{domain_ips}{$ip} eq $domains->[0] ? $ip : "";
 
     # Use the public IP on NAT systems
     # NOTE: this is fine to run on non-NAT systems as it just returns the same IP
-    $severname_ip = Cpanel::NAT::get_public_ip($severname_ip) if $severname_ip;
+    $servername_ip = Cpanel::NAT::get_public_ip($servername_ip) if $servername_ip;
 
     my $wordpress_hr  = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
     my $has_wordpress = ( $wordpress_hr->{docroot_install} || scalar @{ $wordpress_hr->{non_docroot_uris} } ) ? 1 : 0;
@@ -1726,7 +1753,7 @@ sub _render_and_append {
             group               => $group,
             ( defined $uid ? ( uid => $uid ) : () ),
             proxy_ip                     => $ip,
-            ip                           => $severname_ip,
+            ip                           => $servername_ip,
             ipv6                         => $ipv6,
             http2                        => $http2,
             fpm_socket                   => $fpm_socket,
@@ -2632,6 +2659,15 @@ sub _rebuild_and_restart_apache {
 
 Build the configuration for all users asynchronously.
 
+=over
+
+=item global_config_data
+
+A hashref containing data that should be treated as read only that all users
+can use to build their configs with.
+
+=back
+
 =head3 RETURNS
 
 A hashref of users that had errors during the configuration process that should
@@ -2647,12 +2683,13 @@ OR undef if all of the users were configured successfully.
 =cut
 
 sub _update_user_configs_in_parallel_mode {
+    my ($global_config_data) = @_;
 
     my $user_lookup = _get_user_domains();
     my %errors      = mce_loop {
         my ( $mce, $chunk_ref ) = @_;
 
-        my $err_href = _process_users($chunk_ref);
+        my $err_href = _process_users( $chunk_ref, $global_config_data );
         MCE->gather( $_, $err_href->{$_} ) for ( keys %$err_href );
     }
     keys %$user_lookup;
@@ -2663,6 +2700,15 @@ sub _update_user_configs_in_parallel_mode {
 =head2 _update_user_configs_in_serial_mode()
 
 Build the configuration for all users synchronously.
+
+=over
+
+=item global_config_data
+
+A hashref containing data that should be treated as read only that all users
+can use to build their configs with.
+
+=back
 
 =head3 RETURNS
 
@@ -2679,11 +2725,13 @@ OR undef if all of the users were configured successfully.
 =cut
 
 sub _update_user_configs_in_serial_mode {
+    my ($global_config_data) = @_;
+
     print "Serial mode detected.  User configuration will take longer …\n";
 
     my $user_lookup = _get_user_domains();
     my @users       = sort keys %$user_lookup;
-    my $errors      = _process_users( \@users );
+    my $errors      = _process_users( \@users, $global_config_data );
 
     return $errors;
 }
@@ -2698,6 +2746,11 @@ Accepts an arrayref of users and writes the configuration for each user.
 
 A arrayref of users to process
 
+=item global_config_data
+
+A hashref containing data that should be treated as read only that all users
+can use to build their configs with.
+
 =back
 
 =head3 RETURNS
@@ -2707,11 +2760,11 @@ A hashref of users to error messages for any user that configuration fails for.
 =cut
 
 sub _process_users {
-    my ($users) = @_;
+    my ( $users, $global_config_data ) = @_;
 
     my %errors;
     foreach my $usr (@$users) {
-        eval { _write_user_conf($usr); };
+        eval { _write_user_conf( $usr, $global_config_data ); };
         $errors{$usr} = $@ if $@;
     }
 
@@ -2786,6 +2839,67 @@ sub _update_nginx_cache_config_file {
     my $custom_cache_path = path($custom_cache_file);
     $custom_cache_path->move($cache_file) if $custom_cache_path->exists;
     return;
+}
+
+=head2 _get_global_config_data()
+
+Gathers data that should be treated as read only and will be the same for every
+user when rendering the user's config file.
+
+This sub will get called directly in config() so that the data it gathers is
+cloned to every fork and thus will be the same in every fork when building in
+parallel mode (MCE::Loop).
+
+=head3 RETURNS
+
+A hashref similar to the following:
+
+{
+    domain_ips => {
+        $ip => $domain,
+    },
+}
+
+=cut
+
+sub _get_global_config_data {
+    my %global_config_data;
+
+    # TODO: EA-10890 -- Gather more data to pass into _render_and_append() here
+    $global_config_data{domain_ips} = _get_domain_ips();
+
+    return \%global_config_data;
+}
+
+=head2 _get_domain_ips()
+
+Maps IPs to the primary domain that they are associated with on the server.
+This allows us to configure the domain on only one server block and to the
+server block that the user desires according to metadata / apache.
+
+=head3 RETURNS
+
+A hashref that maps IPs to domains.
+
+=cut
+
+sub _get_domain_ips {
+    my $primary_vhosts_obj = Cpanel::HttpUtils::Vhosts::PrimaryReader->new();
+
+    my %domain_ips;
+    my $user_lookup = _get_user_domains();
+    for my $usr ( sort keys %$user_lookup ) {
+        my $domain = Cpanel::Config::userdata::Load::load_userdata_main($usr)->{main_domain};
+        my $ip     = Cpanel::DomainIp::getdomainip($domain);
+
+        if ( $ip && !exists $domain_ips{$ip} ) {
+            if ( Cpanel::DIp::IsDedicated::isdedicatedip($ip) || $domain eq $primary_vhosts_obj->get_primary_non_ssl_servername($ip) ) {
+                $domain_ips{$ip} = $domain;
+            }
+        }
+    }
+
+    return \%domain_ips;
 }
 
 1;
