@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -750,6 +750,10 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Sep 08 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-4
+- EA-10671: Calculate 'server_names_hash_bucket_size' and 'server_names_hash_max_size' at config time
+- EA-10913: Update ea-nginx.conf when adding/updating a config file for a single user
+
 * Tue Aug 23 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-3
 - EA-10892: Avoid configuring shared IPs in multiple server blocks when configuring nginx asynchronously
 
