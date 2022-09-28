@@ -28,14 +28,32 @@ BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 
 # 6.0.4-2 is when the source is included w/ the apache module
 # also ensures Apache has it and Application Manager will be available
+
+
+%if 0%{?rhel} == 9
+BuildRequires: ea-apache24-mod-passenger
+BuildRequires: ea-passenger-runtime
+BuildRequires: ea-passenger-src
+BuildRequires: ruby
+BuildRequires: ruby-devel
+BuildRequires: rubygem-rake
+%else
 BuildRequires: %{ruby_version}-mod_passenger >= 6.0.4-2
 BuildRequires: %{ruby_version}-rubygem-rake >= 0.8.1
 BuildRequires: %{ruby_version}-rubygem-passenger
 BuildRequires: %{ruby_version}-ruby-devel
+%endif
 
 # ea-ruby24-mod_passenger conflicts with ea-ruby27-mod_passenger
 # because they both provide and conflict with apache24-passenger
+
+%if 0%{?rhel} != 9
 Requires: %{ruby_version}
+%else
+Requires: ea-apache24-mod-passenger
+Requires: ea-passenger-runtime
+%endif
+
 Requires: apache24-passenger
 Requires: ea-apache24-mod_remoteip
 
@@ -105,8 +123,13 @@ BuildRequires: systemd
 %define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 %else
+%if 0%{?rhel} == 9
+%define BASE_WITH_CC_OPT "-I/opt/cpanel/ea-passenger-src/passenger-release-6.0.10/src/nginx_module",
+%define BASE_WITH_LD_OPT "-Wl,-z,relro -Wl,-z,now -pie -ldl",
+%else
 %define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl -Wl,-rpath=/opt/cpanel/ea-brotli/lib
+%endif
 %endif
 
 %if 0%{?rhel} > 6
@@ -220,11 +243,17 @@ cp %{SOURCE21} ngx_http_pipelog_module/config
 
 %build
 
+%if 0%{?rhel} == 9
+mkdir -p ngx_http_pipelog_module/
+rm -rf %{bdir}/_passenger_source_code
+cp -rf /opt/cpanel/ea-passenger-src/passenger-release-*/ %{bdir}/_passenger_source_code
+%else
 export PATH=/opt/cpanel/%{ruby_version}/root/usr/bin:/opt/cpanel/libcurl/bin:$PATH
 source /opt/cpanel/%{ruby_version}/enable
 ruby -v
 rm -rf %{bdir}/_passenger_source_code
 cp -rf /opt/cpanel/%{ruby_version}/src/passenger-*/ %{bdir}/_passenger_source_code
+%endif
 
 export LDFLAGS="$LDFLAGS %{WITH_LD_OPT}"
 export CFLAGS="$CFLAGS %{WITH_CC_OPT}"
