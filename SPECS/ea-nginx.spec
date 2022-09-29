@@ -32,7 +32,6 @@ BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 
 %if 0%{?rhel} == 9
 BuildRequires: ea-apache24-mod-passenger
-BuildRequires: ea-passenger-runtime
 BuildRequires: ea-passenger-src
 BuildRequires: ruby
 BuildRequires: ruby-devel
@@ -124,8 +123,8 @@ BuildRequires: systemd
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 %else
 %if 0%{?rhel} == 9
-%define BASE_WITH_CC_OPT "-I/opt/cpanel/ea-passenger-src/passenger-release-6.0.10/src/nginx_module",
-%define BASE_WITH_LD_OPT "-Wl,-z,relro -Wl,-z,now -pie -ldl",
+%define BASE_WITH_CC_OPT "-fPIC -I/opt/cpanel/ea-passenger-src/passenger-release-6.0.10/src/nginx_module",
+%define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl
 %else
 %define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl -Wl,-rpath=/opt/cpanel/ea-brotli/lib
@@ -146,7 +145,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -262,7 +261,11 @@ export EXTRA_CXXFLAGS=$CFLAGS
 export EXTRA_LDFLAGS=$LDFLAGS
 
 %if 0%{?rhel} > 6
+%if 0%{?rhel} == 9
 export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
+%else
+export LDFLAGS="$LDFLAGS"
+%endif
 export MODSECURITY_LIB=/opt/cpanel/ea-modsec30/lib
 export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
 %endif
@@ -279,6 +282,7 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
     --add-dynamic-module=ngx_http_pipelog_module
+
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx %{bdir}/objs/nginx-debug
 
@@ -430,7 +434,9 @@ mkdir -p $RPM_BUILD_ROOT/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDC
 mkdir -p %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures
 install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
 
+%if 0%{?rhel} != 9
 rm -rf %{bdir}/_passenger_source_code
+%endif
 
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
@@ -779,6 +785,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Sep 29 2022 Julian Brown <julian.brown@cpanel.net> - 1.23.1-6
+- ZC-10009: Add changes so that it builds on AlmaLinux 9
+
 * Wed Sep 21 2022 Tim Mullin <tim@cpanel.net> - 1.23.1-5
 - EA-10751: Leave X-Forwarded-Host blank for service subdomains
 
