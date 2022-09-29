@@ -170,8 +170,9 @@ describe "ea-nginx script" => sub {
 
     describe "sub-command" => sub {
         describe "`config`" => sub {
-            my $called_cpanel_fileguard   = 0;
-            my $called_global_config_data = 0;
+            my $called_cpanel_fileguard      = 0;
+            my $called_global_config_data    = 0;
+            my $called_write_global_ea_nginx = 0;
 
             around {
                 local $mi{cmd} = "config";
@@ -186,18 +187,18 @@ describe "ea-nginx script" => sub {
                 $mock_cpanel_fileguard->redefine( new => sub { $called_cpanel_fileguard++; }, );
 
                 local *scripts::ea_nginx::_write_global_cpanel_localhost     = sub { };
-                local *scripts::ea_nginx::_write_global_ea_nginx             = sub { };
                 local *scripts::ea_nginx::_write_global_nginx_conf           = sub { };
                 local *scripts::ea_nginx::_write_global_default              = sub { };
                 local *scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl = sub { };
                 local *scripts::ea_nginx::ensure_valid_nginx_config          = sub { };
 
+                local *scripts::ea_nginx::_write_global_ea_nginx  = sub { $called_write_global_ea_nginx++ };
                 local *scripts::ea_nginx::_get_global_config_data = sub { $called_global_config_data++; };
 
                 yield;
             };
 
-            before each => sub { $called_cpanel_fileguard = 0; $called_global_config_data = 0; };
+            before each => sub { $called_cpanel_fileguard = 0; $called_global_config_data = 0; $called_write_global_ea_nginx = 0; };
 
             it_should_behave_like "any sub command that takes a cpanel user";
 
@@ -224,6 +225,12 @@ describe "ea-nginx script" => sub {
 
                 modulino_run_trap( config => "--all" );
                 is( $called_parallel, 1 );
+            };
+
+            it 'should update ea-nginx.conf if called for a single user' => sub {
+                my $mock = Test::MockFile->dir('/etc/nginx/conf.d/users/');
+                modulino_run_trap( config => "cpuser$$", "--serial" );
+                is( $called_write_global_ea_nginx, 1 );
             };
 
             it "should create the config for the given user if needed" => sub {
@@ -1053,12 +1060,20 @@ describe "ea-nginx script" => sub {
             };
         };
 
+        describe "_get_num_total_domains" => sub {
+            it "should return a scalar value if it loads ‘Cpanel::Config::LoadUserDomains::Count’" => sub {
+                no warnings 'redefine';
+                local *Cpanel::Config::LoadUserDomains::Count::countuserdomains = sub { return 42; };
+
+                is( scripts::ea_nginx::_get_num_total_domains(), 42 );
+            };
+        };
+
         describe "_attempt_to_fix_syntax_errors" => sub {
             around {
                 no warnings 'redefine';
-                local *scripts::ea_nginx::_get_num_current_users           = sub { return 42; };
-                local *scripts::ea_nginx::_update_global_ea_nginx_settings = sub { return; };
-                local *scripts::ea_nginx::_write_global_ea_nginx           = sub { return; };
+                local *scripts::ea_nginx::_get_num_total_domains = sub { return 42; };
+                local *scripts::ea_nginx::_write_global_ea_nginx = sub { return; };
 
                 yield;
             };
@@ -1097,54 +1112,6 @@ describe "ea-nginx script" => sub {
 
                 my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:1];
                 is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
-            };
-
-            it "should return 1 if it increases the value of server_names_hash_max_size" => sub {
-                my $line = q[nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_max_size: 32];
-                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
-            };
-
-            it "should return 1 if it increases the value of server_names_hash_bucket_size" => sub {
-                my $line = q[nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_bucket_size: 16];
-                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
-            };
-        };
-
-        describe "_update_global_ea_nginx_settings" => sub {
-            it "should die if called with no arguments" => sub {
-                dies_ok { scripts::ea_nginx::_update_global_ea_nginx_settings() };
-            };
-
-            it "should die if only called with one argument" => sub {
-                dies_ok { scripts::ea_nginx::_update_global_ea_nginx_settings(42) };
-            };
-
-            it "should call ‘_write_json’ with the updated key/value pair" => sub {
-                my $hr = {};
-
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_get_settings_hr = sub { return; };
-                local *scripts::ea_nginx::_write_json      = sub { $hr = $_[1]; };
-
-                scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 );
-                is_deeply( $hr, { universe => 42 } );
-            };
-
-            it "should return undef if called correctly" => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_get_settings_hr = sub { return; };
-                local *scripts::ea_nginx::_write_json      = sub { return; };
-
-                is( scripts::ea_nginx::_update_global_ea_nginx_settings( 'universe', 42 ), undef );
-            };
-        };
-
-        describe "_get_num_current_users" => sub {
-            it "should return a scalar value if it loads ‘Cpanel::Config::LoadUserDomains::Count’" => sub {
-                no warnings 'redefine';
-                local *Cpanel::Config::LoadUserDomains::Count::counttrueuserdomains = sub { return 42; };
-
-                is( scripts::ea_nginx::_get_num_current_users(), 42 );
             };
         };
 
@@ -1565,6 +1532,7 @@ EOF
         describe "_write_global_passenger" => sub {
             my $data;
             around {
+                no warnings 'redefine', 'once';
                 local *scripts::ea_nginx::_write_global_passenger = $orig__write_global_passenger;
 
                 local *scripts::ea_nginx::_get_application_paths = sub {
@@ -1604,7 +1572,7 @@ EOF
                 no warnings 'redefine';
                 my $mock = Test::MockModule->new('Cpanel::Config::userdata::PassengerApps')->redefine(
                     ensure_paths => sub {
-                        $hr->{ruby} = '/path/to/ruby',
+                        $hr->{ruby}     = '/path/to/ruby',
                           $hr->{python} = '/path/to/python',
                           $hr->{nodejs} = '/path/to/nodejs',
                           return;
@@ -1700,12 +1668,16 @@ EOF
         describe "_get_settings_hr" => sub {
             my $hr;
             around {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_cpconf_hr = sub {
                     return {
                         apache_port     => '0.0.0.0:81',
                         apache_ssl_port => '0.0.0.0:444',
                     };
                 };
+
+                local *scripts::ea_nginx::_get_server_names_hash_bucket_size = sub { return 42; };
+                local *scripts::ea_nginx::_get_server_names_hash_max_size    = sub { return 21; };
                 yield;
             };
 
@@ -1721,8 +1693,8 @@ EOF
                     $hr,
                     {
                         apache_port_ip                => '127.0.0.1',
-                        server_names_hash_bucket_size => 128,
-                        server_names_hash_max_size    => 1024,
+                        server_names_hash_bucket_size => 42,
+                        server_names_hash_max_size    => 21,
                         apache_ssl_port_ip            => '127.0.0.1',
                         client_max_body_size          => '128m',
                         apache_port                   => 81,
@@ -1742,8 +1714,8 @@ EOF
                     {
                         foo                           => 'bar',
                         apache_port_ip                => '127.0.0.1',
-                        server_names_hash_bucket_size => 128,
-                        server_names_hash_max_size    => 1024,
+                        server_names_hash_bucket_size => 42,
+                        server_names_hash_max_size    => 21,
                         apache_ssl_port_ip            => '127.0.0.1',
                         client_max_body_size          => '128m',
                         apache_port                   => 81,
@@ -1769,14 +1741,62 @@ EOF
                     {
                         bar                           => 'foo',
                         apache_port_ip                => '127.0.0.1',
-                        server_names_hash_bucket_size => 128,
-                        server_names_hash_max_size    => 1024,
+                        server_names_hash_bucket_size => 42,
+                        server_names_hash_max_size    => 21,
                         apache_ssl_port_ip            => '127.0.0.1',
                         client_max_body_size          => '128m',
                         apache_port                   => 86,
                         apache_ssl_port               => 468,
                     },
                 ) or diag explain $hr;
+            };
+        };
+
+        describe '_get_server_names_hash_bucket_size' => sub {
+            it 'should return minimum allowed value if there are no long domains hosted on the server' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_user_domains = sub {
+                    return {
+                        foo => ['foo.tld'],
+                    };
+                };
+                use warnings 'redefine';
+
+                my $value = scripts::ea_nginx::_get_server_names_hash_bucket_size();
+                is( $value, 128 );
+            };
+
+            it 'should return a larger value if there is a longer domain hosted on the server' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_user_domains = sub {
+                    return {
+                        foo => ['this.domain.is.really.long.it.goes.on.and.on.till.nobody.is.home.then.it.goes.longer.because.it.can.and.it.will.and.there.is.really.nothing.that.you.can.do.about.it.tld'],
+                    };
+                };
+                use warnings 'redefine';
+
+                my $value = scripts::ea_nginx::_get_server_names_hash_bucket_size();
+                is( $value, 256 );
+            };
+        };
+
+        describe '_get_server_names_hash_max_size' => sub {
+            it 'should return the minimum max size if the number of domains hosted is less than said size' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_num_total_domains = sub { return 1; };
+                use warnings 'redefine';
+
+                my $value = scripts::ea_nginx::_get_server_names_hash_max_size();
+                is( $value, 1024 );
+            };
+
+            it 'should return a larger value if there are a significant number of domains hosted on the server' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_num_total_domains = sub { return 1500; };
+                use warnings 'redefine';
+
+                my $value = scripts::ea_nginx::_get_server_names_hash_max_size();
+                is( $value, 3000 );
             };
         };
 
@@ -1794,49 +1814,63 @@ EOF
             before each => sub { $content = undef; };
 
             it 'should default the value of worker_processes to 1 if it is not defined in settings.json' => sub {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_settings_hr = sub { };
+                use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_nginx_conf();
                 like( $content, qr/worker_processes\s+1;/ );
             };
 
             it 'should update the value of worker_processes to match what is in settings.json if it is valid (integer)' => sub {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_processes => 42 }; };
+                use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_nginx_conf();
                 like( $content, qr/worker_processes\s+42;/ );
             };
 
             it 'should update the value of worker_processes to match what is in settings.json if it is valid (auto)' => sub {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_processes => 'auto' }; };
+                use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_nginx_conf();
                 like( $content, qr/worker_processes\s+auto;/ );
             };
 
             it 'should warn and use the default value of worker_processes if the value set in settings.json is invalid' => sub {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_processes => 'foo' }; };
+                use warnings 'redefine';
 
                 trap { scripts::ea_nginx::_write_global_nginx_conf(); };
                 like( $trap->stderr(), qr/Custom `worker_processes`.*is not a number/ );
             };
 
             it 'should default the value of worker_shutdown_timeout to 10s if it is not defined in settings.json' => sub {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_settings_hr = sub { };
+                use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_nginx_conf();
                 like( $content, qr/worker_shutdown_timeout\s+10s;/ );
             };
 
             it 'should update the value of worker_shutdown_timeout to match what is in settings.json if it is valid' => sub {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_shutdown_timeout => '42ms' }; };
+                use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_nginx_conf();
                 like( $content, qr/worker_shutdown_timeout\s+42ms;/ );
             };
 
             it 'should warn and use the default value of worker_shutdown_timeout if the value set in settings.json is invalid' => sub {
+                no warnings 'redefine';
                 local *scripts::ea_nginx::_get_settings_hr = sub { return { worker_shutdown_timeout => 'foo' }; };
+                use warnings 'redefine';
 
                 trap { scripts::ea_nginx::_write_global_nginx_conf(); };
                 like( $trap->stderr(), qr/Custom `worker_shutdown_timeout`.*is not an NGINX time value/ );
@@ -2025,7 +2059,7 @@ EOF
         describe "_process_users" => sub {
             my @users_called;
             around {
-                no warnings 'once';
+                no warnings 'redefine', 'once';
                 local *scripts::ea_nginx::_write_user_conf = sub {
                     push @users_called, $_[0];
                     die "whoops\n" if $_[0] eq 'foo';
@@ -2150,12 +2184,14 @@ EOF
             };
 
             it 'should pass global_config_data into _render_and_append()' => sub {
+                no warnings 'redefine';
                 my $data = [];
                 local *scripts::ea_nginx::_render_and_append = sub {
                     my ($args) = @_;
                     my $config_data = $args->{global_config_data};
                     push @$data, $config_data;
                 };
+                use warnings 'redefine';
 
                 scripts::ea_nginx::_write_user_conf( 'foo', { foo => 'bar', } );
                 cmp_deeply(
@@ -2491,7 +2527,7 @@ EOF
 
         describe "_get_passenger_apps" => sub {
             around {
-                no warnings 'once';
+                no warnings 'redefine', 'once';
                 local *scripts::ea_nginx::_get_application_paths = sub { };
                 yield;
             };

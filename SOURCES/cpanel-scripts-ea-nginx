@@ -336,6 +336,9 @@ sub config {
         _validate_user_arg( $app, $user );
         mkdir "/etc/nginx/conf.d/users/";
 
+        # Settings in this file can be affected when a new user is added
+        _write_global_ea_nginx();
+
         my $global_config_data = _get_global_config_data();
         _write_user_conf( $user, $global_config_data );
         if ($reload) {
@@ -1092,9 +1095,11 @@ sub _write_global_passenger {
 
 =head2 _get_settings_hr()
 
-Returns a hashref containing nginx settings based on the default settings and
-the contents of '/etc/nginx/ea-nginx/settings.json'.  The result of this sub is
-cached and the cached result will be returned after the first call.
+Returns a hashref containing nginx settings based on the default settings, the
+contents of '/etc/nginx/ea-nginx/settings.json', and the calculated values of
+'server_names_hash_bucket_size', and 'server_names_hash_max_size'.  The result
+of this sub is cached and the cached result will be returned after the first
+call.
 
 =head3 RETURNS
 
@@ -1121,9 +1126,76 @@ sub _get_settings_hr {
             _settings_defaults(),
             %{$global_settings},
         };
+
+        # Do this here so that these two settings are always calculated
+        # NOTE: The calculations are based on the advice given here:  http://nginx.org/en/docs/http/server_names.html#optimization
+        $settings_hr->{server_names_hash_bucket_size} = _get_server_names_hash_bucket_size();
+        $settings_hr->{server_names_hash_max_size}    = _get_server_names_hash_max_size();
     }
 
     return $settings_hr;
+}
+
+=head2 _get_server_names_hash_bucket_size()
+
+Calculate the value of 'server_names_hash_bucket_size' based on the length of
+the longest domain hosted on the server.
+
+=head3 RETURNS
+
+An integer greater than or equal to 128.  The integer must be a power of 2.
+
+=cut
+
+sub _get_server_names_hash_bucket_size {
+    my $server_names_hash_bucket_size = 128;
+    my $service_subdomain_buffer      = 15;                               # Add padding for service subdomains (cpcalendars. is currently the longest)
+    my $needed_length                 = $server_names_hash_bucket_size;
+
+    # Figure out what the longest server_name is
+    my $user_lookup = _get_user_domains();
+    for my $usr ( sort keys %$user_lookup ) {
+        for my $domain ( @{ $user_lookup->{$usr} } ) {
+            my $domain_length = length $domain;
+            $domain_length += $service_subdomain_buffer;
+
+            $needed_length = $domain_length if $domain_length > $needed_length;
+        }
+    }
+
+    # server_names_hash_bucket_size should be power of 2 for CPU cache line size
+    # optimization purposes.  Set it to first power of 2 larger then the longest
+    # server_name or 128 if it is sufficient
+    while ( $server_names_hash_bucket_size < $needed_length ) {
+        $server_names_hash_bucket_size *= 2;
+    }
+
+    return $server_names_hash_bucket_size;
+}
+
+=head2 _get_server_names_hash_max_size()
+
+Calculates the value of 'server_names_hash_max_size' based on the total number
+of domains hosted on the server.
+
+=head3 RETURNS
+
+An integer greater than or equal to 1024.
+
+=cut
+
+sub _get_server_names_hash_max_size {
+    my $minimum_hash_max_size = 1024;
+    my $num_domains           = _get_num_total_domains();
+
+    # We generate 2 server blocks for each domain
+    my $num_server_blocks = $num_domains * 2;
+
+    # At a minimum, 'server_names_hash_max_size' needs to match the number of server blocks generated
+    # If the number of server blocks to generate is larger than the minimum that we allow this setting to be
+    # then increase the setting size to the number of server blocks to generate
+    # otherwise, honor the minimum size
+    return ( $minimum_hash_max_size < $num_server_blocks ) ? $num_server_blocks : $minimum_hash_max_size;
 }
 
 =head2 _write_global_ea_nginx()
@@ -1167,13 +1239,11 @@ sub _settings_defaults {
 
     # hard coded fallback in case they remove stuff from /etc/nginx/ea-nginx/settings.json
     return (
-        apache_port                   => $ports{apache_port},
-        apache_port_ip                => '127.0.0.1',
-        apache_ssl_port               => $ports{apache_ssl_port},
-        apache_ssl_port_ip            => '127.0.0.1',
-        server_names_hash_bucket_size => 128,
-        server_names_hash_max_size    => 1024,
-        client_max_body_size          => '128m',
+        apache_port          => $ports{apache_port},
+        apache_port_ip       => '127.0.0.1',
+        apache_ssl_port      => $ports{apache_ssl_port},
+        apache_ssl_port_ip   => '127.0.0.1',
+        client_max_body_size => '128m',
     );
 }
 
@@ -2530,89 +2600,21 @@ sub _attempt_to_fix_syntax_errors {
             $file->spew( join( "\n", @file_lines ) );
             last;    # nginx -t only reveals the first issue it encounters
         }
-
-        # For example:
-        # nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_max_size: 2
-        elsif ( $output_line =~ m{^nginx: \[emerg\] could not build server_names_hash, you should increase server_names_hash_max_size: ([0-9]+)$} ) {
-            my $current_value     = $1;
-            my $num_current_users = _get_num_current_users();
-            last unless defined $num_current_users;
-
-            # http://nginx.org/en/docs/http/server_names.html
-            # The recommendation here is to set 'server_names_hash_max_size' to the number of server_names on the server
-            # We are taking a more conservative approach here is that number is actually 7x the number
-            # of users on the server at a minimum
-            my $update_value = ( $num_current_users > $current_value ) ? $num_current_users : $current_value * 2;
-
-            _update_global_ea_nginx_settings( 'server_names_hash_max_size', $update_value );
-            _write_global_ea_nginx();
-            $resolved_issue = 1;
-
-            last;    # nginx -t only reveals the first issue it encounters
-        }
-
-        # For example:
-        # nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_bucket_size: 64
-        elsif ( $output_line =~ m{^nginx: \[emerg\] could not build server_names_hash, you should increase server_names_hash_bucket_size: ([0-9]+)$} ) {
-            my $current_value = $1;
-
-            # http://nginx.org/en/docs/http/server_names.html
-            # The recommendation here is to set 'server_names_hash_bucket_size' to the next power of 2
-            # I am going to make the assumption that the initial value is a power of 2
-            my $update_value = $current_value * 2;
-
-            _update_global_ea_nginx_settings( 'server_names_hash_bucket_size', $update_value );
-            _write_global_ea_nginx();
-            $resolved_issue = 1;
-
-            last;    # nginx -t only reveals the first issue it encounters
-        }
     }
 
     return $resolved_issue;
 }
 
-=head2 _update_global_ea_nginx_settings()
+=head2 _get_num_total_domains()
 
-Accepts a key/value pair to add/update 'settings.json' with.
-
-=over
-
-=item key
-
-A key to add to the 'settings.json' file
-
-=item value
-
-The value of the key to add to the 'settings.json' file
-
-=back
-
-=cut
-
-sub _update_global_ea_nginx_settings {
-    my ( $key, $value ) = @_;
-    die "_update_global_ea_nginx_settings: ‘key’ arg is required\n"   unless $key;
-    die "_update_global_ea_nginx_settings: ‘value’ arg is required\n" unless $value;
-
-    my $user_settings_hr = _get_settings_hr();
-    $user_settings_hr->{$key} = $value;
-    _write_json( $settings_file, $user_settings_hr );
-
-    print "Updated ‘$key’ to ‘$value’ since the current value is too low\n";
-    return;
-}
-
-=head2 _get_num_current_users()
-
-Returns an integer representing the number of cPanel user accounts on the
+Returns an integer representing the total number of domains hosted on the
 system.
 
 =cut
 
-sub _get_num_current_users {
+sub _get_num_total_domains {
     return unless ( eval { require Cpanel::Config::LoadUserDomains::Count; 1; } );
-    return Cpanel::Config::LoadUserDomains::Count::counttrueuserdomains();
+    return Cpanel::Config::LoadUserDomains::Count::countuserdomains();
 }
 
 =head2 _get_user_domains()

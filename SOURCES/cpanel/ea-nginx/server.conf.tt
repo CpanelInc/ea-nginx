@@ -279,6 +279,7 @@ server {
     # For includes:
     set $CPANEL_APACHE_PROXY_IP [% proxy_ip || settings.apache_port_ip %];
     set $CPANEL_APACHE_PROXY_SSL_IP [% proxy_ip || settings.apache_port_ip %];
+    set $CPANEL_SERVICE_SUBDOMAIN 1;
 
     location /.well-known/cpanel-dcv {
         root [% docroot %];
