@@ -207,6 +207,28 @@ sub describe {
     } (
         'Api1::cPAddons::mainpg',
     );
+    my @cpanellogd_user_actions = map {
+        {
+            'category' => 'Stats',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_do_reload_logs_adminbin',
+            'exectype' => 'module',
+        }
+    } (
+        'RunUser',
+    );
+    my @cpanellogd_actions = map {
+        {
+            'category' => 'Stats',
+            'event'    => $_,
+            'stage'    => 'post',
+            'hook'     => 'NginxHooks::_reload_logs',
+            'exectype' => 'module',
+        }
+    } (
+        'RunAll',
+    );
     my $hook_ar = [
         @adminbin_actions,
         @build_apache_conf,
@@ -219,6 +241,8 @@ sub describe {
         @script_php_fpm_config_actions,
         @wordpress_actions,
         @just_clear_cache_actions,
+        @cpanellogd_user_actions,
+        @cpanellogd_actions,
     ];
 
     return $hook_ar;
@@ -413,6 +437,20 @@ sub _rebuild_global {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
+sub _reload_logs {
+    local $@;
+    eval {
+        require Cpanel::ServerTasks;
+        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], 5, 'reload_logs' );
+    };
+    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
+sub _do_reload_logs_adminbin {
+    Cpanel::AdminBin::Call::call( 'Cpanel', 'nginx', 'RELOAD_LOGS' );
+    return;
+}
+
 sub _do_adminbin {
     Cpanel::AdminBin::Call::call( 'Cpanel', 'nginx', 'UPDATE_CONFIG' );
     return;
@@ -501,6 +539,10 @@ NginxHooks::_rebuild_global();
 
 NginxHooks::_do_adminbin();
 
+NginxHooks::_reload_logs();
+
+NginxHooks::_do_reload_logs_adminbin();
+
 NginxHooks::rebuild_user( $user, $logger );
 
 NginxHooks::rebuild_config($logger);
@@ -576,6 +618,17 @@ Rebuilds the ea-nginx config for all users.
 
 Action from the Task system.
 Rebuilds the ea-nginx global configs only.
+
+=head2 _reload_logs
+
+This schedules sending a signal to the nginx process that tells it to reload
+its logs.
+
+=head2 _do_reload_logs_adminbin
+
+This is called from cpuser's account and raises the privilege using the admin
+bin system.  This ultimately schedules sending a signal to the nginx process
+that tells it to reload its logs.
 
 =cut
 
