@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -750,6 +750,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Fri Sep 30 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-8
+- EA-10959: Ensure valid nginx configuration when service subdomains are disabled
+
 * Thu Sep 29 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-7
 - Revert ZC-10009
 

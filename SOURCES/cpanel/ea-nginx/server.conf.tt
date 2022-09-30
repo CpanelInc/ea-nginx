@@ -23,6 +23,7 @@ server {
     # For includes:
     set $CPANEL_APACHE_PROXY_IP [% proxy_ip || settings.apache_port_ip %];
     set $CPANEL_APACHE_PROXY_SSL_IP [% proxy_ip || settings.apache_port_ip %];
+    set $CPANEL_SERVICE_SUBDOMAIN 0;
 
     [%- IF behavior.caching.enabled %]
     set $CPANEL_PROXY_CACHE [% user %];
