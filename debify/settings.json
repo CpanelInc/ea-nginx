@@ -24,9 +24,7 @@
         "redhat-lsb-core",
         "ea-ruby27",
         "initscripts",
-        "apache24-passenger",
-        "ruby-devel",
-        "rubygem-rake"
+        "apache24-passenger"
     ],
     "add_to_build_requires": [
         "libcurl4-openssl-dev",
