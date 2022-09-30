@@ -28,31 +28,14 @@ BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 
 # 6.0.4-2 is when the source is included w/ the apache module
 # also ensures Apache has it and Application Manager will be available
-
-
-%if 0%{?rhel} == 9
-BuildRequires: ea-apache24-mod-passenger
-BuildRequires: ea-passenger-src
-BuildRequires: ruby
-BuildRequires: ruby-devel
-BuildRequires: rubygem-rake
-%else
 BuildRequires: %{ruby_version}-mod_passenger >= 6.0.4-2
 BuildRequires: %{ruby_version}-rubygem-rake >= 0.8.1
 BuildRequires: %{ruby_version}-rubygem-passenger
 BuildRequires: %{ruby_version}-ruby-devel
-%endif
 
 # ea-ruby24-mod_passenger conflicts with ea-ruby27-mod_passenger
 # because they both provide and conflict with apache24-passenger
-
-%if 0%{?rhel} != 9
 Requires: %{ruby_version}
-%else
-Requires: ea-apache24-mod-passenger
-Requires: ea-passenger-runtime
-%endif
-
 Requires: apache24-passenger
 Requires: ea-apache24-mod_remoteip
 
@@ -122,13 +105,8 @@ BuildRequires: systemd
 %define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 %else
-%if 0%{?rhel} == 9
-%define BASE_WITH_CC_OPT "-fPIC -I/opt/cpanel/ea-passenger-src/passenger-release-6.0.10/src/nginx_module",
-%define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl
-%else
 %define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl -Wl,-rpath=/opt/cpanel/ea-brotli/lib
-%endif
 %endif
 
 %if 0%{?rhel} > 6
@@ -145,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 7
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -242,17 +220,11 @@ cp %{SOURCE21} ngx_http_pipelog_module/config
 
 %build
 
-%if 0%{?rhel} == 9
-mkdir -p ngx_http_pipelog_module/
-rm -rf %{bdir}/_passenger_source_code
-cp -rf /opt/cpanel/ea-passenger-src/passenger-release-*/ %{bdir}/_passenger_source_code
-%else
 export PATH=/opt/cpanel/%{ruby_version}/root/usr/bin:/opt/cpanel/libcurl/bin:$PATH
 source /opt/cpanel/%{ruby_version}/enable
 ruby -v
 rm -rf %{bdir}/_passenger_source_code
 cp -rf /opt/cpanel/%{ruby_version}/src/passenger-*/ %{bdir}/_passenger_source_code
-%endif
 
 export LDFLAGS="$LDFLAGS %{WITH_LD_OPT}"
 export CFLAGS="$CFLAGS %{WITH_CC_OPT}"
@@ -261,11 +233,7 @@ export EXTRA_CXXFLAGS=$CFLAGS
 export EXTRA_LDFLAGS=$LDFLAGS
 
 %if 0%{?rhel} > 6
-%if 0%{?rhel} == 9
 export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
-%else
-export LDFLAGS="$LDFLAGS"
-%endif
 export MODSECURITY_LIB=/opt/cpanel/ea-modsec30/lib
 export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
 %endif
@@ -282,7 +250,6 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
     --add-dynamic-module=ngx_http_pipelog_module
-
 make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx %{bdir}/objs/nginx-debug
 
@@ -434,9 +401,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDC
 mkdir -p %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures
 install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
 
-%if 0%{?rhel} != 9
 rm -rf %{bdir}/_passenger_source_code
-%endif
 
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
@@ -785,6 +750,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Sep 29 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-7
+- Revert ZC-10009
+
 * Thu Sep 29 2022 Julian Brown <julian.brown@cpanel.net> - 1.23.1-6
 - ZC-10009: Add changes so that it builds on AlmaLinux 9
 
