@@ -47,10 +47,10 @@ BuildRequires: %{ruby_version}-ruby-devel
 
 %if 0%{?rhel} != 9
 Requires: %{ruby_version}
-%else
+%endif
+
 Requires: apache24-passenger
 Requires: ea-apache24-mod_remoteip
-%endif
 
 %if 0%{?rhel} >= 8
 # In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
