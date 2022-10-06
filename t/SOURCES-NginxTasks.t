@@ -30,6 +30,13 @@ my $hooks_module = '/var/cpanel/perl5/lib/NginxHooks.pm';
 
 my @access;
 
+my $signal_sent = 0;
+
+BEGIN {
+    no warnings 'redefine';
+    *CORE::GLOBAL::kill = sub { $signal_sent++; return 1; };
+}
+
 package NginxHooks {
     my $should_die = 0;
 
@@ -50,6 +57,12 @@ package NginxHooks {
         my ($logger) = @_;
         die "rebuild_config" if $should_die;
         push( @access, "rebuild_config" );
+        return;
+    }
+
+    sub reload_logs {
+        die "reload_logs" if $should_die;
+        push( @access, "reload_logs" );
         return;
     }
 };
@@ -376,6 +389,61 @@ __END__
     };
 };
 
+describe "reload_logs" => sub {
+    share my %mi;
+    around {
+        %mi = %conf;
+
+        local $mi{mocks} = {};
+
+        @access              = ();
+        $mi{mocks}->{object} = Cpanel::TaskProcessors::NginxTasks::reload_logs->new();
+        $mi{mocks}->{task}   = My::TestTask->new();
+
+        NginxHooks::set_should_die(0);
+
+        my $mock = Test::MockFile->file( "/var/run/nginx.pid", 1234 );
+
+        yield;
+    };
+
+    describe "_do_child_task" => sub {
+        it 'should send a signal to nginx to reload its log files' => sub {
+          SKIP: {
+                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+
+                # unfortuntely, the hooks module cannot be mockfiled
+                _output_nginx_hooks();
+
+                $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
+
+                is( $signal_sent, 1 );
+
+                unlink $hooks_module;
+            }
+        };
+
+        it 'should die if nginx is not running' => sub {
+          SKIP: {
+                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+
+                # unfortuntely, the hooks module cannot be mockfiled
+                _output_nginx_hooks();
+
+                unlink '/var/run/nginx.pid';
+
+                trap {
+                    $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
+                };
+
+                is( $trap->leaveby(), 'die' );
+
+                unlink $hooks_module;
+            }
+        };
+    };
+};
+
 # ug cannot mockfile the perl module, sorry
 sub _output_nginx_hooks {
     system 'mkdir -p /var/cpanel/perl5/lib';
@@ -419,6 +487,10 @@ describe "to_register" => sub {
             [
                 'clear_user_cache',
                 'Cpanel::TaskProcessors::NginxTasks::clear_user_cache'
+            ],
+            [
+                'reload_logs',
+                'Cpanel::TaskProcessors::NginxTasks::reload_logs'
             ],
         ];
 

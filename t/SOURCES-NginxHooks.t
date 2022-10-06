@@ -433,6 +433,64 @@ describe "NginxHooks" => sub {
             is_deeply( \@log_output, ['rebuild_config'] );
         };
     };
+
+    describe "_reload_logs" => sub {
+        share my %mi;
+        around {
+            %mi = %conf;
+
+            local $mi{mocks} = {};
+
+            $mi{mocks}->{servertasks}           = Test::MockModule->new('Cpanel::ServerTasks');
+            $mi{mocks}->{servertasks_tasks}     = [];
+            $mi{mocks}->{servertasks_shoulddie} = 0;
+            $mi{mocks}->{servertasks}->redefine(
+                schedule_task => sub {
+                    my ( $ar, $time_to_wait, $task ) = @_;
+                    my $str = join( ',', @{$ar}, $time_to_wait, $task );
+                    push( @{ $mi{mocks}->{servertasks_tasks} }, $str );
+                    die "a horrible death" if ( $mi{mocks}->{servertasks_shoulddie} );
+                    return;
+                }
+            );
+
+            yield;
+        };
+
+        it "should do the thing if happy path" => sub {
+            my ( $ret, $msg ) = NginxHooks::_reload_logs();
+            my $expected_ar = ["NginxTasks,5,reload_logs"];
+
+            is_deeply( $mi{mocks}->{servertasks_tasks}, $expected_ar );
+        };
+    };
+
+    describe "_do_reload_logs_adminbin" => sub {
+        share my %mi;
+        around {
+            %mi = %conf;
+
+            local $mi{mocks} = {};
+
+            $mi{mocks}->{adminbin_tasks} = [];
+            $mi{mocks}->{adminbin}       = Test::MockModule->new('Cpanel::AdminBin::Call');
+            $mi{mocks}->{adminbin}->redefine(
+                call => sub {
+                    push( @{ $mi{mocks}->{adminbin_tasks} }, join( ',', @_ ) );
+                    return 1;
+                }
+            );
+
+            yield;
+        };
+
+        it "should call adminbin" => sub {
+            NginxHooks::_do_reload_logs_adminbin();
+            my $expected_ar = ['Cpanel,nginx,RELOAD_LOGS'];
+
+            is_deeply( $mi{mocks}->{adminbin_tasks}, $expected_ar );
+        };
+    };
 };
 
 runtests unless caller;
