@@ -123,7 +123,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 8
+%define release_prefix 9
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -602,6 +602,8 @@ getent passwd %{nginx_user} >/dev/null || \
 exit 0
 
 %post
+# DRAGONS:  if you update this, then SOURCES/pkg.postinst needs updated with the same changes
+
 # Register the nginx service
 if [ $1 -eq 1 ]; then
 %if %{use_systemd}
@@ -673,6 +675,8 @@ fi
 /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
 
 %posttrans
+# DRAGONS:  if you update this, then SOURCES/pkg.postinst needs updated with the same changes
+
 # I move this to here, to deal with the craziness of the order of operations
 # on yum upgrade and downgrades.
 # No need to restart nginx here since that is handled in the universal-hook
@@ -685,6 +689,10 @@ if [ $cpversion -ge 80 ]; then
     /usr/local/cpanel/bin/manage_hooks prune; /bin/true;
     /usr/local/cpanel/bin/manage_hooks add module NginxHooks
 fi
+
+# also ensure that queueprocd is kicked so that it reads in the custom task
+# processor that we wrote for it
+/usr/local/cpanel/scripts/restartsrv queueprocd
 
 # hook is not run for the transaction that installs it, so for good measure (ZC-7669)
 %if 0%{?rhel} >= 8
@@ -750,6 +758,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Fri Sep 30 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-9
+- SEC-651: Add Stats hooks for cpanellogd to signal nginx to reload its log files after rotation
+
 * Fri Sep 30 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-8
 - EA-10959: Ensure valid nginx configuration when service subdomains are disabled
 

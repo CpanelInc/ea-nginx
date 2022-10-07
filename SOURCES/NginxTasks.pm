@@ -117,6 +117,41 @@ Cpanel::TaskProcessors::NginxTasks
 
 }
 
+{
+
+    package Cpanel::TaskProcessors::NginxTasks::reload_logs;
+    use parent 'Cpanel::TaskQueue::FastSpawn';
+
+    sub overrides {
+        my ( $self, $new, $old ) = @_;
+        my $is_dupe = $self->is_dupe( $new, $old );
+        return $is_dupe;
+    }
+
+    sub is_valid_args {
+        my ( $self, $task ) = @_;
+        return 0 == $task->args;
+    }
+
+    sub _do_child_task {
+        my ( $self, $task, $logger ) = @_;
+
+        my $nginx_pid = $self->get_nginx_pid();
+        kill 'USR1', $nginx_pid;
+        return;
+    }
+
+    sub get_nginx_pid {
+        require Cpanel::LoadFile;
+
+        my $pid_file = '/var/run/nginx.pid';
+        my $pid      = Cpanel::LoadFile::load($pid_file);
+
+        return $pid;
+    }
+
+}
+
 =head2 to_register
 
 rebuild_user - Rebuilds the Nginx config for a user
@@ -127,6 +162,8 @@ rebuild_global - Rebuilds the Nginx global config
 
 clear_user_cache - clears the cache for one user
 
+reload_logs - sends SIGUSR1 to nginx which signals it to reload its logs
+
 =cut
 
 sub to_register {
@@ -135,6 +172,7 @@ sub to_register {
         [ 'rebuild_config',   Cpanel::TaskProcessors::NginxTasks::rebuild_config->new() ],
         [ 'rebuild_global',   Cpanel::TaskProcessors::NginxTasks::rebuild_global->new() ],
         [ 'clear_user_cache', Cpanel::TaskProcessors::NginxTasks::clear_user_cache->new() ],
+        [ 'reload_logs',      Cpanel::TaskProcessors::NginxTasks::reload_logs->new() ],
     );
 }
 

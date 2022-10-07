@@ -63,9 +63,9 @@ shared_examples_for "all subcommand based methods" => sub {
 
 describe "nginx-adminbin" => sub {
     describe "_actions" => sub {
-        it "should UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE" => sub {
+        it "should UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS" => sub {
             my @ret = bin::admin::Cpanel::nginx::_actions();
-            is_deeply \@ret, [qw(UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE)];
+            is_deeply \@ret, [qw(UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS)];
         };
     };
 
@@ -146,6 +146,48 @@ describe "nginx-adminbin" => sub {
                 my $expected = ['UPDATE_CONFIG() called'];
 
                 is_deeply( $mi{mocks}->{debug_log}, $expected );
+
+                unlink $hooks_module;
+            }
+        };
+    };
+
+    describe "RELOAD_LOGS" => sub {
+        share my %mi;
+        around {
+            %mi = %conf;
+
+            local $mi{mocks} = {};
+
+            $mi{mocks}->{call} = Test::MockModule->new('Cpanel::AdminBin::Script::Call');
+            $mi{mocks}->{call}->redefine(
+                get_caller_username => sub {
+                    return 'sideshow_bob';
+                },
+                new => sub {
+                    my ($class) = @_;
+                    my $self = {};
+                    return bless $self, $class;
+                }
+            );
+
+            $mi{mocks}->{object} = bin::admin::Cpanel::nginx->new();
+
+            local *NginxHooks::_reload_logs = sub { $mi{hooks_called}++ };
+
+            yield;
+        };
+
+        it 'should call NginxHooks::_reload_logs' => sub {
+          SKIP: {
+                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+
+                # unfortuntely, the hooks module cannot be mockfiled
+                _output_nginx_hooks();
+
+                $mi{mocks}->{object}->RELOAD_LOGS();
+
+                is( $mi{hooks_called}, 1 );
 
                 unlink $hooks_module;
             }
