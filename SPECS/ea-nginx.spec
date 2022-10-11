@@ -784,7 +784,7 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
-* Fri Oct 11 2022 Julian Brown <julian.brown@cpanel.net> - 1.23.1-10
+* Tue Oct 11 2022 Julian Brown <julian.brown@cpanel.net> - 1.23.1-10
 - ZC-10336: Build on Alma Linux 9
 
 * Fri Sep 30 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-9
