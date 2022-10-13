@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 10
+%define release_prefix 11
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -784,6 +784,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Oct 13 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-11
+- EA-10963: Ensure valid nginx configuration when no accounts are created on the system
+
 * Tue Oct 11 2022 Julian Brown <julian.brown@cpanel.net> - 1.23.1-10
 - ZC-10336: Build on Alma Linux 9
 
