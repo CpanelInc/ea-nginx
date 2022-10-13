@@ -25,7 +25,7 @@ if ($@) {                                                 # … if its not inst
 __PACKAGE__->run( 'alarm' => 120 ) unless caller;
 
 sub _actions {
-    return qw(UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS);
+    return qw(UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS RELOAD_SERVICE);
 }
 
 sub UPDATE_CONFIG {
@@ -47,6 +47,18 @@ sub RELOAD_LOGS {
     my ($self) = @_;
     require '/var/cpanel/perl5/lib/NginxHooks.pm';
     NginxHooks::_reload_logs();
+    return 1;
+}
+
+sub RELOAD_SERVICE {
+    my ($self) = @_;
+
+    local $@;
+    eval {
+        require Cpanel::ServerTasks;
+        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], 5, 'reload_service' );
+    };
+
     return 1;
 }
 
@@ -169,6 +181,10 @@ Requires the `toggle_nginx_caching` feature.
 =head2 RELOAD_LOGS
 
 Send SIGUSR1 to the nginx process which informs it to reload its log files.
+
+=head2 RELOAD_SERVICE
+
+Restart the nginx service
 
 =cut
 

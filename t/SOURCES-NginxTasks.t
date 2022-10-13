@@ -65,6 +65,12 @@ package NginxHooks {
         push( @access, "reload_logs" );
         return;
     }
+
+    sub reload_service {
+        die "reload_service" if $should_die;
+        push( @access, "reload_service" );
+        return;
+    }
 };
 
 package My::TestTask {
@@ -96,6 +102,7 @@ package My::TestTask {
 
 my @clear_cache_users;
 my $clear_cache_called = 0;
+my $reload_called      = 0;
 
 package scripts::ea_nginx {
     our $should_die = 0;
@@ -111,6 +118,11 @@ package scripts::ea_nginx {
         die "a horrible death" if $should_die;
         $clear_cache_called++;
         push( @clear_cache_users, $user );
+    }
+
+    sub _reload {
+        die "a horrible death" if $should_die;
+        $reload_called++;
     }
 };
 
@@ -444,6 +456,75 @@ describe "reload_logs" => sub {
     };
 };
 
+describe "reload_service" => sub {
+    share my %mi;
+    around {
+        %mi = %conf;
+
+        local $mi{mocks} = {};
+
+        @access              = ();
+        $mi{mocks}->{object} = Cpanel::TaskProcessors::NginxTasks::reload_service->new();
+        $mi{mocks}->{task}   = My::TestTask->new();
+
+        NginxHooks::set_should_die(0);
+
+        $mi{mocks}->{scripts_dir} = File::Temp->newdir();
+        $mi{mocks}->{script}      = $mi{mocks}->{scripts_dir} . "/ea_nginx";
+
+        no warnings 'once';
+        local $Cpanel::TaskProcessors::NginxTasks::reload_service::ea_nginx_script = $mi{mocks}->{script};
+
+        scripts::ea_nginx::set_should_die(0);
+
+        Path::Tiny::path( $mi{mocks}->{script} )->spew(
+            q{package hi::mom;
+
+1;
+
+__END__
+}
+        );
+
+        yield;
+    };
+
+    before each => sub { $reload_called = 0; };
+
+    describe "_do_child_task" => sub {
+        it "should not do anything if ea_nginx_script is missing" => sub {
+          SKIP: {
+                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+
+                # unfortuntely, the hooks module cannot be mockfiled
+                _output_nginx_hooks();
+
+                unlink $mi{mocks}->{script};
+                $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
+
+                is( $reload_called, 0 );
+
+                unlink $hooks_module;
+            }
+        };
+
+        it 'should call scripts::ea_nginx::_reload()' => sub {
+          SKIP: {
+                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+
+                # unfortuntely, the hooks module cannot be mockfiled
+                _output_nginx_hooks();
+
+                $mi{mocks}->{object}->_do_child_task( $mi{mocks}->{task}, "logger" );
+
+                is( $reload_called, 1 );
+
+                unlink $hooks_module;
+            }
+        };
+    };
+};
+
 # ug cannot mockfile the perl module, sorry
 sub _output_nginx_hooks {
     system 'mkdir -p /var/cpanel/perl5/lib';
@@ -491,6 +572,10 @@ describe "to_register" => sub {
             [
                 'reload_logs',
                 'Cpanel::TaskProcessors::NginxTasks::reload_logs'
+            ],
+            [
+                'reload_service',
+                'Cpanel::TaskProcessors::NginxTasks::reload_service'
             ],
         ];
 

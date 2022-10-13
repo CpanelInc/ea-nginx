@@ -63,9 +63,9 @@ shared_examples_for "all subcommand based methods" => sub {
 
 describe "nginx-adminbin" => sub {
     describe "_actions" => sub {
-        it "should UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS" => sub {
+        it "should UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS RELOAD_SERVICE" => sub {
             my @ret = bin::admin::Cpanel::nginx::_actions();
-            is_deeply \@ret, [qw(UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS)];
+            is_deeply \@ret, [qw(UPDATE_CONFIG CLEAR_CACHE RESET_CACHE_CONFIG ENABLE_CACHE DISABLE_CACHE RELOAD_LOGS RELOAD_SERVICE)];
         };
     };
 
@@ -188,6 +188,57 @@ describe "nginx-adminbin" => sub {
                 $mi{mocks}->{object}->RELOAD_LOGS();
 
                 is( $mi{hooks_called}, 1 );
+
+                unlink $hooks_module;
+            }
+        };
+    };
+
+    describe "RELOAD_SERVICE" => sub {
+        share my %mi;
+        around {
+            %mi = %conf;
+
+            local $mi{mocks} = {};
+
+            $mi{mocks}->{call} = Test::MockModule->new('Cpanel::AdminBin::Script::Call');
+            $mi{mocks}->{call}->redefine(
+                get_caller_username => sub {
+                    return 'sideshow_bob';
+                },
+                new => sub {
+                    my ($class) = @_;
+                    my $self = {};
+                    return bless $self, $class;
+                }
+            );
+
+            $mi{mocks}->{object} = bin::admin::Cpanel::nginx->new();
+
+            $mi{schedule_task_args} = [];
+            $mi{mocks}->{schedule_task} = Test::MockModule->new('Cpanel::ServerTasks');
+            $mi{mocks}->{schedule_task}->redefine(
+                schedule_task => sub {
+                    push @{ $mi{schedule_task_args} }, @_;
+                },
+            );
+
+            yield;
+        };
+
+        it 'should call NginxHooks::_reload_logs' => sub {
+          SKIP: {
+                skip "hooks are actually installed on this system", 1 if -e $hooks_module;
+
+                # unfortuntely, the hooks module cannot be mockfiled
+                _output_nginx_hooks();
+
+                $mi{mocks}->{object}->RELOAD_SERVICE();
+
+                is_deeply(
+                    $mi{schedule_task_args},
+                    [ ['NginxTasks'], 5, 'reload_service' ],
+                ) or diag explain $mi{schedule_task_args};
 
                 unlink $hooks_module;
             }
