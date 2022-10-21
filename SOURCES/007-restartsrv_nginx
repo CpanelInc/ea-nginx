@@ -73,7 +73,7 @@ sub _is_listening_on_80_or_443 {
 
     my $app_pid_ref = Cpanel::AppPort::get_pids_bound_to_ports( \@ports );
     foreach my $pid ( keys %$app_pid_ref ) {
-        return 1 if $app_pid_ref->{$pid}{process} eq $service;
+        return 1 if $app_pid_ref->{$pid}{process} =~ /^\Q$service\E|\/\Q$service\E/;
     }
 
     return 0;
