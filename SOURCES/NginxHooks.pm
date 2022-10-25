@@ -446,8 +446,16 @@ sub _reload_logs {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
+sub _is_piped_logging_enabled {
+    require Whostmgr::TweakSettings;
+    return Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
+}
+
 sub _do_reload_logs_adminbin {
-    Cpanel::AdminBin::Call::call( 'Cpanel', 'nginx', 'RELOAD_LOGS' );
+    _is_piped_logging_enabled()
+      ? Cpanel::AdminBin::Call::call( 'Cpanel', 'nginx', 'RELOAD_SERVICE' )
+      : Cpanel::AdminBin::Call::call( 'Cpanel', 'nginx', 'RELOAD_LOGS' );
+
     return;
 }
 
@@ -627,8 +635,13 @@ its logs.
 =head2 _do_reload_logs_adminbin
 
 This is called from cpuser's account and raises the privilege using the admin
-bin system.  This ultimately schedules sending a signal to the nginx process
-that tells it to reload its logs.
+bin system.  This ultimately schedules a task to restart nginx if piped logging
+is enabled, or schedules a task to signal nginx to reload its log files if piped
+logging is disabled.
+
+=head2 _is_piped_logging_enabled
+
+This returns 1 or 0 depending on if piped logging is enabled on the server
 
 =cut
 

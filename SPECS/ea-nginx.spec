@@ -175,7 +175,6 @@ Source22: NginxHooks.pm
 Source23: NginxTasks.pm
 Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
-Source26: cpanel-scripts-ea-nginx-logrotate
 Source27: 007-restartsrv_nginx
 Source28: whm_feature_addon
 Source29: set_NGINX_CONFIGURE_array.sh
@@ -357,7 +356,6 @@ mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
 mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
 %{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
 %{__install} -m 755 -p %{SOURCE19} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-userdata
-%{__install} -m 755 -p %{SOURCE26} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-logrotate
 
 ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
@@ -480,7 +478,6 @@ rm -rf %{bdir}/_passenger_source_code
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-userdata
-%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-logrotate
 %if 0%{?rhel} >= 8
 %attr(755, root, root) /etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
 %else
@@ -786,6 +783,7 @@ fi
 %changelog
 * Fri Oct 21 2022 Tim Mullin <tim@cpanel.net> - 1.23.2-2
 - EA-10999: Update logic to check if service is listening on ports 80 or 443
+- EA-10985: Drop logrotate configuration for domain logs since cpanellogd handles the rotation
 
 * Thu Oct 20 2022 Cory McIntire <cory@cpanel.net> - 1.23.2-1
 - EA-11003: Update ea-nginx from v1.23.1 to v1.23.2
