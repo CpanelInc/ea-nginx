@@ -79,7 +79,6 @@ install -m 644 -p ${SOURCE15} $DEB_INSTALL_ROOT/etc/chkserv.d/nginx
 mkdir -p $DEB_INSTALL_ROOT/usr/local/cpanel/scripts
 install -m 755 -p ${SOURCE16} $DEB_INSTALL_ROOT/usr/local/cpanel/scripts/ea-nginx
 install -m 755 -p ${SOURCE19} $DEB_INSTALL_ROOT/usr/local/cpanel/scripts/ea-nginx-userdata
-install -m 755 -p ${SOURCE26} $DEB_INSTALL_ROOT/usr/local/cpanel/scripts/ea-nginx-logrotate
 
 mkdir -p $DEB_INSTALL_ROOT/usr/local/cpanel/scripts
 ln -s restartsrv_base $DEB_INSTALL_ROOT/usr/local/cpanel/scripts/restartsrv_nginx

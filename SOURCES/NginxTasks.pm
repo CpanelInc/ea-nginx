@@ -152,6 +152,39 @@ Cpanel::TaskProcessors::NginxTasks
 
 }
 
+{
+
+    package Cpanel::TaskProcessors::NginxTasks::reload_service;
+    use parent 'Cpanel::TaskQueue::FastSpawn';
+
+    our $ea_nginx_script = '/usr/local/cpanel/scripts/ea-nginx';
+
+    sub overrides {
+        my ( $self, $new, $old ) = @_;
+        my $is_dupe = $self->is_dupe( $new, $old );
+        return $is_dupe;
+    }
+
+    sub is_valid_args {
+        my ( $self, $task ) = @_;
+        return 0 == $task->args;
+    }
+
+    sub _do_child_task {
+        my ( $self, $task, $logger ) = @_;
+
+        return if !-e $ea_nginx_script;
+        require $ea_nginx_script;
+
+        local $@;
+        eval { scripts::ea_nginx::_reload(); };    # Prefer _reload() here since we do not want to clear the cache
+        print STDERR "scripts::ea_nginx::_reload() $@" if $@;
+
+        return;
+    }
+
+}
+
 =head2 to_register
 
 rebuild_user - Rebuilds the Nginx config for a user
@@ -164,6 +197,8 @@ clear_user_cache - clears the cache for one user
 
 reload_logs - sends SIGUSR1 to nginx which signals it to reload its logs
 
+reload_service - reloads the nginx service
+
 =cut
 
 sub to_register {
@@ -173,6 +208,7 @@ sub to_register {
         [ 'rebuild_global',   Cpanel::TaskProcessors::NginxTasks::rebuild_global->new() ],
         [ 'clear_user_cache', Cpanel::TaskProcessors::NginxTasks::clear_user_cache->new() ],
         [ 'reload_logs',      Cpanel::TaskProcessors::NginxTasks::reload_logs->new() ],
+        [ 'reload_service',   Cpanel::TaskProcessors::NginxTasks::reload_service->new() ],
     );
 }
 

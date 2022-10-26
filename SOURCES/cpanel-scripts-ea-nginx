@@ -1743,9 +1743,9 @@ sub _render_and_append {
     chmod 0644, "/var/log/nginx/domains/$domains->[0]-bytes_log";
     chown 0, 0, "/var/log/nginx/domains/$domains->[0]-bytes_log";
 
-    if ( -f "/var/log/nginx/domains/$domains->[0]-ssl_log" ) {
-        chown 0, $gid, "/var/log/nginx/domains/$domains->[0]-ssl_log";
-    }
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]-ssl_log");
+    chmod 0640, "/var/log/nginx/domains/$domains->[0]-ssl_log";
+    chown 0, $gid, "/var/log/nginx/domains/$domains->[0]-ssl_log";
 
     # Include numeric UID if they want it
     my $uid;

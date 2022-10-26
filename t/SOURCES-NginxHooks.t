@@ -484,11 +484,52 @@ describe "NginxHooks" => sub {
             yield;
         };
 
-        it "should call adminbin" => sub {
+        it "should call adminbin (RELOAD_SERVICE)" => sub {
+            no warnings 'redefine';
+            local *NginxHooks::_is_piped_logging_enabled = sub { return 1; };
+            use warnings 'redefine';
+
+            NginxHooks::_do_reload_logs_adminbin();
+            my $expected_ar = ['Cpanel,nginx,RELOAD_SERVICE'];
+
+            is_deeply( $mi{mocks}->{adminbin_tasks}, $expected_ar );
+        };
+
+        it "should call adminbin (RELOAD_LOGS)" => sub {
+            no warnings 'redefine';
+            local *NginxHooks::_is_piped_logging_enabled = sub { return 0; };
+            use warnings 'redefine';
+
             NginxHooks::_do_reload_logs_adminbin();
             my $expected_ar = ['Cpanel,nginx,RELOAD_LOGS'];
 
             is_deeply( $mi{mocks}->{adminbin_tasks}, $expected_ar );
+        };
+    };
+
+    describe "_do_reload_logs_adminbin" => sub {
+        it 'should return true when piped logging is enabled' => sub {
+            my $mock_tweaksettings = Test::MockModule->new('Whostmgr::TweakSettings')->redefine(
+                get_value => sub {
+                    my %hash = @_;
+                    return 1 if $hash{'Main'} eq 'enable_piped_logs';
+                    die "Whostmgr::TweakSettings::get_value() called with incorrect key\n";
+                },
+            );
+
+            is( NginxHooks::_is_piped_logging_enabled(), 1 );
+        };
+
+        it 'should return false when piped logging is disabled' => sub {
+            my $mock_tweaksettings = Test::MockModule->new('Whostmgr::TweakSettings')->redefine(
+                get_value => sub {
+                    my %hash = @_;
+                    return 0 if $hash{'Main'} eq 'enable_piped_logs';
+                    die "Whostmgr::TweakSettings::get_value() called with incorrect key\n";
+                },
+            );
+
+            is( NginxHooks::_is_piped_logging_enabled(), 0 );
         };
     };
 };

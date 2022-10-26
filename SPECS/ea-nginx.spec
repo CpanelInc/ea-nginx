@@ -110,7 +110,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.23.1
+%define main_version 1.23.2
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 11
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -175,7 +175,6 @@ Source22: NginxHooks.pm
 Source23: NginxTasks.pm
 Source24: nginx-adminbin
 Source25: nginx-adminbin.conf
-Source26: cpanel-scripts-ea-nginx-logrotate
 Source27: 007-restartsrv_nginx
 Source28: whm_feature_addon
 Source29: set_NGINX_CONFIGURE_array.sh
@@ -357,7 +356,6 @@ mkdir -p $RPM_BUILD_ROOT/etc/chkserv.d
 mkdir -p $RPM_BUILD_ROOT/usr/local/cpanel/scripts
 %{__install} -m 755 -p %{SOURCE16} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx
 %{__install} -m 755 -p %{SOURCE19} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-userdata
-%{__install} -m 755 -p %{SOURCE26} $RPM_BUILD_ROOT/usr/local/cpanel/scripts/ea-nginx-logrotate
 
 ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
@@ -480,7 +478,6 @@ rm -rf %{bdir}/_passenger_source_code
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-userdata
-%attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx-logrotate
 %if 0%{?rhel} >= 8
 %attr(755, root, root) /etc/dnf/universal-hooks/multi_pkgs/transaction/ea-__WILDCARD__nginx__WILDCARD__/007-restartsrv_nginx
 %else
@@ -784,6 +781,13 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Fri Oct 21 2022 Tim Mullin <tim@cpanel.net> - 1.23.2-2
+- EA-10999: Update logic to check if service is listening on ports 80 or 443
+- EA-10985: Drop logrotate configuration for domain logs since cpanellogd handles the rotation
+
+* Thu Oct 20 2022 Cory McIntire <cory@cpanel.net> - 1.23.2-1
+- EA-11003: Update ea-nginx from v1.23.1 to v1.23.2
+
 * Thu Oct 13 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.1-11
 - EA-10963: Ensure valid nginx configuration when no accounts are created on the system
 
