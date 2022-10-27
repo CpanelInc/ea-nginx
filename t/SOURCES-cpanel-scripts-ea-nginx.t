@@ -1572,7 +1572,7 @@ EOF
                 no warnings 'redefine';
                 my $mock = Test::MockModule->new('Cpanel::Config::userdata::PassengerApps')->redefine(
                     ensure_paths => sub {
-                        $hr->{ruby}     = '/path/to/ruby',
+                        $hr->{ruby} = '/path/to/ruby',
                           $hr->{python} = '/path/to/python',
                           $hr->{nodejs} = '/path/to/nodejs',
                           return;
@@ -1755,27 +1755,29 @@ EOF
         describe '_get_server_names_hash_bucket_size' => sub {
             it 'should return minimum allowed value if there are no long domains hosted on the server' => sub {
                 no warnings 'redefine';
-                local *scripts::ea_nginx::_get_user_domains = sub {
+                local *scripts::ea_nginx::_get_domain_length_info = sub {
                     return {
-                        foo => ['foo.tld'],
+                        longest      => 12,
+                        total_length => 42,
                     };
                 };
                 use warnings 'redefine';
 
-                my $value = scripts::ea_nginx::_get_server_names_hash_bucket_size();
+                my $value = scripts::ea_nginx::_get_server_names_hash_bucket_size(1024);
                 is( $value, 128 );
             };
 
             it 'should return a larger value if there is a longer domain hosted on the server' => sub {
                 no warnings 'redefine';
-                local *scripts::ea_nginx::_get_user_domains = sub {
+                local *scripts::ea_nginx::_get_domain_length_info = sub {
                     return {
-                        foo => ['this.domain.is.really.long.it.goes.on.and.on.till.nobody.is.home.then.it.goes.longer.because.it.can.and.it.will.and.there.is.really.nothing.that.you.can.do.about.it.tld'],
+                        longest      => 200,
+                        total_length => 4242,
                     };
                 };
                 use warnings 'redefine';
 
-                my $value = scripts::ea_nginx::_get_server_names_hash_bucket_size();
+                my $value = scripts::ea_nginx::_get_server_names_hash_bucket_size(1024);
                 is( $value, 256 );
             };
         };
@@ -1796,7 +1798,7 @@ EOF
                 use warnings 'redefine';
 
                 my $value = scripts::ea_nginx::_get_server_names_hash_max_size();
-                is( $value, 3000 );
+                is( $value, 12000 );
             };
         };
 
@@ -2887,6 +2889,38 @@ EOF
                         '5.6.7.8' => 'bar.tld',
                     },
                 ) or diag explain $data;
+            };
+        };
+
+        describe "_get_aligned_domain_length" => sub {
+            it 'should return the smallest integer that is divisible by 8 and greater than or equal to the given integer' => sub {
+                is( scripts::ea_nginx::_get_aligned_domain_length(16), 16 );
+                is( scripts::ea_nginx::_get_aligned_domain_length(42), 48 );
+            };
+        };
+
+        describe "_get_domain_length_info" => sub {
+            it 'should return the length of the longest domain and the total length of all domains hosted on the system' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_user_domains = sub {
+                    return {
+                        foo => [
+                            'foo.tld',
+                            'new.foo.tld',
+                        ],
+                        bar    => ['bar.tld'],
+                        whodat => ['this.is.a.really.long.domain.name.it.goes.on.and.on.till.the.end.of.the.song.and.it.is.still.not.as.long.as.it.needs.to.be.so.my.will.go.on.even.though.it.is.annoyed'],
+                    };
+                };
+                use warnings 'redefine';
+
+                is_deeply(
+                    scripts::ea_nginx::_get_domain_length_info(),
+                    {
+                        longest      => 200,
+                        total_length => 3280,
+                    },
+                );
             };
         };
     };
