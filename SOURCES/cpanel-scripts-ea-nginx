@@ -1129,8 +1129,8 @@ sub _get_settings_hr {
 
         # Do this here so that these two settings are always calculated
         # NOTE: The calculations are based on the advice given here:  http://nginx.org/en/docs/http/server_names.html#optimization
-        $settings_hr->{server_names_hash_bucket_size} = _get_server_names_hash_bucket_size();
         $settings_hr->{server_names_hash_max_size}    = _get_server_names_hash_max_size();
+        $settings_hr->{server_names_hash_bucket_size} = _get_server_names_hash_bucket_size( $settings_hr->{server_names_hash_max_size} );
     }
 
     return $settings_hr;
@@ -1148,29 +1148,107 @@ An integer greater than or equal to 128.  The integer must be a power of 2.
 =cut
 
 sub _get_server_names_hash_bucket_size {
-    my $server_names_hash_bucket_size = 128;
-    my $service_subdomain_buffer      = 15;                               # Add padding for service subdomains (cpcalendars. is currently the longest)
-    my $needed_length                 = $server_names_hash_bucket_size;
+    my ($server_names_hash_max_size) = @_;
 
-    # Figure out what the longest server_name is
-    my $user_lookup = _get_user_domains();
-    for my $usr ( sort keys %$user_lookup ) {
-        for my $domain ( @{ $user_lookup->{$usr} } ) {
-            my $domain_length = length $domain;
-            $domain_length += $service_subdomain_buffer;
+    my $server_names_hash_bucket_size = 128;    # minimum value for this setting
 
-            $needed_length = $domain_length if $domain_length > $needed_length;
-        }
-    }
+    my $domain_length_info = _get_domain_length_info();
 
     # server_names_hash_bucket_size should be power of 2 for CPU cache line size
     # optimization purposes.  Set it to first power of 2 larger then the longest
     # server_name or 128 if it is sufficient
-    while ( $server_names_hash_bucket_size < $needed_length ) {
+    # As a sanity check, we also need to ensure that
+    # server_names_hash_max_size * server_names_hash_bucket_size
+    # is larger than the total bytes taken up by all the domains combined
+    my $server_names_total_size = $server_names_hash_max_size * $server_names_hash_bucket_size;
+    while ( $server_names_hash_bucket_size < $domain_length_info->{longest} || $server_names_total_size < $domain_length_info->{total_length} ) {
         $server_names_hash_bucket_size *= 2;
+        $server_names_total_size = $server_names_hash_max_size * $server_names_hash_bucket_size;
     }
 
     return $server_names_hash_bucket_size;
+}
+
+=head2 _get_aligned_domain_length()
+
+Given an integer, it returns the smallest integer that is larger than the
+integer and divisible by 8.
+
+=over
+
+=item domain_length
+
+An unsigned integer to align to 8
+
+=back
+
+=head3 RETURNS
+
+The smallest integer that is larger than the given integer and divisible by 8
+
+=cut
+
+sub _get_aligned_domain_length {
+    my ($domain_length) = @_;
+    my $align_to = 8;           # Assumes x86_64
+
+    my $remainder = $domain_length % $align_to;
+
+    # if there is a remainder, then we need to align the domain length
+    # otherwise, it is already divisible by 8 and there is nothing to do
+    my $aligned_domain_length = $remainder ? $domain_length + $align_to - $remainder : $domain_length;
+
+    return $aligned_domain_length;
+}
+
+=head2 _get_domain_length_info()
+
+Returns a hashref containing two keys that represent that have values
+representing the length of the longest domain on the server and the total length
+of all domains hosted on the server
+
+=head3 RETURNS
+
+A hashref similar to the following:
+
+{
+    longest      => 200,
+    total_length => 4242,
+}
+
+=cut
+
+sub _get_domain_length_info {
+    my $nginx_buffer             = 16;    # nginx uses some of this space for internal purposes
+    my $service_subdomain_buffer = 16;    # Add padding for service subdomains (autodiscover. is currently the longest)
+
+    my $longest      = 0;
+    my $total_length = 0;
+
+    my $user_lookup = _get_user_domains();
+    for my $usr ( sort keys %$user_lookup ) {
+        for my $domain ( @{ $user_lookup->{$usr} } ) {
+            my $domain_length         = length $domain;
+            my $aligned_domain_length = _get_aligned_domain_length($domain_length);
+            my $total_domain_length   = $aligned_domain_length + $nginx_buffer + $service_subdomain_buffer;
+            $longest = $total_domain_length if $total_domain_length > $longest;
+
+            # There are up to 10 copies of the domain generated between the two
+            # server_name blocks for the domain.  On average, this number is 8,
+            # but we go with the larger number here to be sure that we the
+            # configure nginx with large enough values to generate its
+            # server_names hash
+            $total_domain_length *= 10;
+            $total_length        += $total_domain_length;
+        }
+    }
+
+    my $domain_length_info = {
+        longest      => $longest,
+        total_length => $total_length,
+    };
+
+    return $domain_length_info;
 }
 
 =head2 _get_server_names_hash_max_size()
@@ -1188,8 +1266,8 @@ sub _get_server_names_hash_max_size {
     my $minimum_hash_max_size = 1024;
     my $num_domains           = _get_num_total_domains();
 
-    # We generate 2 server blocks for each domain
-    my $num_server_blocks = $num_domains * 2;
+    # We generate ~8 server blocks for each domain
+    my $num_server_blocks = $num_domains * 8;
 
     # At a minimum, 'server_names_hash_max_size' needs to match the number of server blocks generated
     # If the number of server blocks to generate is larger than the minimum that we allow this setting to be
