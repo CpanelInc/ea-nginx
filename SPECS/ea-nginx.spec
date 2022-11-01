@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -781,6 +781,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Oct 27 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-3
+- EA-10977: Fix 'could not build optimal server_names_hash' warnings
+
 * Fri Oct 21 2022 Tim Mullin <tim@cpanel.net> - 1.23.2-2
 - EA-10999: Update logic to check if service is listening on ports 80 or 443
 - EA-10985: Drop logrotate configuration for domain logs since cpanellogd handles the rotation

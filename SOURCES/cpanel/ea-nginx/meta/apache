@@ -68,6 +68,16 @@ sub move_apache_to_alt_ports {
         }
         path("/etc/nginx/conf.d/ea-nginx.conf")->spew($cont);
     }
+
+    # EA-10977 - Since we now calculate these values each time the config script executes,
+    #            we need to remove them from settings.json in order to avoid end user
+    #            confusion regarding them
+    for my $key (qw(server_names_hash_max_size server_names_hash_bucket_size)) {
+        my $cur_settings = _get_settings();
+        delete $cur_settings->{$key};
+        _set_settings($cur_settings);
+    }
+
 }
 
 sub move_apache_back_to_orig_ports {
