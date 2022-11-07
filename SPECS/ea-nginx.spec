@@ -783,6 +783,7 @@ fi
 %changelog
 * Wed Nov 09 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-5
 - EA-10769: Allow custom config files to be moved across partitions when ea-nginx is installed
+- EA-11025: If user generated config is detected as bad after configuration, remove the config file to avoid taking all sites down
 
 * Tue Nov 01 2022 Tim Mullin <tim@cpanel.net> - 1.23.2-4
 - EA-11004: Fix Passenger restart failures after reboot
