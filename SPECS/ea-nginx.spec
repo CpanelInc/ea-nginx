@@ -783,6 +783,7 @@ fi
 %changelog
 * Tue Nov 01 2022 Tim Mullin <tim@cpanel.net> - 1.23.2-4
 - EA-11004: Fix Passenger restart failures after reboot
+- EA-10670: Add better guards against bad userdata to configuration script
 
 * Thu Oct 27 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-3
 - EA-10977: Fix 'could not build optimal server_names_hash' warnings

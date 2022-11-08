@@ -2137,7 +2137,9 @@ EOF
                     append => sub { },
                 );
 
-                local *scripts::ea_nginx::_render_and_append = sub { my ($args) = @_; push @$render_domains, $args->{domains}; };
+                local *scripts::ea_nginx::_render_and_append            = sub { my ($args) = @_; push @$render_domains, $args->{domains}; };
+                local *scripts::ea_nginx::_validate_user_uid_and_gid    = sub { };
+                local *scripts::ea_nginx::_validate_domains_data_or_die = sub { };
                 yield;
             };
 
@@ -2921,6 +2923,63 @@ EOF
                         total_length => 3280,
                     },
                 );
+            };
+        };
+
+        describe "_validate_domains_data_or_die" => sub {
+            it 'should die if given falsy domains data' => sub {
+                trap {
+                    scripts::ea_nginx::_validate_domains_data_or_die('foo');
+                };
+                like( $trap->die, qr/Failed to load user/ );
+            };
+
+            it 'should die if given invalid domains data' => sub {
+                trap {
+                    scripts::ea_nginx::_validate_domains_data_or_die( 'foo', { main_domain => '' } );
+                };
+                like( $trap->die, qr/No vhosts config data for user/ );
+            };
+
+            it 'should return undef if given valid domains data' => sub {
+                trap {
+                    scripts::ea_nginx::_validate_domains_data_or_die( 'foo', { main_domain => 'dragons.tld' } );
+                };
+                is( $trap->leaveby, 'return' );
+            };
+        };
+
+        describe "_validate_user_uid_and_gid" => sub {
+            around {
+                my $mock_cpanel_pwcache = Test::MockModule->new('Cpanel::PwCache')->redefine(
+                    getpwnam => sub { my ($user) = @_; return $user eq 'foo' ? undef : ( undef, undef, 42 ) },
+                );
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_group_for = sub { my ($user) = @_; return $user eq 'bar' ? undef : 42; };
+
+                yield;
+            };
+
+            it 'should die if the given user does not have a valid system uid' => sub {
+                trap {
+                    scripts::ea_nginx::_validate_user_uid_and_gid('foo');
+                };
+                like( $trap->die, qr/Unable to determine user id for/ );
+            };
+
+            it 'should die if the given user does not have a valid system gid' => sub {
+                trap {
+                    scripts::ea_nginx::_validate_user_uid_and_gid('bar');
+                };
+                like( $trap->die, qr/Unable to determine group id for/ );
+            };
+
+            it 'should return undef if the user has a valid uid and gid' => sub {
+                trap {
+                    scripts::ea_nginx::_validate_user_uid_and_gid('happy');
+                };
+                is( $trap->leaveby, 'return' );
             };
         };
     };

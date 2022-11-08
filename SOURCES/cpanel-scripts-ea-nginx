@@ -1392,6 +1392,55 @@ sub _reload {
     return 1;
 }
 
+=head2 _validate_domains_data_or_die( $user, $domains_data )
+
+Validates that the given user was able to load its domain userdata and that the
+domain userdata has the minimum expected data
+
+=over
+
+=item user
+
+The username that is being validated
+
+=item domains_data
+
+A hashref containing the domain data that is being validated
+
+=back
+
+=cut
+
+sub _validate_domains_data_or_die {
+    my ( $user, $domains_data ) = @_;
+
+    die "Failed to load user ‘$user’s web vhost data\n" unless $domains_data;
+    die "No vhosts config data for user ‘$user’\n"      unless $domains_data->{main_domain};
+    return;
+}
+
+=head2 _validate_user_uid_and_gid($user)
+
+Validates that the given user has a valid system UID and GID
+
+=over
+
+=item user
+
+The username being validated
+
+=back
+
+=cut
+
+sub _validate_user_uid_and_gid {
+    my ($user) = @_;
+
+    die "Unable to determine user id for $user, assuming invalid user and skipping\n"  unless ( Cpanel::PwCache::getpwnam($user) )[2];
+    die "Unable to determine group id for $user, assuming invalid user and skipping\n" unless _get_group_for($user);
+    return;
+}
+
 =head2 _write_user_conf()
 
 Writes the configuration for the given user.  This includes the caching
@@ -1416,12 +1465,19 @@ can use to build their configs with.
 sub _write_user_conf {
     my ( $user, $global_config_data ) = @_;
 
+    _validate_user_uid_and_gid($user);
+
     my $domains_data = Cpanel::Config::userdata::Load::load_userdata_main($user);
+
+    _validate_domains_data_or_die( $user, $domains_data );
+
     my %addon_subdomains;
     @addon_subdomains{ values %{ $domains_data->{addon_domains} } } = ();
-    my @actual_subdomains = grep { !exists $addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
+    my @actual_subdomains = grep { $_ && !exists $addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
 
     my $mail_subdomain_exists = scalar grep { $_ eq 'mail.' . $domains_data->{main_domain} } @actual_subdomains;
+
+    my %subdomains_hash = map { $_ => 1 } @{ $domains_data->{sub_domains} };
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
 
@@ -1474,6 +1530,14 @@ sub _write_user_conf {
         path($userconf)->append("\n#### addon domains for $user ##\n");
         for my $aod ( sort keys %{ $domains_data->{addon_domains} } ) {
             my $sub = $domains_data->{addon_domains}{$aod};
+
+            next unless $sub;
+
+            if ( !$subdomains_hash{$sub} ) {
+                warn "Skipping addon domain $aod for $user, corresponding sub domain $sub does not exist";
+                next;
+            }
+
             _render_and_append(
                 {
                     user                  => $user,
@@ -1661,7 +1725,7 @@ A valid cPanel username
 
 =head3 RETURNS
 
-A string representing the group name of the given username.
+A string representing the group name of the given username or undef.
 
 =cut
 
@@ -1677,6 +1741,8 @@ sub _get_group_for {
 
     # otherwise: via gid
     my $gid = ( getpwnam($user) )[3];
+    return unless $gid;
+
     $group_cache{$user} = getgrgid($gid);
 
     return $group_cache{$user};
