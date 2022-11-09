@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -781,6 +781,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Nov 09 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-5
+- EA-10769: Allow custom config files to be moved across partitions when ea-nginx is installed
+
 * Tue Nov 01 2022 Tim Mullin <tim@cpanel.net> - 1.23.2-4
 - EA-11004: Fix Passenger restart failures after reboot
 - EA-10670: Add better guards against bad userdata to configuration script
