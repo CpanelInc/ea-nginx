@@ -141,7 +141,11 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
+<<<<<<< HEAD
 %define release_prefix 2
+=======
+%define release_prefix 8
+>>>>>>> 168ec88 (ZC-10317: Update ngx_http_pipelog_module to v1.0.3)
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -783,6 +787,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Jan 04 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.23.3-3
+- ZC-10317: Update ngx_http_pipelog_module to v1.0.3
+
 * Tue Dec 27 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-2
 - EA-11087: Guard against bad userdata where a domain is considered an addon domain and subdomain
 
