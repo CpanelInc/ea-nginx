@@ -19,6 +19,7 @@ use Cpanel::DIp::IsDedicated                 ();
 use Cpanel::DomainIp                         ();
 use Cpanel::DomainLookup::DocRoot            ();
 use Cpanel::FileGuard                        ();
+use Cpanel::FileUtils::Move                  ();
 use Cpanel::FileUtils::TouchFile             ();
 use Cpanel::HTTP::Client                     ();
 use Cpanel::HttpUtils::ApRestart::BgSafe     ();
@@ -2973,7 +2974,11 @@ sub _update_nginx_settings_config_file {
             $new->{$key} = $cur->{$key};
         }
         _write_json( $custom_settings_file, $new );
-        $custom_settings_path->move($settings_file);
+
+        # Do not use Path::Tiny until 110 or greater only is supported
+        # See CPANEL-41646 for details
+        # $custom_settings_path->move($settings_file);
+        Cpanel::FileUtils::Move::safemv( '-fv', $custom_settings_file, $settings_file );
     }
 
     return;
@@ -2989,7 +2994,12 @@ This reads in a cache.json file from the $custom_settings_dir and moves it to
 sub _update_nginx_cache_config_file {
     my $custom_cache_file = "$custom_settings_dir/cache.json";
     my $custom_cache_path = path($custom_cache_file);
-    $custom_cache_path->move($cache_file) if $custom_cache_path->exists;
+
+    # Do not use Path::Tiny until 110 or greater only is supported
+    # See CPANEL-41646 for details
+    # $custom_cache_path->move($cache_file) if $custom_cache_path->exists;
+    Cpanel::FileUtils::Move::safemv( '-fv', $custom_cache_file, $cache_file ) if $custom_cache_path->exists;
+
     return;
 }
 
