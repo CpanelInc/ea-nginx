@@ -2751,6 +2751,20 @@ sub _attempt_to_fix_syntax_errors {
             $file->spew( join( "\n", @file_lines ) );
             last;    # nginx -t only reveals the first issue it encounters
         }
+
+        elsif ( $output_line =~ m{^nginx: \[emerg\].*?in (/etc/nginx/conf.d/users/[a-z0-9]{1,16}\.conf):([0-9]+)$} ) {
+            my $file_path = $1;
+            my $line_num  = $2;
+
+            die "‘$file_path’ reported an error on line $line_num.  However, ‘$file_path’ does not exist on the system\n"
+              unless -s $file_path;
+
+            unlink $file_path;
+            die "Unable to remove $file_path\n" if -f $file_path;
+            $resolved_issue = 1;
+            print "‘$file_path’ was removed due to a configuration issue:  $output_line\n";
+            last;    # nginx -t only reveals the first issue it encounters
+        }
     }
 
     return $resolved_issue;
