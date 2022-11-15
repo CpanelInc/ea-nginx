@@ -1110,7 +1110,15 @@ describe "ea-nginx script" => sub {
                     spew  => sub { return; },
                 );
 
-                my $line = q[nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:1];
+                my $line = q{nginx: [emerg] "bad_key" directive is duplicate in /etc/nginx/conf.d/duplicate.conf:1};
+                is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
+            };
+
+            it "should return 1 if it removes a bad user config" => sub {
+                my $mockdir  = Test::MockFile->dir('/etc/nginx/conf.d/users/');
+                my $mockfile = Test::MockFile->file( '/etc/nginx/conf.d/users/bad.conf', 'yikes' );
+
+                my $line = q{nginx: [emerg] whoops in /etc/nginx/conf.d/users/bad.conf:42};
                 is( scripts::ea_nginx::_attempt_to_fix_syntax_errors($line), 1 );
             };
         };
