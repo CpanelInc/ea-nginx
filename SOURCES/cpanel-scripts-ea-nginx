@@ -60,6 +60,8 @@ our $cpanel_proxy_file                 = '/etc/nginx/conf.d/includes-optional/cp
 our $custom_settings_dir               = '/var/nginx/ea-nginx';
 our $piped_module_conf                 = '/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf';
 
+our $default_server_names_hash_bucket_size = 128;
+
 my $nginxroot = "/etc/nginx";
 
 my $cmds = {
@@ -1157,7 +1159,7 @@ An integer greater than or equal to 128.  The integer must be a power of 2.
 sub _get_server_names_hash_bucket_size {
     my ($server_names_hash_max_size) = @_;
 
-    my $server_names_hash_bucket_size = 128;    # minimum value for this setting
+    my $server_names_hash_bucket_size = $default_server_names_hash_bucket_size;
 
     my $domain_length_info = _get_domain_length_info();
 
@@ -1226,7 +1228,11 @@ A hashref similar to the following:
 =cut
 
 sub _get_domain_length_info {
-    my $nginx_buffer             = 16;    # nginx uses some of this space for internal purposes
+
+    # If a miss is encountered while building the server_names_hash, then up to half
+    # of the hash length could be unused
+    my $nginx_buffer = $default_server_names_hash_bucket_size / 2;
+
     my $service_subdomain_buffer = 16;    # Add padding for service subdomains (autodiscover. is currently the longest)
 
     my $longest      = 0;
@@ -1472,9 +1478,11 @@ sub _write_user_conf {
 
     _validate_domains_data_or_die( $user, $domains_data );
 
-    my %addon_subdomains;
-    @addon_subdomains{ values %{ $domains_data->{addon_domains} } } = ();
-    my @actual_subdomains = grep { $_ && !exists $addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
+    my %addon_subdomains = map { $domains_data->{addon_domains}{$_} => 1 }
+      grep { $domains_data->{addon_domains}{$_} }
+      keys %{ $domains_data->{addon_domains} };
+
+    my @actual_subdomains = grep { $_ && !$addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
 
     my $mail_subdomain_exists = scalar grep { $_ eq 'mail.' . $domains_data->{main_domain} } @actual_subdomains;
 
@@ -1946,8 +1954,8 @@ sub _render_and_append {
         }
     }
 
-    my $ip            = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';                              # juuust in case so we don’t break nginx w/ syntax error
-    my $servername_ip = $ip ne '127.0.0.1' && $global_config_data->{domain_ips}{$ip} eq $domains->[0] ? $ip : "";
+    my $ip            = Cpanel::DomainIp::getdomainip( $domains->[0] ) || '127.0.0.1';                                                                        # juuust in case so we don’t break nginx w/ syntax error
+    my $servername_ip = $ip ne '127.0.0.1' && $global_config_data->{domain_ips}{$ip} && $global_config_data->{domain_ips}{$ip} eq $domains->[0] ? $ip : "";
 
     # Use the public IP on NAT systems
     # NOTE: this is fine to run on non-NAT systems as it just returns the same IP
