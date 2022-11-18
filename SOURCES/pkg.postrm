@@ -20,5 +20,6 @@ if test -x "/usr/bin/apt"; then
 
     rm -f /etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf
     rm -f /etc/nginx/conf.d/passenger.conf
+    mv -fv /var/log/nginx /var/log/nginx.uninstall ||:
 fi
 
