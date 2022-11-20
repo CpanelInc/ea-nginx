@@ -2927,8 +2927,8 @@ EOF
                 is_deeply(
                     scripts::ea_nginx::_get_domain_length_info(),
                     {
-                        longest      => 200,
-                        total_length => 3280,
+                        longest      => 248,
+                        total_length => 5200,
                     },
                 );
             };
