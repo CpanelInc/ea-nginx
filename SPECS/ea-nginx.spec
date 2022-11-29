@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 7
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -774,6 +774,10 @@ rm -rf  /etc/nginx/conf.d/global-logging.conf
 
 rm -rf /etc/nginx/ea-nginx/cpanel_localhost_header.json
 
+if [ $1 -eq 0 ]; then
+    mv -fv /var/log/nginx /var/log/nginx.uninstall ||:
+fi
+
 if [ $1 -ge 1 ]; then
     /sbin/service nginx status  >/dev/null 2>&1 || exit 0
     /sbin/service nginx upgrade >/dev/null 2>&1 || echo \
@@ -781,6 +785,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Fri Nov 18 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-7
+- EA-11048: Move '/var/log/nginx' to a backup location during uninstall
+
 * Thu Nov 17 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-6
 - EA-11049: Avoid server_names_hash warning
 
