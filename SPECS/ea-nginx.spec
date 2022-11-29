@@ -787,6 +787,7 @@ fi
 %changelog
 * Fri Nov 18 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-7
 - EA-11048: Move '/var/log/nginx' to a backup location during uninstall
+- EA-11069: Increase open files limit for master and worker processes
 
 * Thu Nov 17 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-6
 - EA-11049: Avoid server_names_hash warning
