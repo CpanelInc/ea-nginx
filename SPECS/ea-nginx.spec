@@ -266,7 +266,6 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
-    --with-ipv6 \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
@@ -280,7 +279,6 @@ make %{?_smp_mflags}
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
-    --with-ipv6 \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
@@ -301,7 +299,7 @@ cp -f %{SOURCE29} .
 %{__mkdir} -p $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev
 export SPACE_ESCAPED_WITH_CC_OPT=$(echo "%{WITH_CC_OPT}" | sed 's/ /+/g')
 export SPACE_ESCAPED_WITH_LD_OPT=$(echo "%{WITH_LD_OPT}" | sed 's/ /+/g')
-echo "%{BASE_CONFIGURE_ARGS} --with-cc-opt=$SPACE_ESCAPED_WITH_CC_OPT --with-ld-opt=$SPACE_ESCAPED_WITH_LD_OPT --with-ipv6" > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/ngx-configure-args
+echo "%{BASE_CONFIGURE_ARGS} --with-cc-opt=$SPACE_ESCAPED_WITH_CC_OPT --with-ld-opt=$SPACE_ESCAPED_WITH_LD_OPT" > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/ngx-configure-args
 echo -n %{version} > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/nginx-ver
 /bin/cp -f %{SOURCE0} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
 %{__install} -p %{SOURCE29} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
@@ -788,6 +786,7 @@ fi
 * Fri Nov 18 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-7
 - EA-11048: Move '/var/log/nginx' to a backup location during uninstall
 - EA-11069: Increase open files limit for master and worker processes
+- EA-10574: Remove deprecated configure option --with-ipv6
 
 * Thu Nov 17 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-6
 - EA-11049: Avoid server_names_hash warning
