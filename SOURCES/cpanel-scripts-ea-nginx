@@ -855,45 +855,7 @@ will be altered by this sub.
 
 sub _get_application_paths {
     my ($app) = @_;
-
-    # This sub does not exist in older versions of cPanel
-    return Cpanel::Config::userdata::PassengerApps->ensure_paths( $app, 0 ) if defined &Cpanel::Config::userdata::PassengerApps::ensure_paths;
-
-    # This is copied out of ulc as a fallback for older versions that do not have the above yet
-    # TODO: remove the fallback once only 94 and newer are supported
-    my $new                = 0;
-    my %pre_multi_binaries = (
-        ruby   => "/opt/cpanel/ea-ruby24/root/usr/libexec/passenger-ruby24",
-        nodejs => "/opt/cpanel/ea-nodejs10/bin/node",
-        python => "/usr/bin/python3",
-    );
-
-    for my $type ( keys %pre_multi_binaries ) {
-        if ( !exists $app->{$type} ) {    # this and !$new means they have pre-94/pre_multi_binary-only …
-            my $pre_multi_binary = $pre_multi_binaries{$type};
-            if ( !$new && -x $pre_multi_binary ) {    # … so set them to that explicitly in case passeneger moves on to a newer version
-                $app->{$type} = $pre_multi_binary;
-            }
-            elsif ( my $current_default = Cpanel::LoadFile::load_if_exists("/etc/cpanel/ea4/passenger.$type") ) {
-                if ( !$new ) {
-                    warn "The “$app->{name}” application‘s “$type” value ($pre_multi_binary) is not executable/does not exist.\n";
-                    warn "The current default, $current_default, will be in effect for the “\$app->{name}” application.\n";
-                }
-                $app->{$type} = $current_default;
-            }
-        }
-        else {
-            if ( !defined $app->{$type} ) {
-                warn "The “$app->{name}” application has “$type” but it is not defined, removing …\n";
-                delete $app->{$type};
-                next;
-            }
-
-            warn "The “$app->{name}” application’s “$type” value ($app->{$type}) is not executable/does not exist.\n" if !-x $app->{$type};
-        }
-    }
-
-    return;
+    return Cpanel::Config::userdata::PassengerApps->ensure_paths( $app, 0 );
 }
 
 =head2 _write_global_cpanel_localhost()
