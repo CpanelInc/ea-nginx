@@ -1208,9 +1208,9 @@ A hashref similar to the following:
 
 sub _get_domain_length_info {
 
-    # If a miss is encountered while building the server_names_hash, then up to half
-    # of the hash length could be unused
-    my $nginx_buffer = $default_server_names_hash_bucket_size / 2;
+    # If a miss is encountered while building the server_names_hash, then up to
+    # 5/8 of the hash length could be unused
+    my $nginx_buffer = $default_server_names_hash_bucket_size / 8 * 5;
 
     my $service_subdomain_buffer = 16;    # Add padding for service subdomains (autodiscover. is currently the longest)
 

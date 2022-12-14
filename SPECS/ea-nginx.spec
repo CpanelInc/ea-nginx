@@ -785,6 +785,7 @@ fi
 %changelog
 * Thu Dec 08 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-8
 - EA-11078: Fix uninitialized value warning for non-user requests when the USER_ID touch file exists
+- EA-11093: Increase nginx buffer when calculating server_names_hash_bucket_size
 
 * Fri Nov 18 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-7
 - EA-11048: Move '/var/log/nginx' to a backup location during uninstall
