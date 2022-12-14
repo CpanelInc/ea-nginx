@@ -790,6 +790,7 @@ fi
 * Tue Jan 04 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.23.3-3
 - ZC-10317: Update ngx_http_pipelog_module to v1.0.3
 - ZC-10484: Remove SIGKILL from various nginx files
+- ZC-10517: Address Ubuntu creating addiotional splitlog processes
 
 * Tue Dec 27 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-2
 - EA-11087: Guard against bad userdata where a domain is considered an addon domain and subdomain

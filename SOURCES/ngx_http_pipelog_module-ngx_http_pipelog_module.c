@@ -13,6 +13,8 @@
 #include <zlib.h>
 #endif
 
+#include <wordexp.h>
+
 typedef struct ngx_http_log_op_s  ngx_http_log_op_t;
 
 typedef u_char *(*ngx_http_log_op_run_pt) (ngx_http_request_t *r, u_char *buf,
@@ -1697,13 +1699,9 @@ ngx_http_log_init(ngx_conf_t *cf)
 #include <ngx_setproctitle.h>
 #include <ngx_process.h>
 #include <sys/param.h>
-#if (NGX_LINUX)
-#include <linux/prctl.h>
-#endif
 
 #define MODULE_NAME "ngx_http_pipelog_module"
 #define LOGGER_PROC_NAME "logger process"
-#define SHELL_CMD "/bin/sh"
 
 typedef struct {
     ngx_array_t pims;
@@ -1951,6 +1949,20 @@ ngx_http_pipelog_set_log (ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
         ngx_nonblocking(pipelog->pim->fd[1]);
     }
     pipelog->pim->command = value[1];
+
+    wordexp_t  w;
+    int result = wordexp((const char*)value[1].data, &w, WRDE_NOCMD);
+    if (result != 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "wrong command syntax(%i): %s", result, value[1].data);
+        return NGX_CONF_ERROR;
+    }
+    int word_count = w.we_wordc;
+    wordfree(&w);
+
+    if (word_count < 1) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "no command: %s", value[1].data);
+        return NGX_CONF_ERROR;
+    }
     return NGX_CONF_OK;
 }
 
@@ -2110,24 +2122,22 @@ ngx_http_pipelog_init (ngx_conf_t *cf) {
 static ngx_pid_t
 ngx_http_pipelog_command_exec (ngx_str_t *command, ngx_fd_t rfd, ngx_cycle_t *cycle, sigset_t mask) {
     ngx_pid_t pid;
-    char *argv[4], cmd[1024];
+    char cmd[1024];
     ngx_fd_t fd;
-
+    wordexp_t w;
     if (command->len > sizeof(cmd) - 1) {
         return -1;
     }
+
     pid = fork();
     switch (pid){
     case -1:
         ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "%s: ngx_http_pipelog_command_exec fork(): error", MODULE_NAME);
         return NGX_ERROR;
     case 0:
-#if (NGX_LINUX)
-        if(prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
-            ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "%s: ngx_http_pipelog_command_exec: prctl() failed", MODULE_NAME);
+        if(sigprocmask(SIG_SETMASK, &mask, NULL) == -1) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "%s: ngx_http_pipelog_command_exec sigprocmask(): error", MODULE_NAME);
         }
-#endif
-        sigprocmask(SIG_SETMASK, &mask, NULL);
         dup2(rfd, STDIN_FILENO);
         for (fd = 0; fd < NOFILE; fd++) {
             if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO) {
@@ -2136,11 +2146,19 @@ ngx_http_pipelog_command_exec (ngx_str_t *command, ngx_fd_t rfd, ngx_cycle_t *cy
         }
         memset(cmd, 0, sizeof(cmd));
         memcpy(cmd, command->data, command->len);
-        argv[0] = SHELL_CMD;
-        argv[1] = "-c";
-        argv[2] = cmd;
-        argv[3] = NULL;
-        execvp(argv[0], argv);
+        if (wordexp(cmd, &w, WRDE_NOCMD) == 0) {
+            if (w.we_wordc > 0) {
+                char *bin = w.we_wordv[0];
+                if (*bin) {
+                    /* We need to unblock signals for execve() so that
+                       processes can see SIGTERM/SIGHUP */
+                    sigfillset(&mask);
+                    sigprocmask(SIG_UNBLOCK, &mask, NULL);
+                    execve(bin, w.we_wordv, NULL);
+                }
+            }
+            wordfree(&w);
+        }
         exit(1);
     default:
         break;
