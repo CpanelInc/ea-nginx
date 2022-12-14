@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -783,6 +783,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Dec 08 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-8
+- EA-11078: Fix uninitialized value warning for non-user requests when the USER_ID touch file exists
+
 * Fri Nov 18 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-7
 - EA-11048: Move '/var/log/nginx' to a backup location during uninstall
 - EA-11069: Increase open files limit for master and worker processes
