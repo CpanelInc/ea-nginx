@@ -2191,7 +2191,8 @@ EOF
 
         describe "_write_user_conf" => sub {
             my $spewed;
-            my $render_domains = [];
+            my $render_domains   = [];
+            my $init_log_domains = [];
             around {
                 no warnings 'redefine', 'once';
                 local *scripts::ea_nginx::_write_user_conf = $orig__write_user_conf;
@@ -2235,12 +2236,13 @@ EOF
                 );
 
                 local *scripts::ea_nginx::_render_and_append            = sub { my ($args) = @_; push @$render_domains, $args->{domains}; };
+                local *scripts::ea_nginx::_init_logs_for                = sub { my ( $user, $domain ) = @_; push @$init_log_domains, $domain; };
                 local *scripts::ea_nginx::_validate_user_uid_and_gid    = sub { };
                 local *scripts::ea_nginx::_validate_domains_data_or_die = sub { };
                 yield;
             };
 
-            before each => sub { $spewed = undef; };
+            before each => sub { $spewed = undef; $init_log_domains = []; };
 
             it 'should write the cache configuration for the user at the top of its configuration file' => sub {
                 scripts::ea_nginx::_write_user_conf('foo');
@@ -2306,15 +2308,26 @@ EOF
                     ],
                 ) or diag explain $data;
             };
+
+            it 'should initialize the log files for each domain owned by the user' => sub {
+                scripts::ea_nginx::_write_user_conf('foo');
+                is_deeply(
+                    $init_log_domains,
+                    [
+                        'foo.tld',
+                        'sub1.foo.tld',
+                        'sub2.foo.tld',
+                        'sub.addon1.tld',
+                        'sub.addon2.tld',
+                    ],
+                ) or diag explain $init_log_domains;
+            };
         };
 
         describe "_render_and_append" => sub {
             my $mock_template;
             around {
                 my $mock_modsecurity_module = Test::MockFile->file('/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf');
-                my $mock_log_file           = Test::MockFile->file('/var/log/nginx/domains/foo.tld');
-                my $mock_bytes_log_file     = Test::MockFile->file('/var/log/nginx/domains/foo.tld-bytes_log');
-                my $mock_ssl_log_file       = Test::MockFile->file('/var/log/nginx/domains/foo.tld-ssl_log');
                 my $mock_set_user_id        = Test::MockFile->file('/etc/cpanel/ea4/option-flags/set-USER_ID');
                 my $mock_user_conf          = Test::MockFile->file('/etc/nginx/conf.d/users/foo.conf');
 
@@ -2366,10 +2379,6 @@ EOF
 
                 my $mock_cpanel_pwcache = Test::MockModule->new('Cpanel::PwCache')->redefine(
                     getpwnam => sub { return ( undef, undef, undef, undef ); },
-                );
-
-                my $mock_cpanel_fileutils_touchfile = Test::MockModule->new('Cpanel::FileUtils::TouchFile')->redefine(
-                    touchfile => sub { },
                 );
 
                 my $mock_cpanel_phpfpm_get = Test::MockModule->new('Cpanel::PHPFPM::Get')->redefine(
@@ -3096,6 +3105,29 @@ EOF
             it 'should return 0 if the set-USER_ID touch file does not exist' => sub {
                 unlink '/etc/cpanel/ea4/option-flags/set-USER_ID';
                 is( scripts::ea_nginx::_wants_user_id(), 0 );
+            };
+        };
+
+        describe "_init_logs_for" => sub {
+            it 'should create the log files for a given user and domain' => sub {
+
+                local *scripts::ea_nginx::_get_gid_for = sub { return 42; };
+
+                my $touched_files                   = [];
+                my $mock_cpanel_fileutils_touchfile = Test::MockModule->new('Cpanel::FileUtils::TouchFile')->redefine(
+                    touchfile => sub { push @$touched_files, @_; },
+                );
+
+                scripts::ea_nginx::_init_logs_for( 'foo', 'foo.tld' );
+
+                is_deeply(
+                    $touched_files,
+                    [
+                        '/var/log/nginx/domains/foo.tld',
+                        '/var/log/nginx/domains/foo.tld-ssl_log',
+                        '/var/log/nginx/domains/foo.tld-bytes_log',
+                    ],
+                ) or diag explain $touched_files;
             };
         };
     };
