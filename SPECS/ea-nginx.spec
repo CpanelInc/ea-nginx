@@ -110,7 +110,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.23.2
+%define main_version 1.23.3
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 8
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -783,6 +783,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Dec 15 2022 Cory McIntire <cory@cpanel.net> - 1.23.3-1
+- EA-11104: Update ea-nginx from v1.23.2 to v1.23.3
+
 * Thu Dec 08 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.2-8
 - EA-11078: Fix uninitialized value warning for non-user requests when the USER_ID touch file exists
 
