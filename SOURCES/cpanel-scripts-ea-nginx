@@ -1500,6 +1500,8 @@ sub _write_user_conf {
         }
     );
 
+    _init_logs_for( $user, $domains_data->{main_domain} );
+
     if (@actual_subdomains) {
         path($userconf)->append("\n#### sub domains for $user ##\n");
         for my $subdom (@actual_subdomains) {
@@ -1511,6 +1513,8 @@ sub _write_user_conf {
                     mail_subdomain_exists => $mail_subdomain_exists,
                 }
             );
+
+            _init_logs_for( $user, $subdom );
         }
     }
 
@@ -1534,6 +1538,8 @@ sub _write_user_conf {
                     mail_subdomain_exists => $mail_subdomain_exists,
                 }
             );
+
+            _init_logs_for( $user, $sub );
         }
     }
 
@@ -1728,12 +1734,44 @@ sub _get_group_for {
     return $group_cache{$user} if $group_cache{$user};
 
     # otherwise: via gid
-    my $gid = ( getpwnam($user) )[3];
+    my $gid = _get_gid_for($user);
     return unless $gid;
 
     $group_cache{$user} = getgrgid($gid);
 
     return $group_cache{$user};
+}
+
+=head2 _get_gid_for()
+
+Returns the gid for the given username.  The result is cached in a hash
+and the cached result will be returned if the given username exists in the hash.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=head3 RETURNS
+
+An integer representing the group ID of the given username or undef.
+
+=cut
+
+my %gid_cache;
+
+sub _get_gid_for {
+    my ($user) = @_;
+    return $gid_cache{$user} if $gid_cache{$user};
+
+    my $gid = ( getpwnam($user) )[3];
+    return unless $gid;
+
+    $gid_cache{$user} = $gid;
+    return $gid_cache{$user};
 }
 
 =head2 _get_domains_with_ssls()
@@ -1869,21 +1907,6 @@ sub _render_and_append {
 
     my $ipv6  = _has_ipv6();
     my $http2 = _wants_http2();
-    my $gid   = ( Cpanel::PwCache::getpwnam($user) )[3];
-
-    # TODO: Move the logging initialization to its own sub and call it after _render_and_append()
-    # create no matter what because the are either used directly or via piped logging
-    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
-    chmod 0640, "/var/log/nginx/domains/$domains->[0]";
-    chown 0, $gid, "/var/log/nginx/domains/$domains->[0]";
-
-    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]-bytes_log");
-    chmod 0644, "/var/log/nginx/domains/$domains->[0]-bytes_log";
-    chown 0, 0, "/var/log/nginx/domains/$domains->[0]-bytes_log";
-
-    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]-ssl_log");
-    chmod 0640, "/var/log/nginx/domains/$domains->[0]-ssl_log";
-    chown 0, $gid, "/var/log/nginx/domains/$domains->[0]-ssl_log";
 
     # Include numeric UID if they want it
     my $uid = ( Cpanel::PwCache::getpwnam($user) )[2] if _wants_user_id();
@@ -1996,6 +2019,47 @@ sub _render_and_append {
     }
 
     return 1;
+}
+
+=head2 _init_logs_for()
+
+Initializes the logs for a given user and domain.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=item domain
+
+The domain to initialize
+
+=back
+
+=cut
+
+sub _init_logs_for {
+    my ( $user, $domain ) = @_;
+
+    my $gid = _get_gid_for($user);
+
+    # STD log
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domain");
+    chmod 0640, "/var/log/nginx/domains/$domain";
+    chown 0, $gid, "/var/log/nginx/domains/$domain";
+
+    # SSL log
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domain-ssl_log");
+    chmod 0640, "/var/log/nginx/domains/$domain-ssl_log";
+    chown 0, $gid, "/var/log/nginx/domains/$domain-ssl_log";
+
+    # Bytes log
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domain-bytes_log");
+    chmod 0644, "/var/log/nginx/domains/$domain-bytes_log";
+    chown 0, 0, "/var/log/nginx/domains/$domain-bytes_log";
+
+    return;
 }
 
 =head2 _get_homedir()
