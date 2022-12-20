@@ -59,6 +59,7 @@ our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_in
 our $cpanel_proxy_file                 = '/etc/nginx/conf.d/includes-optional/cpanel-proxy-xt.conf';
 our $custom_settings_dir               = '/var/nginx/ea-nginx';
 our $piped_module_conf                 = '/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf';
+our $user_id_file                      = '/etc/cpanel/ea4/option-flags/set-USER_ID';
 
 our $default_server_names_hash_bucket_size = 128;
 
@@ -964,7 +965,7 @@ sub _write_global_nginx_conf {
 =head2 _write_global_cpanel_proxy_non_ssl()
 
 Update '/etc/nginx/conf.d/cpanel-proxy-non-ssl.conf' with the correct values for
-IPv6.
+IPv6 and USER_ID.
 
 =cut
 
@@ -978,6 +979,11 @@ sub _write_global_cpanel_proxy_non_ssl {
     # toggle IPv6
     $content =~ s/^.*(listen\s+\[::\]:)/    $prefix$1/gm;
 
+    my $user_id_prefix = _wants_user_id() ? '' : '# ';
+
+    # toggle $USER_ID
+    $content =~ s/^.*(set\s+\$USER_ID\s+""\s*;)/    $user_id_prefix$1/gm;
+
     $cpns->spew($content);
 
     return 1;
@@ -986,7 +992,7 @@ sub _write_global_cpanel_proxy_non_ssl {
 =head2 _write_global_default()
 
 Update '/etc/nginx/conf.d/default.conf' with the correct values for IPv6, http2,
-and the correct default ssl certificate to use on the system.
+USER_ID, and the correct default ssl certificate to use on the system.
 
 =cut
 
@@ -997,28 +1003,39 @@ sub _write_global_default {
     my $dflt    = path("/etc/nginx/conf.d/default.conf");
     my $content = $dflt->slurp;
 
-    # toggle IPv6
-    $content =~ s/^.*(listen\s+\[::\]:)/    $prefix$1/gm;
+    my $set_user_id_line_found = 0;
 
-    # toggle the pem
-    if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
+    my @lines = split /\n/, $content;
+    foreach my $line (@lines) {
+        if ( $line =~ /^(.*listen\s+(?:\[::\]:)?)443\s+ssl\s*(?:http2)?\s*;/ ) {
+            $line = _wants_http2() ? "${1}443 ssl http2;" : "${1}443 ssl;";
+        }
 
-        # ensure it is /var/cpanel/ssl/cpanel/mycpanel.pem
-        $content =~ s{/var/cpanel/ssl/cpanel/cpanel\.pem}{/var/cpanel/ssl/cpanel/mycpanel.pem}gm;
+        if ( $line =~ /^.*(listen\s+\[::\]:[0-9]+\s*(?:ssl)?(?:\s*http2)?\s*;)/ ) {
+            $line = "    $prefix$1";
+        }
+        elsif ( $line =~ /^\s*(ssl_certificate(?:_key)?)\s+/ ) {
+            $line =
+              -f '/var/cpanel/ssl/cpanel/mycpanel.pem'
+              ? "    $1 /var/cpanel/ssl/cpanel/mycpanel.pem;"
+              : "    $1 /var/cpanel/ssl/cpanel/cpanel.pem;";
+        }
+        elsif ( $line =~ /set\s+\$USER_ID\s+""\s*;/ ) {
+            if ($set_user_id_line_found) {
+                $line = "";
+            }
+            else {
+                $set_user_id_line_found = 1;
+                $line                   = _wants_user_id() ? '    set $USER_ID "";' : '    # set $USER_ID "";';
+            }
+        }
     }
-    else {
-        # ensure it is /var/cpanel/ssl/cpanel/cpanel.pem
-        $content =~ s{/var/cpanel/ssl/cpanel/mycpanel\.pem}{/var/cpanel/ssl/cpanel/cpanel.pem}gm;
-    }
 
-    # ¿YAGNI? we could check and warn if there ia an ssl_certificate_key or ssl_certificate
-    #   that is not /var/cpanel/ssl/cpanel/mycpanel.pem or /var/cpanel/ssl/cpanel/cpanel.pem
+    $content = join "\n", @lines;
 
-    if ( _wants_http2() ) {
-        $content =~ s{443 ssl;}{443 ssl http2;}gm;
-    }
-    else {
-        $content =~ s{443 ssl http2;}{443 ssl;}gm;
+    # Just in case the line isn't there at all
+    if ( _wants_user_id() && !$set_user_id_line_found ) {
+        $content =~ s{^\s*include\s+conf\.d/server-includes/\*\.conf\s*;\s*$}{    set \$USER_ID "";\n\n    include conf.d/server-includes/*.conf;}gm;
     }
 
     $dflt->spew($content);
@@ -1191,9 +1208,9 @@ A hashref similar to the following:
 
 sub _get_domain_length_info {
 
-    # If a miss is encountered while building the server_names_hash, then up to half
-    # of the hash length could be unused
-    my $nginx_buffer = $default_server_names_hash_bucket_size / 2;
+    # If a miss is encountered while building the server_names_hash, then up to
+    # 5/8 of the hash length could be unused
+    my $nginx_buffer = $default_server_names_hash_bucket_size / 8 * 5;
 
     my $service_subdomain_buffer = 16;    # Add padding for service subdomains (autodiscover. is currently the longest)
 
@@ -1483,6 +1500,8 @@ sub _write_user_conf {
         }
     );
 
+    _init_logs_for( $user, $domains_data->{main_domain} );
+
     if (@actual_subdomains) {
         path($userconf)->append("\n#### sub domains for $user ##\n");
         for my $subdom (@actual_subdomains) {
@@ -1494,6 +1513,8 @@ sub _write_user_conf {
                     mail_subdomain_exists => $mail_subdomain_exists,
                 }
             );
+
+            _init_logs_for( $user, $subdom );
         }
     }
 
@@ -1517,6 +1538,8 @@ sub _write_user_conf {
                     mail_subdomain_exists => $mail_subdomain_exists,
                 }
             );
+
+            _init_logs_for( $user, $sub );
         }
     }
 
@@ -1711,12 +1734,44 @@ sub _get_group_for {
     return $group_cache{$user} if $group_cache{$user};
 
     # otherwise: via gid
-    my $gid = ( getpwnam($user) )[3];
+    my $gid = _get_gid_for($user);
     return unless $gid;
 
     $group_cache{$user} = getgrgid($gid);
 
     return $group_cache{$user};
+}
+
+=head2 _get_gid_for()
+
+Returns the gid for the given username.  The result is cached in a hash
+and the cached result will be returned if the given username exists in the hash.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=head3 RETURNS
+
+An integer representing the group ID of the given username or undef.
+
+=cut
+
+my %gid_cache;
+
+sub _get_gid_for {
+    my ($user) = @_;
+    return $gid_cache{$user} if $gid_cache{$user};
+
+    my $gid = ( getpwnam($user) )[3];
+    return unless $gid;
+
+    $gid_cache{$user} = $gid;
+    return $gid_cache{$user};
 }
 
 =head2 _get_domains_with_ssls()
@@ -1852,27 +1907,9 @@ sub _render_and_append {
 
     my $ipv6  = _has_ipv6();
     my $http2 = _wants_http2();
-    my $gid   = ( Cpanel::PwCache::getpwnam($user) )[3];
-
-    # TODO: Move the logging initialization to its own sub and call it after _render_and_append()
-    # create no matter what because the are either used directly or via piped logging
-    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]");
-    chmod 0640, "/var/log/nginx/domains/$domains->[0]";
-    chown 0, $gid, "/var/log/nginx/domains/$domains->[0]";
-
-    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]-bytes_log");
-    chmod 0644, "/var/log/nginx/domains/$domains->[0]-bytes_log";
-    chown 0, 0, "/var/log/nginx/domains/$domains->[0]-bytes_log";
-
-    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domains->[0]-ssl_log");
-    chmod 0640, "/var/log/nginx/domains/$domains->[0]-ssl_log";
-    chown 0, $gid, "/var/log/nginx/domains/$domains->[0]-ssl_log";
 
     # Include numeric UID if they want it
-    my $uid;
-    if ( -e "/etc/cpanel/ea4/option-flags/set-USER_ID" ) {
-        $uid = ( Cpanel::PwCache::getpwnam($user) )[2];
-    }
+    my $uid = ( Cpanel::PwCache::getpwnam($user) )[2] if _wants_user_id();
 
     my $fpm_socket;
     my $fpm_socket_php_major_version;
@@ -1982,6 +2019,47 @@ sub _render_and_append {
     }
 
     return 1;
+}
+
+=head2 _init_logs_for()
+
+Initializes the logs for a given user and domain.
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=item domain
+
+The domain to initialize
+
+=back
+
+=cut
+
+sub _init_logs_for {
+    my ( $user, $domain ) = @_;
+
+    my $gid = _get_gid_for($user);
+
+    # STD log
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domain");
+    chmod 0640, "/var/log/nginx/domains/$domain";
+    chown 0, $gid, "/var/log/nginx/domains/$domain";
+
+    # SSL log
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domain-ssl_log");
+    chmod 0640, "/var/log/nginx/domains/$domain-ssl_log";
+    chown 0, $gid, "/var/log/nginx/domains/$domain-ssl_log";
+
+    # Bytes log
+    Cpanel::FileUtils::TouchFile::touchfile("/var/log/nginx/domains/$domain-bytes_log");
+    chmod 0644, "/var/log/nginx/domains/$domain-bytes_log";
+    chown 0, 0, "/var/log/nginx/domains/$domain-bytes_log";
+
+    return;
 }
 
 =head2 _get_homedir()
@@ -3046,6 +3124,25 @@ sub _get_domain_ips {
     }
 
     return \%domain_ips;
+}
+
+=head2 _wants_user_id()
+
+Returns whether the server admin wants the user id of the server block that was
+hit logged or not.  Caches the result for subsequent calls.
+
+=head3 RETURNS
+
+Returns 1 or 0 depending on the existence of the touch file
+
+=cut
+
+our $wants_user_id;
+
+sub _wants_user_id {
+    return $wants_user_id if defined $wants_user_id;
+    $wants_user_id = -e $user_id_file ? 1 : 0;
+    return $wants_user_id;
 }
 
 1;

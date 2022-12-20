@@ -1888,6 +1888,7 @@ EOF
         };
 
         describe "_write_global_default" => sub {
+            share my %mi;
             my $content;
             around {
                 my $mockfile = Test::MockFile->file( "/var/cpanel/ssl/cpanel/mycpanel.pem", "this is an ssl for real though" );
@@ -1896,9 +1897,10 @@ EOF
                 local *scripts::ea_nginx::_has_ipv6    = sub { return 1; };
                 local *scripts::ea_nginx::_wants_http2 = sub { return 0; };
 
-                my $mock_path_tiny = Test::MockModule->new('Path::Tiny')->redefine(
+                $mi{mock_path_tiny} = Test::MockModule->new('Path::Tiny');
+                $mi{mock_path_tiny}->redefine(
                     path  => sub { return bless {}, 'Path::Tiny'; },
-                    slurp => sub { return "    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n"; },
+                    slurp => sub { return "    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    include conf.d/server-includes/*.conf;"; },
                     spew  => sub { $content = pop @_; },
                 );
                 yield;
@@ -1906,14 +1908,32 @@ EOF
 
             before each => sub { $content = undef; };
 
-            it 'should add a configuration for IPv6 if it is enabled' => sub {
+            it 'should add a configuration for IPv6 if it is enabled (http2 disabled)' => sub {
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/listen \[::\]:80;/ );
+                like( $content, qr/^\s*listen \[::\]:80;/m );
             };
 
-            it 'should add a comment stating that IPv6 is not enabled if it is disabled' => sub {
+            it 'should add a configuration for IPv6 if it is enabled (http2 enabled)' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
+                use warnings 'redefine';
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/^\s*listen \[::\]:80;/m );
+            };
+
+            it 'should add a comment stating that IPv6 is not enabled if it is disabled (http2 disabled)' => sub {
                 no warnings 'redefine';
                 local *scripts::ea_nginx::_has_ipv6 = sub { return 0; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/# server does not have IPv6 enabled:/ );
+            };
+
+            it 'should add a comment stating that IPv6 is not enabled if it is disabled (http2 enabled)' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_has_ipv6    = sub { return 0; };
+                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
                 use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_default();
@@ -1932,18 +1952,72 @@ EOF
                 like( $content, qr{ssl_certificate_key\s+/var/cpanel/ssl/cpanel/cpanel\.pem} );
             };
 
-            it 'should configure port 443 to use http2 if it is enabled' => sub {
+            it 'should configure port 443 to use http2 if it is enabled (ipv6 enabled)' => sub {
                 no warnings 'redefine';
                 local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
                 use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/listen 443 ssl http2;/ );
+                like( $content, qr/^\s*listen 443 ssl http2;/m );
             };
 
-            it 'should not configure port 443 to use http2 if it is not enabled' => sub {
+            it 'should not configure port 443 to use http2 if it is not enabled (ipv6 enabled)' => sub {
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/listen 443 ssl;/ );
+                like( $content, qr/^\s*listen 443 ssl;/m );
+            };
+
+            it 'should configure port 443 to use http2 if it is enabled (ipv6 disabled)' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_has_ipv6    = sub { return 0; };
+                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl http2;/m );
+            };
+
+            it 'should not configure port 443 to use http2 if it is not enabled (ipv6 disabled)' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_has_ipv6 = sub { return 0; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl;/m );
+            };
+
+            it 'should configure USER_ID if the set-USER_ID touch file is in place (initially missing from file)' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_wants_user_id = sub { return 1; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/^\s*set \$USER_ID "";/m );
+            };
+
+            it 'should configure USER_ID if the set-USER_ID touch file is in place (comment out in file)' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_wants_user_id = sub { return 1; };
+                use warnings 'redefine';
+
+                $mi{mock_path_tiny}->redefine(
+                    slurp => sub { return qq[    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
+                );
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/^\s*set \$USER_ID "";/m );
+            };
+
+            it 'should comment USER_ID out if it is set and the set-USER_ID touch file is missing' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_wants_user_id = sub { return 0; };
+                use warnings 'redefine';
+
+                $mi{mock_path_tiny}->redefine(
+                    slurp => sub { return qq[    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
+                );
+
+                scripts::ea_nginx::_write_global_default();
+                like( $content, qr/^\s*# set \$USER_ID "";/m );
             };
         };
 
@@ -1991,6 +2065,7 @@ server {
     server_name cpanel.*;
     listen 80;
     listen [::]:80;
+    # set $USER_ID "";
     return 301 https://$host$request_uri;
 }
 EOF
@@ -2021,6 +2096,20 @@ EOF
 
                 scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl();
                 like( $content, qr/# server does not have IPv6 enabled:/ );
+            };
+
+            it 'should leave USER_ID commented out if the set-USER_ID touch file is not present' => sub {
+                scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl();
+                like( $content, qr/# set \$USER_ID "";/ );
+            };
+
+            it 'should set USER_ID to an empty string if the set-USER_ID touch file is present' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_wants_user_id = sub { return 1; };
+                use warnings 'redefine';
+
+                scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl();
+                like( $content, qr/set \$USER_ID "";/ );
             };
         };
 
@@ -2102,7 +2191,8 @@ EOF
 
         describe "_write_user_conf" => sub {
             my $spewed;
-            my $render_domains = [];
+            my $render_domains   = [];
+            my $init_log_domains = [];
             around {
                 no warnings 'redefine', 'once';
                 local *scripts::ea_nginx::_write_user_conf = $orig__write_user_conf;
@@ -2146,12 +2236,13 @@ EOF
                 );
 
                 local *scripts::ea_nginx::_render_and_append            = sub { my ($args) = @_; push @$render_domains, $args->{domains}; };
+                local *scripts::ea_nginx::_init_logs_for                = sub { my ( $user, $domain ) = @_; push @$init_log_domains, $domain; };
                 local *scripts::ea_nginx::_validate_user_uid_and_gid    = sub { };
                 local *scripts::ea_nginx::_validate_domains_data_or_die = sub { };
                 yield;
             };
 
-            before each => sub { $spewed = undef; };
+            before each => sub { $spewed = undef; $init_log_domains = []; };
 
             it 'should write the cache configuration for the user at the top of its configuration file' => sub {
                 scripts::ea_nginx::_write_user_conf('foo');
@@ -2217,15 +2308,26 @@ EOF
                     ],
                 ) or diag explain $data;
             };
+
+            it 'should initialize the log files for each domain owned by the user' => sub {
+                scripts::ea_nginx::_write_user_conf('foo');
+                is_deeply(
+                    $init_log_domains,
+                    [
+                        'foo.tld',
+                        'sub1.foo.tld',
+                        'sub2.foo.tld',
+                        'sub.addon1.tld',
+                        'sub.addon2.tld',
+                    ],
+                ) or diag explain $init_log_domains;
+            };
         };
 
         describe "_render_and_append" => sub {
             my $mock_template;
             around {
                 my $mock_modsecurity_module = Test::MockFile->file('/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf');
-                my $mock_log_file           = Test::MockFile->file('/var/log/nginx/domains/foo.tld');
-                my $mock_bytes_log_file     = Test::MockFile->file('/var/log/nginx/domains/foo.tld-bytes_log');
-                my $mock_ssl_log_file       = Test::MockFile->file('/var/log/nginx/domains/foo.tld-ssl_log');
                 my $mock_set_user_id        = Test::MockFile->file('/etc/cpanel/ea4/option-flags/set-USER_ID');
                 my $mock_user_conf          = Test::MockFile->file('/etc/nginx/conf.d/users/foo.conf');
 
@@ -2247,6 +2349,7 @@ EOF
                 local *scripts::ea_nginx::_get_httpd_vhosts_hash = sub { };
                 local *scripts::ea_nginx::_get_cpconf_hr         = sub { };
                 local *scripts::ea_nginx::_get_settings_hr       = sub { };
+                local *scripts::ea_nginx::_wants_user_id         = sub { return 0; };
                 local *scripts::ea_nginx::_get_wordpress_info    = sub {
                     return {
                         docroot_install  => undef,
@@ -2276,10 +2379,6 @@ EOF
 
                 my $mock_cpanel_pwcache = Test::MockModule->new('Cpanel::PwCache')->redefine(
                     getpwnam => sub { return ( undef, undef, undef, undef ); },
-                );
-
-                my $mock_cpanel_fileutils_touchfile = Test::MockModule->new('Cpanel::FileUtils::TouchFile')->redefine(
-                    touchfile => sub { },
                 );
 
                 my $mock_cpanel_phpfpm_get = Test::MockModule->new('Cpanel::PHPFPM::Get')->redefine(
@@ -2927,8 +3026,8 @@ EOF
                 is_deeply(
                     scripts::ea_nginx::_get_domain_length_info(),
                     {
-                        longest      => 248,
-                        total_length => 5200,
+                        longest      => 264,
+                        total_length => 5840,
                     },
                 );
             };
@@ -2988,6 +3087,47 @@ EOF
                     scripts::ea_nginx::_validate_user_uid_and_gid('happy');
                 };
                 is( $trap->leaveby, 'return' );
+            };
+        };
+
+        describe "_wants_user_id" => sub {
+            around {
+                my $mockfile = Test::MockFile->file( '/etc/cpanel/ea4/option-flags/set-USER_ID', '' );
+                yield;
+            };
+
+            before each => sub { no warnings 'once'; $scripts::ea_nginx::wants_user_id = undef; };
+
+            it 'should return 1 if the set-USER_ID touch file exists' => sub {
+                is( scripts::ea_nginx::_wants_user_id(), 1 );
+            };
+
+            it 'should return 0 if the set-USER_ID touch file does not exist' => sub {
+                unlink '/etc/cpanel/ea4/option-flags/set-USER_ID';
+                is( scripts::ea_nginx::_wants_user_id(), 0 );
+            };
+        };
+
+        describe "_init_logs_for" => sub {
+            it 'should create the log files for a given user and domain' => sub {
+
+                local *scripts::ea_nginx::_get_gid_for = sub { return 42; };
+
+                my $touched_files                   = [];
+                my $mock_cpanel_fileutils_touchfile = Test::MockModule->new('Cpanel::FileUtils::TouchFile')->redefine(
+                    touchfile => sub { push @$touched_files, @_; },
+                );
+
+                scripts::ea_nginx::_init_logs_for( 'foo', 'foo.tld' );
+
+                is_deeply(
+                    $touched_files,
+                    [
+                        '/var/log/nginx/domains/foo.tld',
+                        '/var/log/nginx/domains/foo.tld-ssl_log',
+                        '/var/log/nginx/domains/foo.tld-bytes_log',
+                    ],
+                ) or diag explain $touched_files;
             };
         };
     };
