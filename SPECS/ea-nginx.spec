@@ -789,6 +789,7 @@ fi
 - ZC-10517: Address Ubuntu creating addiotional splitlog processes
 - ZC-10593: Close out fd's during reload/shutdown
 - EA-11088: Account for mail subdomains of addon and parked domains when configuring the server_name directive
+- EA-11121: Add ipv6 subdomain to server_name directive when account has an ipv6 address assigned
 
 * Tue Dec 27 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-2
 - EA-11087: Guard against bad userdata where a domain is considered an addon domain and subdomain

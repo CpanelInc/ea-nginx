@@ -1458,6 +1458,8 @@ sub _write_user_conf {
 
     _validate_domains_data_or_die( $user, $domains_data );
 
+    my $userdata_for_main_domain = _get_userdata_for( $user => $domains_data->{main_domain} );
+
     my %addon_subdomains = map { $domains_data->{addon_domains}{$_} => 1 }
       grep { $domains_data->{addon_domains}{$_} }
       keys %{ $domains_data->{addon_domains} };
@@ -1495,6 +1497,7 @@ sub _write_user_conf {
     ];
 
     push( @$domains, "mail.$domains_data->{main_domain}" ) unless $subdomains_hash{"mail.$domains_data->{main_domain}"};
+    push( @$domains, "ipv6.$domains_data->{main_domain}" ) if exists $userdata_for_main_domain->{ipv6};
 
     foreach my $dom ( @{ $domains_data->{parked_domains} } ) {
         push @$domains, $dom;
