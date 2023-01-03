@@ -2210,6 +2210,9 @@ EOF
                                 'sub.addon2.tld',
                                 'sub1.foo.tld',
                                 'sub2.foo.tld',
+                                'mail.addon2.tld',
+                                'mail.parked2.tld',
+                                '*.foo.tld',
                             ],
                             parked_domains => [
                                 'parked1.tld',
@@ -2249,16 +2252,20 @@ EOF
                 like( $spewed, qr{^proxy_cache_path /var/cache/ea-nginx/proxy/foo levels=1:2 keys_zone=foo:24m inactive=42m;} );
             };
 
-            it 'should call _render_and_append() to write the server block for the primary domain for the user' => sub {
-                scripts::ea_nginx::_write_user_conf('foo');
-                is( $render_domains->[0][0], 'foo.tld' );
-            };
-
-            it 'should include the parked domains for the account when calling _render_and_append() for the primary domain for the user' => sub {
+            it 'should call _render_and_append() to write the server block for the primary and parked domains for the user' => sub {
                 scripts::ea_nginx::_write_user_conf('foo');
                 is_deeply(
                     $render_domains->[0],
-                    [ 'foo.tld', 'parked1.tld', 'parked2.tld' ],
+                    [
+                        'foo.tld',
+                        'www.foo.tld',
+                        'mail.foo.tld',
+                        'parked1.tld',
+                        'www.parked1.tld',
+                        'mail.parked1.tld',
+                        'parked2.tld',
+                        'www.parked2.tld',
+                    ],
                 );
             };
 
@@ -2266,23 +2273,60 @@ EOF
                 scripts::ea_nginx::_write_user_conf('foo');
                 is_deeply(
                     $render_domains->[1],
-                    ['sub1.foo.tld'],
+                    [
+                        'sub1.foo.tld',
+                        'www.sub1.foo.tld',
+                    ],
                 );
                 is_deeply(
                     $render_domains->[2],
-                    ['sub2.foo.tld'],
+                    [
+                        'sub2.foo.tld',
+                        'www.sub2.foo.tld',
+                    ],
+                );
+                is_deeply(
+                    $render_domains->[3],
+                    [
+                        'mail.addon2.tld',
+                        'www.mail.addon2.tld',
+                    ],
+                );
+                is_deeply(
+                    $render_domains->[4],
+                    [
+                        'mail.parked2.tld',
+                        'www.mail.parked2.tld',
+                    ],
+                );
+                is_deeply(
+                    $render_domains->[5],
+                    [
+                        '*.foo.tld',
+                    ],
                 );
             };
 
             it 'should call _render_and_append() for each addon domain for the account' => sub {
                 scripts::ea_nginx::_write_user_conf('foo');
                 is_deeply(
-                    $render_domains->[3],
-                    [ 'sub.addon1.tld', 'addon1.tld' ],
+                    $render_domains->[6],
+                    [
+                        'sub.addon1.tld',
+                        'www.sub.addon1.tld',
+                        'addon1.tld',
+                        'www.addon1.tld',
+                        'mail.addon1.tld',
+                    ],
                 );
                 is_deeply(
-                    $render_domains->[4],
-                    [ 'sub.addon2.tld', 'addon2.tld' ],
+                    $render_domains->[7],
+                    [
+                        'sub.addon2.tld',
+                        'www.sub.addon2.tld',
+                        'addon2.tld',
+                        'www.addon2.tld',
+                    ],
                 );
             };
 
@@ -2305,6 +2349,9 @@ EOF
                         { foo => 'bar' },
                         { foo => 'bar' },
                         { foo => 'bar' },
+                        { foo => 'bar' },
+                        { foo => 'bar' },
+                        { foo => 'bar' },
                     ],
                 ) or diag explain $data;
             };
@@ -2317,6 +2364,9 @@ EOF
                         'foo.tld',
                         'sub1.foo.tld',
                         'sub2.foo.tld',
+                        'mail.addon2.tld',
+                        'mail.parked2.tld',
+                        '*.foo.tld',
                         'sub.addon1.tld',
                         'sub.addon2.tld',
                     ],
