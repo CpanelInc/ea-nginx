@@ -1461,7 +1461,7 @@ sub _write_user_conf {
       grep { $domains_data->{addon_domains}{$_} }
       keys %{ $domains_data->{addon_domains} };
 
-    my @actual_subdomains = grep { $_ && !$addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
+    my @actual_subdomains = grep { $_ && !exists $domains_data->{addon_domains}{$_} && !$addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
 
     my $mail_subdomain_exists = scalar grep { $_ eq 'mail.' . $domains_data->{main_domain} } @actual_subdomains;
 
