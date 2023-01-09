@@ -35,6 +35,7 @@ use Cpanel::SafeRun::Object                  ();
 use Cpanel::Transaction::File::JSON          ();
 use Cpanel::Validate::URL                    ();
 use Cpanel::Validate::Username               ();
+use Cpanel::WildcardDomain                   ();
 use File::Glob                               ();
 use File::Path::Tiny                         ();
 use IO::Callback                             ();
@@ -1463,8 +1464,6 @@ sub _write_user_conf {
 
     my @actual_subdomains = grep { $_ && !exists $domains_data->{addon_domains}{$_} && !$addon_subdomains{$_} } @{ $domains_data->{sub_domains} };
 
-    my $mail_subdomain_exists = scalar grep { $_ eq 'mail.' . $domains_data->{main_domain} } @actual_subdomains;
-
     my %subdomains_hash = map { $_ => 1 } @{ $domains_data->{sub_domains} };
 
     my $userconf = "/etc/nginx/conf.d/users/$user.conf";
@@ -1490,13 +1489,27 @@ sub _write_user_conf {
         $pre_server = "proxy_cache_path /var/cache/ea-nginx/proxy/$user levels=$caching_hr->{levels} keys_zone=$user:$caching_hr->{zone_size} inactive=$caching_hr->{inactive_time};\n\n";
     }
 
+    my $domains = [
+        $domains_data->{main_domain},
+        'www.' . $domains_data->{main_domain},
+    ];
+
+    push( @$domains, "mail.$domains_data->{main_domain}" ) unless $subdomains_hash{"mail.$domains_data->{main_domain}"};
+
+    foreach my $dom ( @{ $domains_data->{parked_domains} } ) {
+        push @$domains, $dom;
+        if ( !Cpanel::WildcardDomain::is_wildcard_domain($dom) ) {
+            push @$domains, "www.$dom";
+            push( @$domains, "mail.$dom" ) unless $subdomains_hash{"mail.$dom"};
+        }
+    }
+
     path($userconf)->spew( $pre_server . "#### main domain for $user ##\n" );
     _render_and_append(
         {
-            user                  => $user,
-            domains               => [ $domains_data->{main_domain}, @{ $domains_data->{parked_domains} } ],
-            global_config_data    => $global_config_data,
-            mail_subdomain_exists => $mail_subdomain_exists,
+            user               => $user,
+            domains            => $domains,
+            global_config_data => $global_config_data,
         }
     );
 
@@ -1505,12 +1518,13 @@ sub _write_user_conf {
     if (@actual_subdomains) {
         path($userconf)->append("\n#### sub domains for $user ##\n");
         for my $subdom (@actual_subdomains) {
+            my $subdoms = [$subdom];
+            push( @$subdoms, "www.$subdom" ) unless Cpanel::WildcardDomain::is_wildcard_domain($subdom);
             _render_and_append(
                 {
-                    user                  => $user,
-                    domains               => [$subdom],
-                    global_config_data    => $global_config_data,
-                    mail_subdomain_exists => $mail_subdomain_exists,
+                    user               => $user,
+                    domains            => $subdoms,
+                    global_config_data => $global_config_data,
                 }
             );
 
@@ -1530,12 +1544,24 @@ sub _write_user_conf {
                 next;
             }
 
+            my $ao_domains = [];
+
+            # subdomain first -- does not add mail subdomain
+            push @$ao_domains, $sub;
+            push( @$ao_domains, "www.$sub" ) unless Cpanel::WildcardDomain::is_wildcard_domain($sub);
+
+            # addon domain second -- adds mail subdomain
+            push @$ao_domains, $aod;
+            if ( !Cpanel::WildcardDomain::is_wildcard_domain($aod) ) {
+                push @$ao_domains, "www.$aod";
+                push( @$ao_domains, "mail.$aod" ) unless $subdomains_hash{"mail.$aod"};
+            }
+
             _render_and_append(
                 {
-                    user                  => $user,
-                    domains               => [ $sub, $aod ],
-                    global_config_data    => $global_config_data,
-                    mail_subdomain_exists => $mail_subdomain_exists,
+                    user               => $user,
+                    domains            => $ao_domains,
+                    global_config_data => $global_config_data,
                 }
             );
 
@@ -1860,12 +1886,6 @@ A arrayref of domains names
 A hashref containing data that should be treated as read only that all users
 can use to build their configs with.
 
-=item mail_subdomain_exists
-
-Tells the sub whether 'mail' is a separate subdomain or not for the given user
-account.  The value will either be 0 or 1 depending on if it is a separate
-subdomain or not.
-
 =back
 
 =back
@@ -1879,10 +1899,9 @@ subdomain or not.
 sub _render_and_append {
     my ($args) = @_;
 
-    my $user                  = $args->{user};
-    my $domains               = $args->{domains};
-    my $global_config_data    = $args->{global_config_data};
-    my $mail_subdomain_exists = $args->{mail_subdomain_exists};
+    my $user               = $args->{user};
+    my $domains            = $args->{domains};
+    my $global_config_data = $args->{global_config_data};
 
     my $group = _get_group_for($user);
 
@@ -2004,7 +2023,6 @@ sub _render_and_append {
                 caching    => $caching_hr,
             },
             proxysubdomains_enabled => $cpconf_hr->{proxysubdomains},
-            mail_subdomain_exists   => $mail_subdomain_exists,
         },
         sub {
             my ($out) = @_;
