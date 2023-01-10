@@ -2222,8 +2222,9 @@ EOF
                     },
                 );
 
-                local *scripts::ea_nginx_userdata::run    = sub { };
-                local *scripts::ea_nginx::_get_caching_hr = sub {
+                local *scripts::ea_nginx_userdata::run      = sub { };
+                local *scripts::ea_nginx::_get_userdata_for = sub { };
+                local *scripts::ea_nginx::_get_caching_hr   = sub {
                     return {
                         enabled       => 1,
                         inactive_time => '42m',
