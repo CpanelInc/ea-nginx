@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -783,6 +783,15 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Jan 04 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.23.3-3
+- ZC-10317: Update ngx_http_pipelog_module to v1.0.3
+- ZC-10484: Remove SIGKILL from various nginx files
+- ZC-10517: Address Ubuntu creating addiotional splitlog processes
+- ZC-10593: Close out fd's during reload/shutdown
+- EA-11088: Account for mail subdomains of addon and parked domains when configuring the server_name directive
+- EA-11121: Add ipv6 subdomain to server_name directive when account has an ipv6 address assigned
+- EA-10890: Refactor _render_and_append() to use more data from global config data
+
 * Tue Dec 27 2022 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-2
 - EA-11087: Guard against bad userdata where a domain is considered an addon domain and subdomain
 

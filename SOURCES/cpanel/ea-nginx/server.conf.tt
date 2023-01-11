@@ -1,5 +1,5 @@
 server {
-    server_name[% FOREACH domain IN domains %] [% domain %] [%- IF domain.match('^[^\*]') %] www.[% domain %][% IF !mail_subdomain_exists %] mail.[% domain %][% END %][% END %][% END %][% IF ip %] [% ip %][% END %];
+    server_name[% FOREACH domain IN domains %] [% domain %][% END %][% IF ip %] [% ip %][% END %];
     listen 80;
     [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
 
