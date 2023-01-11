@@ -18,6 +18,8 @@ use Cpanel::Config::userdata::PassengerApps  ();
 use Cpanel::DIp::IsDedicated                 ();
 use Cpanel::DomainIp                         ();
 use Cpanel::DomainLookup::DocRoot            ();
+use Cpanel::EA4::Conf                        ();
+use Cpanel::EA4::Conf::Tiny                  ();
 use Cpanel::FileGuard                        ();
 use Cpanel::FileUtils::Move                  ();
 use Cpanel::FileUtils::TouchFile             ();
@@ -314,6 +316,7 @@ sub config {
 
         my $errors = {};
         if ( $user eq '--all' ) {
+            _populate_wordpress_cache( { all => 1 } );
             my $global_config_data = _get_global_config_data();
             mkdir "/etc/nginx/conf.d/users/";
             unlink( File::Glob::bsd_glob("/etc/nginx/conf.d/users/*.conf") );
@@ -344,6 +347,7 @@ sub config {
         # Settings in this file can be affected when a new user is added
         _write_global_ea_nginx();
 
+        _populate_wordpress_cache( { user => $user } );
         my $global_config_data = _get_global_config_data();
         _write_user_conf( $user, $global_config_data );
         if ($reload) {
@@ -1277,7 +1281,7 @@ Uses template toolkit file to write '/etc/nginx/conf.d/ea-nginx.conf'
 
 sub _write_global_ea_nginx {
     my $cur_settings = _get_settings_hr();
-    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
+    my $ea4_conf_hr  = Cpanel::EA4::Conf->instance->as_hr();
 
     my $vhosts = _get_httpd_vhosts_hash();
     my %ips    = map { $vhosts->{$_}{ip} => 1 } keys %{$vhosts};
@@ -1714,7 +1718,6 @@ sub _get_logging_hr {
 
     $logging_hr->{piped_logs}          = Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
     $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
-    $logging_hr->{loglevel}            = "warn";
 
     my $global_caching = caching_global();
     $logging_hr->{enable_cache_log} = $global_caching->{logging};
@@ -1724,11 +1727,8 @@ sub _get_logging_hr {
         $logging_hr->{default_format_name} = "combined";
     }
 
-    if ( eval { require Cpanel::EA4::Conf::Tiny; 1 } ) {
-        my $e4c = Cpanel::EA4::Conf::Tiny::get_ea4_conf_hr();
-
-        $logging_hr->{loglevel} = $e4c->{loglevel};
-    }
+    my $e4c = Cpanel::EA4::Conf::Tiny::get_ea4_conf_hr();
+    $logging_hr->{loglevel} = $e4c->{loglevel} || 'warn';
 
     return $logging_hr;
 }
@@ -1895,10 +1895,6 @@ can use to build their configs with.
 
 =cut
 
-# TODO: Figure out how much of this data is not unique to the user
-#       and pass it into this sub as a hashref.  The reason is that it
-#       will allow us to gather the data before any forking happens (MCE::Loop) meaning
-#       that every fork will have it in advance.
 sub _render_and_append {
     my ($args) = @_;
 
@@ -1912,33 +1908,29 @@ sub _render_and_append {
     my $cpanel_password_protected_directories = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_password_protected_directories.json");
     my $cpanel_redirects                      = Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/cpanel_redirects.json");
 
-    my $userconf   = "/etc/nginx/conf.d/users/$user.conf";
-    my $standalone = _is_standalone();
-    $tt                ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
-    $server_tt         ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
-    $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
-    my $docroot = $docroots->{$user}{ $domains->[0] };
+    my $userconf = "/etc/nginx/conf.d/users/$user.conf";
+    $tt        ||= Template->new( { INCLUDE_PATH => "/etc/nginx/" } );
+    $server_tt ||= path("/etc/nginx/ea-nginx/server.conf.tt")->slurp;
+
+    my $user_docroots = _get_docroots_for($user);
+    my $docroot       = $user_docroots->{ $domains->[0] };
 
     my $basic_auth       = _get_basic_auth( $user, $docroot, $cpanel_password_protected_directories );
     my $redirects        = _get_redirects( $domains, $cpanel_redirects );
-    my $logging_hr       = _get_logging_hr();
     my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
     my $secruleengineoff = -e "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf" ? _get_secruleengineoff( $user => $domains ) : 0;
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
-
-    my $ipv6  = _has_ipv6();
-    my $http2 = _wants_http2();
 
     # Include numeric UID if they want it
     my $uid = ( Cpanel::PwCache::getpwnam($user) )[2] if _wants_user_id();
 
     my $fpm_socket;
     my $fpm_socket_php_major_version;
-    for my $i ( 0, 1 ) {
-        my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $domains->[$i] );
+    foreach my $dom (@$domains) {
+        my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $dom );
         if ($has_fpm) {
-            my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [ $domains->[$i] ] )->{ $domains->[$i] };
+            my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [$dom] )->{$dom};
 
             if ($php_config_ref) {
                 my ( $proxy, $socket ) = Cpanel::PHPFPM::Get::get_proxy_from_php_config_for_domain($php_config_ref);
@@ -1947,8 +1939,8 @@ sub _render_and_append {
                     $fpm_socket_php_major_version = $1;
                 }
             }
-            elsif ($standalone) {
-                warn "Could not find PHP configuration for “$domains->[$i]”, it will not be configured to use PHP-FPM\n";
+            elsif ( $global_config_data->{standalone} ) {
+                warn "Could not find PHP configuration for “$dom”, it will not be configured to use PHP-FPM\n";
             }
 
             last;
@@ -1982,13 +1974,9 @@ sub _render_and_append {
     # NOTE: this is fine to run on non-NAT systems as it just returns the same IP
     $servername_ip = Cpanel::NAT::get_public_ip($servername_ip) if $servername_ip;
 
-    my $wordpress_hr  = _get_wordpress_info( $user, $docroots->{$user}{ $domains->[0] } );
+    my $wordpress_hr  = _get_wordpress_info( $user, $user_docroots->{ $domains->[0] } );
     my $has_wordpress = ( $wordpress_hr->{docroot_install} || scalar @{ $wordpress_hr->{non_docroot_uris} } ) ? 1 : 0;
 
-    my $cpconf_hr = _get_cpconf_hr();
-
-    my $cur_settings = _get_settings_hr();
-    my $ea4_conf_hr  = eval { require Cpanel::EA4::Conf; 1 } ? Cpanel::EA4::Conf->instance->as_hr() : {};
     $tt->process(
         \$server_tt,
         {
@@ -2004,8 +1992,8 @@ sub _render_and_append {
             ( defined $uid ? ( uid => $uid ) : () ),
             proxy_ip                     => $ip,
             ip                           => $servername_ip,
-            ipv6                         => $ipv6,
-            http2                        => $http2,
+            ipv6                         => $global_config_data->{ipv6},
+            http2                        => $global_config_data->{http2},
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
             has_wordpress                => $has_wordpress,
@@ -2015,17 +2003,17 @@ sub _render_and_append {
             },
             basic_auth => $basic_auth,
             redirects  => $redirects,
-            logging    => $logging_hr,
-            ea4conf    => $ea4_conf_hr,
-            settings   => $cur_settings,
+            logging    => $global_config_data->{logging},
+            ea4conf    => $global_config_data->{e4c},
+            settings   => $global_config_data->{cur_settings},
             passenger  => {
                 apps => $passenger_apps,
             },
             behavior => {
-                standalone => $standalone,
+                standalone => $global_config_data->{standalone},
                 caching    => $caching_hr,
             },
-            proxysubdomains_enabled => $cpconf_hr->{proxysubdomains},
+            proxysubdomains_enabled => $global_config_data->{cpconf}->{proxysubdomains},
         },
         sub {
             my ($out) = @_;
@@ -2467,12 +2455,14 @@ sub _get_wp_uapi {
 my $wp_toolkit_list;
 
 sub _get_wp_toolkit_list {
+    print "Gathering wordpress data...\n";
     my $run = Cpanel::SafeRun::Object->new(
         program => $wp_toolkit_bin,
         args    => [ '--list', '-format', 'json' ],
     );
 
     warn 'Could not determine managed wordpress instances via wordpress toolkit' if $run->CHILD_ERROR();
+    print "...done gathering wordpress data\n";
 
     return eval { Cpanel::JSON::Load( $run->stdout() ) } || [];
 }
@@ -2545,37 +2535,42 @@ A hashref that appears similar to the following:
 
 =cut
 
+our %wordpress_info;
+
 sub _get_wordpress_info {
     my ( $user, $docroot ) = @_;
 
-    my $res;
+    return $wordpress_info{$docroot} if exists $wordpress_info{$docroot};
 
     my $docroot_underscore = $docroot;
     $docroot_underscore =~ s{/}{_}g;
     my $cache_file = "$wordpress_cache_dir/${user}_${docroot_underscore}_wordpress_info.json";
 
     # Returns undef if the cache_file fails to load or does not contain the required keys
-    $res = _get_wordpress_info_from_cache($cache_file) if _is_wordpress_info_cache_valid($cache_file);
-    return $res                                        if defined $res;
+    $wordpress_info{$docroot} = _get_wordpress_info_from_cache($cache_file) if _is_wordpress_info_cache_valid($cache_file);
+    return $wordpress_info{$docroot}                                        if exists $wordpress_info{$docroot};
 
-    $res = {
+    my $res = {
         docroot_install  => 0,
         non_docroot_uris => [],
     };
 
     if ( -e $wp_toolkit_bin ) {
-        $res = _get_wp_toolkit_list_for_user( $user, $docroot, $res );
+        $wordpress_info{$docroot} = _get_wp_toolkit_list_for_user( $user, $docroot, $res );
     }
     elsif ( -e '/usr/local/cpanel/Cpanel/API/WordPressInstanceManager.pm' ) {
         $wordpress_lu->{$user} ||= _get_wp_uapi($user);
-        $res = _get_wordpress_info_from_wpmanager( $docroot, $wordpress_lu->{$user}{result}{data}{instances}, $res );
+        $wordpress_info{$docroot} = _get_wordpress_info_from_wpmanager( $docroot, $wordpress_lu->{$user}{result}{data}{instances}, $res );
+    }
+    else {
+        $wordpress_info{$docroot} = $res;
     }
 
     # cache wordpress info
     _ensure_wordpress_info_cache_directory();
     _write_json( $cache_file, $res );
 
-    return $res;
+    return $wordpress_info{$docroot};
 }
 
 sub _get_wordpress_info_from_wpmanager {
@@ -3097,23 +3092,105 @@ parallel mode (MCE::Loop).
 
 =head3 RETURNS
 
-A hashref similar to the following:
-
-{
-    domain_ips => {
-        $ip => $domain,
-    },
-}
+A hashref containing data that should be considered read only
 
 =cut
 
 sub _get_global_config_data {
-    my %global_config_data;
-
-    # TODO: EA-10890 -- Gather more data to pass into _render_and_append() here
-    $global_config_data{domain_ips} = _get_domain_ips();
+    my %global_config_data = (
+        domain_ips   => _get_domain_ips(),
+        ipv6         => _has_ipv6(),
+        http2        => _wants_http2(),
+        logging      => _get_logging_hr(),
+        e4c          => Cpanel::EA4::Conf->instance->as_hr(),
+        cur_settings => _get_settings_hr(),
+        standalone   => _is_standalone(),
+        cpconf       => _get_cpconf_hr(),
+    );
 
     return \%global_config_data;
+}
+
+=head2 _populate_wordpress_cache( { all => 1 } )
+
+This populates the wordpress cache before the script starts forking so that a
+potentially expensive call to wp-toolkit will only ever be called a maximum of
+one time
+
+=over
+
+=item args
+
+A hashref containing the known args as listed below
+
+=over
+
+=item all => 1
+
+This tells the sub to populate the wordpress cache for all users
+
+=item user => $user
+
+This tells the sub to only populate the wordpress cache for the given user
+
+=back
+
+=back
+
+=cut
+
+sub _populate_wordpress_cache {
+    my ($args) = @_;
+
+    die "_populate_wordpress_cache: invalid args passed.  Either ‘all’ or ‘user’ is required\n"
+      if ( !$args->{all} && !$args->{user} );
+
+    return _populate_wordpress_cache_for_all_users()           if $args->{all};
+    return _populate_wordpress_cache_for_user( $args->{user} ) if $args->{user};
+
+    return;
+}
+
+sub _populate_wordpress_cache_for_all_users {
+    my $user_lookup = _get_user_domains();
+    foreach my $user ( sort keys %$user_lookup ) {
+        _populate_wordpress_cache_for_user($user);
+    }
+    return;
+}
+
+sub _populate_wordpress_cache_for_user {
+    my ($user) = @_;
+
+    my $docroots = _get_docroots_for($user);
+    foreach my $domain ( keys %$docroots ) {
+        _get_wordpress_info( $user, $docroots->{$domain} );
+    }
+
+    return;
+}
+
+=head2 _get_docroots_for($user)
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=head3 RETURNS
+
+A hashref where the keys are all the domains owned by the given user and the
+values represent the docroot for the given domain
+
+=cut
+
+sub _get_docroots_for {
+    my ($user) = @_;
+    $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
+    return $docroots->{$user};
 }
 
 =head2 _get_domain_ips()

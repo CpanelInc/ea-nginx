@@ -56,6 +56,7 @@ my $orig__update_for_custom_configs = \&scripts::ea_nginx::_update_for_custom_co
 my $orig__write_global_logging      = \&scripts::ea_nginx::_write_global_logging;
 my $orig__write_global_passenger    = \&scripts::ea_nginx::_write_global_passenger;
 my $orig__get_global_config_data    = \&scripts::ea_nginx::_get_global_config_data;
+my $orig__populate_wordpress_cache  = \&scripts::ea_nginx::_populate_wordpress_cache;
 
 no warnings "redefine";
 *scripts::ea_nginx::_write_user_conf           = sub { push @_write_user_conf, [ $_[0] ] };
@@ -66,6 +67,7 @@ no warnings "redefine";
 *scripts::ea_nginx::_write_global_logging      = sub { };
 *scripts::ea_nginx::_write_global_passenger    = sub { };
 *scripts::ea_nginx::_get_global_config_data    = sub { return {}; };
+*scripts::ea_nginx::_populate_wordpress_cache  = sub { };
 use warnings "redefine";
 
 our $cpanel_json_loadfiles_string = "";
@@ -2387,20 +2389,15 @@ EOF
 
                 no warnings 'redefine';
                 local *scripts::ea_nginx::_get_group_for         = sub { };
-                local *scripts::ea_nginx::_is_standalone         = sub { return 1; };
                 local *scripts::ea_nginx::_get_basic_auth        = sub { };
                 local *scripts::ea_nginx::_get_redirects         = sub { };
-                local *scripts::ea_nginx::_get_logging_hr        = sub { };
                 local *scripts::ea_nginx::_get_ssl_redirect      = sub { };
                 local *scripts::ea_nginx::_get_passenger_apps    = sub { };
                 local *scripts::ea_nginx::_get_caching_hr        = sub { };
-                local *scripts::ea_nginx::_has_ipv6              = sub { };
-                local *scripts::ea_nginx::_wants_http2           = sub { };
                 local *scripts::ea_nginx::_get_domains_with_ssls = sub { };
                 local *scripts::ea_nginx::_get_httpd_vhosts_hash = sub { };
-                local *scripts::ea_nginx::_get_cpconf_hr         = sub { };
-                local *scripts::ea_nginx::_get_settings_hr       = sub { };
                 local *scripts::ea_nginx::_wants_user_id         = sub { return 0; };
+                local *scripts::ea_nginx::_get_docroots_for      = sub { return { 'foo.tld' => '/home/foo/public_html' }; };
                 local *scripts::ea_nginx::_get_wordpress_info    = sub {
                     return {
                         docroot_install  => undef,
@@ -2424,10 +2421,6 @@ EOF
                     slurp => sub { },
                 );
 
-                my $mock_cpanel_domainlookup_docroot = Test::MockModule->new('Cpanel::DomainLookup::DocRoot')->redefine(
-                    getdocroots => sub { return 'foo.tld' => '/home/foo/public_html'; },
-                );
-
                 my $mock_cpanel_pwcache = Test::MockModule->new('Cpanel::PwCache')->redefine(
                     getpwnam => sub { return ( undef, undef, undef, undef ); },
                 );
@@ -2437,7 +2430,7 @@ EOF
                 );
 
                 my $mock_cpanel_apache_tls = Test::MockModule->new('Cpanel::Apache::TLS')->redefine(
-                    get_tls_path => sub { },
+                    get_tls_path => sub { return '/not/a/path'; },
                 );
 
                 my $mock_cpanel_domainip = Test::MockModule->new('Cpanel::DomainIp')->redefine(
@@ -2446,11 +2439,6 @@ EOF
 
                 my $mock_cpanel_nat = Test::MockModule->new('Cpanel::NAT')->redefine(
                     get_public_ip => sub { return ''; },
-                );
-
-                my $mock_cpanel_ea4_conf = Test::MockModule->new('Cpanel::EA4::Conf')->redefine(
-                    instance => sub { return bless {}, 'Cpanel::EA4::Conf'; },
-                    as_hr    => sub { },
                 );
 
                 yield;
@@ -2468,9 +2456,11 @@ EOF
                 trap {
                     scripts::ea_nginx::_render_and_append(
                         {
-                            user                  => 'foo',
-                            domains               => ['foo.tld'],
-                            global_config_data    => {},
+                            user               => 'foo',
+                            domains            => ['foo.tld'],
+                            global_config_data => {
+                                standalone => 1,
+                            },
                             mail_subdomain_exists => 0,
                         }
                     );
@@ -2785,6 +2775,8 @@ EOF
                 yield;
             };
 
+            before each => sub { no warnings 'once'; %scripts::ea_nginx::wordpress_info = (); };
+
             it 'should return the wp info from the cache file if it is valid' => sub {
                 my $called = 0;
 
@@ -2863,7 +2855,7 @@ EOF
                         docroot_install  => 0,
                         non_docroot_uris => [],
                     },
-                );
+                ) or diag explain $res;
             };
         };
 
@@ -2983,18 +2975,39 @@ EOF
                 no warnings 'redefine';
                 local *scripts::ea_nginx::_get_global_config_data = $orig__get_global_config_data;
 
-                local *scripts::ea_nginx::_get_domain_ips = sub { return { '1.2.3.4' => 'foo.tld' }; };
+                my $mock_cpanel_ea4_conf = Test::MockModule->new('Cpanel::EA4::Conf')->redefine(
+                    instance => sub { return bless {}, 'Cpanel::EA4::Conf'; },
+                    as_hr    => sub { return {}; },
+                );
+
+                local *scripts::ea_nginx::_get_domain_ips  = sub { return { '1.2.3.4' => 'foo.tld' }; };
+                local *scripts::ea_nginx::_has_ipv6        = sub { return 1; };
+                local *scripts::ea_nginx::_wants_http2     = sub { return 1; };
+                local *scripts::ea_nginx::_get_logging_hr  = sub { return {}; };
+                local *scripts::ea_nginx::_get_settings_hr = sub { return {}; };
+                local *scripts::ea_nginx::_is_standalone   = sub { return 1; };
+                local *scripts::ea_nginx::_get_cpconf_hr   = sub { return {}; };
                 yield;
             };
 
             it 'should return a hashref containing data that all users will need when being configured' => sub {
                 my $data = scripts::ea_nginx::_get_global_config_data();
+
+                # The important thing here is that it has the expected keys
+                # Everything else is tested elsewhere
                 is_deeply(
                     $data,
                     {
                         domain_ips => {
                             '1.2.3.4' => 'foo.tld',
                         },
+                        ipv6         => 1,
+                        http2        => 1,
+                        logging      => {},
+                        e4c          => {},
+                        cur_settings => {},
+                        standalone   => 1,
+                        cpconf       => {},
                     },
                 ) or diag explain $data;
             };
