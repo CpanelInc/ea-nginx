@@ -190,6 +190,13 @@ sub run {
 
     # ^^^ /need to have App::CmdDispatch do this automatically see CPANEL-22328
 
+    # Enforce acquiring a lock before continuing so that two competing processes
+    # do not stomp on each other
+    my $lock_dir = '/var/cpanel/locks';
+    mkdir( $lock_dir, 0700 ) unless -e $lock_dir;
+
+    my $nginx_config_lock = Cpanel::FileGuard->new("$lock_dir/ea-nginx-config-in-progress");
+
     # allows customers to set custom configs before ea-nginx is installed
     _update_for_custom_configs();
 
@@ -295,13 +302,6 @@ sub config {
 
     my $use_serial_mode = grep( { $_ eq '--serial' } @args ) ? 1 : 0;
     $use_serial_mode = 1 if -e $serial_touch_file;
-
-    # Enforce acquiring a config lock before continuing so that two competing
-    # config processes do not stomp on each other
-    my $lock_dir = '/var/cpanel/locks';
-    mkdir( $lock_dir, 0700 ) unless -e $lock_dir;
-
-    my $nginx_config_lock = Cpanel::FileGuard->new("$lock_dir/ea-nginx-config-in-progress");
 
     if ( $user eq '--all' || $user eq '--global' ) {
 

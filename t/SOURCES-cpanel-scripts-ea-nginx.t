@@ -159,6 +159,9 @@ describe "ea-nginx script" => sub {
         local $ENV{"scripts::ea_nginx::bail_die"} = 1;
         use warnings "redefine", "once";
 
+        my $mock_cpanel_fileguard = Test::MockModule->new('Cpanel::FileGuard');
+        $mock_cpanel_fileguard->redefine( new => sub { }, );
+
         %mi = %conf;
         Cpanel::Config::LoadUserDomains->expects("loaduserdomains")->returns( { "cpuser$$" => [], "other$$" => [] } )->maybe;
         yield;
