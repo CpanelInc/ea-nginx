@@ -111,12 +111,6 @@ rh_status() {
     status -p ${pidfile} -b ${nginx} ${nginx}
 }
 
-clean_ngx_http_pipelog_module_processes() {
-    ps -C nginx -o pid,command= --no-headers | grep "nginx: logger process" | awk '{ print $1 }' | xargs -r kill
-    ps -C splitlogs -o pid,command= --no-headers | grep "nginx/domains" | awk '{ print $1 }' | xargs -r kill
-    return 0
-}
-
 check_reload() {
     templog=`/bin/mktemp --tmpdir nginx-check-reload-XXXXXX.log`
     trap '/bin/rm -f $templog' 0
@@ -137,7 +131,6 @@ case "$1" in
         ;;
     stop)
         stop
-        clean_ngx_http_pipelog_module_processes
         ;;
     status)
         rh_status
@@ -146,31 +139,26 @@ case "$1" in
     restart)
         configtest -q || exit $RETVAL
         stop
-        clean_ngx_http_pipelog_module_processes
         start
         ;;
     upgrade)
         rh_status >/dev/null 2>&1 || exit 0
         upgrade
-        clean_ngx_http_pipelog_module_processes
         ;;
     condrestart|try-restart)
         if rh_status >/dev/null 2>&1; then
             stop
-            clean_ngx_http_pipelog_module_processes
             start
         fi
         ;;
     force-reload|reload)
         reload
-        clean_ngx_http_pipelog_module_processes
         ;;
     configtest)
         configtest
         ;;
     check-reload)
         check_reload
-        clean_ngx_http_pipelog_module_processes
         RETVAL=0
         ;;
     *)
