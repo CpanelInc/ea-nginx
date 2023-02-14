@@ -29,6 +29,7 @@ use Cpanel::HttpUtils::Vhosts::PrimaryReader ();
 use Cpanel::Hostname                         ();
 use Cpanel::JSON                             ();
 use Cpanel::NAT                              ();
+use Cpanel::OpenSSL                          ();
 use Cpanel::PHP::Config                      ();
 use Cpanel::PHPFPM::Get                      ();
 use Cpanel::PwCache                          ();
@@ -65,6 +66,9 @@ our $piped_module_conf                 = '/etc/nginx/conf.d/modules/ngx_http_pip
 our $user_id_file                      = '/etc/cpanel/ea4/option-flags/set-USER_ID';
 
 our $default_server_names_hash_bucket_size = 128;
+
+# Used to validate certificates
+my $openssl_obj;
 
 my $nginxroot = "/etc/nginx";
 
@@ -1958,7 +1962,7 @@ sub _render_and_append {
     }
 
     my $combined_tls = Cpanel::Apache::TLS->get_tls_path( $domains->[0] );
-    if ( !-f $combined_tls ) {
+    if ( !_is_certfile_valid($combined_tls) ) {
         if ( -f "/var/cpanel/ssl/cpanel/mycpanel.pem" ) {
             $combined_tls = "/var/cpanel/ssl/cpanel/mycpanel.pem";
         }
@@ -2069,6 +2073,62 @@ sub _init_logs_for {
     chown 0, 0, "/var/log/nginx/domains/$domain-bytes_log";
 
     return;
+}
+
+=head2 _is_certfile_valid()
+
+Tests if an SSL certificate file is valid
+
+=head3 RETURNS
+
+Returns false if the certificate file has been found to be invalid
+Returns true otherwise
+
+=cut
+
+sub _is_certfile_valid {
+    my ($certfile) = @_;
+
+    # It cannot be valid if it is absent or empty
+    if ( !-f $certfile || -z _ ) {
+        print "Certificate file $certfile is absent or empty; excluding from config file\n";
+        return;
+    }
+
+    # We cannot meaningfully test further if the openssl binary hasn't been found
+    # This issue will have already been reported
+    my $openssl = _get_openssl_obj();
+    return 1 unless $openssl;
+
+    my $output = $openssl->get_cert_text( { crtfile => $certfile } );
+    if ( $output->{CHILD_ERROR} ) {
+        print "Certificate file $certfile is invalid; excluding from config file: " . $output->{stderr} . "\n";
+        return;
+    }
+
+    return 1;
+}
+
+=head2 _get_openssl_obj()
+
+Gets a cached instance of a Cpanel::OpenSSL object
+If not present in the cache, then allocates & caches
+
+=head3 RETURNS
+
+Returns a Cpanel::OpenSSL instance if OpenSSL binaries are present
+Returns false otherwise
+
+=cut
+
+sub _get_openssl_obj {
+
+    $openssl_obj //= Cpanel::OpenSSL->new();
+    if ( !$openssl_obj ) {
+        warn "The openssl binary could not be located\n";
+    }
+
+    return $openssl_obj;
 }
 
 =head2 _get_homedir()
