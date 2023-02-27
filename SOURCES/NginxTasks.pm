@@ -176,9 +176,37 @@ Cpanel::TaskProcessors::NginxTasks
         return if !-e $ea_nginx_script;
         require $ea_nginx_script;
 
+        # Go through run to go through the lock code
+        # and thus avoid potential race conditions where
+        # multiple instances of the script are executing
         local $@;
-        eval { scripts::ea_nginx::_reload(); };    # Prefer _reload() here since we do not want to clear the cache
-        print STDERR "scripts::ea_nginx::_reload() $@" if $@;
+        eval { scripts::ea_nginx::run('reload'); };
+        print STDERR "scripts::ea_nginx::run('reload') $@" if $@;
+
+        return;
+    }
+
+    sub is_task_deferred {
+        my ( $self, $task, $defer_hash ) = @_;
+
+        return 1 if $self->SUPER::is_task_deferred( $task, $defer_hash );
+
+        return $self->_is_task_deferred_by_httpd_deferred_restart_time();
+    }
+
+    sub _is_task_deferred_by_httpd_deferred_restart_time {
+        my ($self) = @_;
+
+        my $pid_file = '/var/run/nginx.pid';
+
+        require Cpanel::Config::LoadCpConf;
+        my $cpconf = Cpanel::Config::LoadCpConf::loadcpconf();
+
+        if ( $cpconf->{httpd_deferred_restart_time} ) {
+            my $pidtime = ( stat $pid_file )[9];
+            return   if !$pidtime;
+            return 1 if $pidtime + $cpconf->{httpd_deferred_restart_time} > time();
+        }
 
         return;
     }
