@@ -56,7 +56,7 @@ sub RELOAD_SERVICE {
     local $@;
     eval {
         require Cpanel::ServerTasks;
-        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], 5, 'reload_service' );
+        Cpanel::ServerTasks::schedule_task( ['NginxTasks'], 30, 'reload_service' );
     };
 
     return 1;

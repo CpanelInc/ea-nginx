@@ -237,7 +237,7 @@ describe "nginx-adminbin" => sub {
 
                 is_deeply(
                     $mi{schedule_task_args},
-                    [ ['NginxTasks'], 5, 'reload_service' ],
+                    [ ['NginxTasks'], 30, 'reload_service' ],
                 ) or diag explain $mi{schedule_task_args};
 
                 unlink $hooks_module;
