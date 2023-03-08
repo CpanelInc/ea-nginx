@@ -120,8 +120,12 @@ package scripts::ea_nginx {
         push( @clear_cache_users, $user );
     }
 
-    sub _reload {
+    sub run {
         die "a horrible death" if $should_die;
+        _reload()              if grep { $_ eq 'reload' } @_;
+    }
+
+    sub _reload {
         $reload_called++;
     }
 };

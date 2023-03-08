@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 6
+%define release_prefix 7
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -783,6 +783,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Feb 27 2023 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-7
+- EA-11269: Reduce frequency of nginx restarts during cpanellogd's domain log processing when piped logging is enabled
+
 * Tue Feb 07 2023 Dan Muey <dan@cpanel.net> - 1.23.3-6
 - ZC-10615: Remove cleaning pipelog artifacts from init.d and chksrvd files
 
