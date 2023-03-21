@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -783,6 +783,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Mar 21 2023 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-8
+- EA-11298: Do not log microseconds to bytes log
+
 * Mon Feb 27 2023 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-7
 - EA-11269: Reduce frequency of nginx restarts during cpanellogd's domain log processing when piped logging is enabled
 
@@ -795,7 +798,7 @@ fi
 * Mon Jan 16 2023 Travis Holloway <t.holloway@cpanel.net> - 1.23.3-4
 - EA-11156: Avoid reloads while config subcommand is executing
 
-* Tue Jan 04 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.23.3-3
+* Wed Jan 04 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.23.3-3
 - ZC-10317: Update ngx_http_pipelog_module to v1.0.3
 - ZC-10484: Remove SIGKILL from various nginx files
 - ZC-10517: Address Ubuntu creating addiotional splitlog processes
