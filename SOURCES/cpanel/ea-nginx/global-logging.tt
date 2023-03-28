@@ -1,3 +1,7 @@
+map $msec $msec_no_microseconds {
+    ~([0-9]+)\. $1;
+}
+
 error_log /var/log/nginx/error.log [% logging.loglevel %];
 
 log_format cp_combined '$server_name:$server_port $remote_addr - $remote_user [$time_local] '
@@ -7,13 +11,13 @@ log_format cp_combined '$server_name:$server_port $remote_addr - $remote_user [$
 log_format cp_common '$server_name:$server_port $remote_addr - $remote_user [$time_local] '
     '"$request" $status $body_bytes_sent';
 
-log_format cp_bytes_server '$msec $request_length .\n$msec $bytes_sent .';
+log_format cp_bytes_server '$msec_no_microseconds $request_length .\n$msec_no_microseconds $bytes_sent .';
 
 [%- IF logging.piped_logs %]
 # pipelog_format/pipelog is from module loaded in:
 #   /etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf
 
-pipelog_format bytesvhost '$server_name $msec $request_length .\n$server_name $msec $bytes_sent .';
+pipelog_format bytesvhost '$server_name $msec_no_microseconds $request_length .\n$server_name $msec_no_microseconds $bytes_sent .';
 
 pipelog_format combinedvhost '$server_name:$server_port $remote_addr - $remote_user [$time_local] '
     '"$request" $status $body_bytes_sent '
