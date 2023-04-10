@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -783,6 +783,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Apr 05 2023 Travis Holloway <t.holloway@cpanel.net> - 1.23.4-2
+- EA-11324: Wrap docroot in quotes so that docroots that contain semicolons do not break the config
+
 * Wed Mar 29 2023 Cory McIntire <cory@cpanel.net> - 1.23.4-1
 - EA-11323: Update ea-nginx from v1.23.3 to v1.23.4
 
