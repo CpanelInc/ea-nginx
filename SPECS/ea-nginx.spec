@@ -773,6 +773,7 @@ rm -rf  /etc/nginx/conf.d/global-logging.conf
 rm -rf /etc/nginx/ea-nginx/cpanel_localhost_header.json
 
 if [ $1 -eq 0 ]; then
+    rm -rf /var/log/nginx.uninstall ||:
     mv -fv /var/log/nginx /var/log/nginx.uninstall ||:
 fi
 
@@ -785,6 +786,7 @@ fi
 %changelog
 * Tue Apr 25 2023 Travis Holloway <t.holloway@cpanel.net> - 1.24.0-2
 - EA-11131: Ensure userdata reflects apache port changes when ea-nginx is removed
+- EA-11132: Ensure '/var/log/nginx.uninstall' does not exist before moving active log files there
 
 * Wed Apr 12 2023 Cory McIntire <cory@cpanel.net> - 1.24.0-1
 - EA-11350: Update ea-nginx from v1.23.4 to v1.24.0
