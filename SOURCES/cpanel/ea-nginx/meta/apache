@@ -10,6 +10,7 @@ use warnings;
 use Path::Tiny;
 use JSON::Syck                      ();
 use Cpanel::SafeRun::Object         ();
+use Cpanel::ServerTasks             ();
 use Cpanel::Transaction::File::JSON ();
 
 my $meta_dir = "/etc/nginx/ea-nginx/meta";
@@ -99,6 +100,8 @@ sub move_apache_back_to_orig_ports {
             _set_settings($cur_settings);
         }
     }
+
+    Cpanel::ServerTasks::schedule_task( ['ApacheTasks'], 5, 'userdata_update' );
 }
 
 ###############
