@@ -141,7 +141,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -784,6 +784,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Fri May 05 2023 Travis Holloway <t.holloway@cpanel.net> - 1.24.0-3
+- EA-11397: Ensure deb package moves '/var/log/nginx' to '/var/log/nginx.uninstall' upon removal
+
 * Tue Apr 25 2023 Travis Holloway <t.holloway@cpanel.net> - 1.24.0-2
 - EA-11131: Ensure userdata reflects apache port changes when ea-nginx is removed
 - EA-11132: Ensure '/var/log/nginx.uninstall' does not exist before moving active log files there
