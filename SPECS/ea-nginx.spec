@@ -61,11 +61,6 @@ BuildRequires: ea-libcurl >= 7.68.0-2
 BuildRequires: ea-libcurl-devel >= 7.68.0-2
 %endif
 
-%if 0%{?rhel} > 6
-BuildRequires: ea-modsec30
-BuildRequires: ea-modsec30-connector-nginx
-%endif
-
 %if 0%{?rhel} == 6
 %define _group System Environment/Daemons
 Requires(pre): shadow-utils
@@ -127,13 +122,8 @@ BuildRequires: systemd
 %endif
 %endif
 
-%if 0%{?rhel} > 6
-%define WITH_CC_OPT $(echo "%{BASE_WITH_CC_OPT} -I/opt/cpanel/ea-modsec30/include")
-%define WITH_LD_OPT $(echo "%{BASE_WITH_LD_OPT} -Wl,-rpath=/opt/cpanel/ea-modsec30/lib")
-%else
 %define WITH_CC_OPT $(echo "%{BASE_WITH_CC_OPT}")
 %define WITH_LD_OPT $(echo "%{BASE_WITH_LD_OPT}")
-%endif
 
 %define BASE_CONFIGURE_ARGS $(echo "--prefix=%{_sysconfdir}/nginx --sbin-path=%{_sbindir}/nginx --modules-path=%{_libdir}/nginx/modules --conf-path=%{_sysconfdir}/nginx/nginx.conf --error-log-path=%{_localstatedir}/log/nginx/error.log --http-log-path=%{_localstatedir}/log/nginx/access.log --pid-path=%{_localstatedir}/run/nginx.pid --lock-path=%{_localstatedir}/run/nginx.lock --http-client-body-temp-path=%{_localstatedir}/cache/nginx/client_temp --http-proxy-temp-path=%{_localstatedir}/cache/nginx/proxy_temp --http-fastcgi-temp-path=%{_localstatedir}/cache/nginx/fastcgi_temp --http-uwsgi-temp-path=%{_localstatedir}/cache/nginx/uwsgi_temp --http-scgi-temp-path=%{_localstatedir}/cache/nginx/scgi_temp --user=%{nginx_user} --group=%{nginx_group} --with-compat --with-file-aio --with-threads --with-http_addition_module --with-http_auth_request_module --with-http_dav_module --with-http_flv_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_mp4_module --with-http_random_index_module --with-http_realip_module --with-http_secure_link_module --with-http_slice_module --with-http_ssl_module --with-http_stub_status_module --with-http_sub_module --with-http_v2_module --with-mail --with-mail_ssl_module --with-stream --with-stream_realip_module --with-stream_ssl_module --with-stream_ssl_preread_module --with-openssl-opt=enable-tls1_3 --with-openssl-opt=no-nextprotoneg")
 
@@ -141,7 +131,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -200,10 +190,6 @@ configured as a caching reverse-proxy by default.
 This setup results in faster time to first byte
 and often less load on a busy server.
 
-%if 0%{?suse_version} >= 1315
-%debug_package
-%endif
-
 %package ngxdev
 Group: Development/Tools
 Summary: Simplify making EA4 pkgs of NGINX modules
@@ -257,8 +243,6 @@ export EXTRA_LDFLAGS=$LDFLAGS
 
 %if 0%{?rhel} > 6
 export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
-export MODSECURITY_LIB=/opt/cpanel/ea-modsec30/lib
-export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
 %endif
 
 # build debug
@@ -268,7 +252,6 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
     --with-debug \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
-    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
     --add-dynamic-module=ngx_http_pipelog_module
@@ -281,7 +264,6 @@ make %{?_smp_mflags}
     --with-ld-opt="%{WITH_LD_OPT}" \
     --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
-    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
     --add-dynamic-module=ngx_http_pipelog_module
@@ -516,7 +498,6 @@ rm -rf %{bdir}/_passenger_source_code
 %attr(0755,root,root) %dir %{_libdir}/nginx/modules
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_pipelog_module.so
 %if 0%{?rhel} > 6
-%attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_modsecurity_module.so
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_brotli_filter_module.so
 %attr(0755,root,root) %{_libdir}/nginx/modules/ngx_http_brotli_static_module.so
 %endif
@@ -784,6 +765,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon May 31 2023 Dan Muey <dan@cpanel.net> - 1.25.0-2
+- ZC-10395: Remove modsec 3 from build
+
 * Wed May 24 2023 Cory McIntire <cory@cpanel.net> - 1.25.0-1
 - EA-11442: Update ea-nginx from v1.24.0 to v1.25.0
 

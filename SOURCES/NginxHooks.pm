@@ -26,6 +26,7 @@ sub describe {
         'Lang::PHP::set_system_default_version',
         'Lang::PHP::ini_set_directives',
     );
+
     my @script_php_fpm_config_actions = map {
         {
             'category' => 'scripts',
@@ -37,40 +38,7 @@ sub describe {
     } (
         'php_fpm_config',
     );
-    my @modsecurity_category = map {
-        {
-            'category' => 'ModSecurity',
-            'event'    => $_,
-            'stage'    => 'post',
 
-            # NOTE: this is an admin bin, but is called on the raised
-            # privileges side
-
-            'hook'     => 'NginxHooks::_modsecurity_user',
-            'exectype' => 'module',
-        }
-    } (
-        'adjust_secruleengineoff',
-    );
-    my @modsec_vendor = map {
-        {
-            'category' => 'scripts',
-            'event'    => $_,
-            'stage'    => 'post',
-            'hook'     => 'NginxHooks::_rebuild_global',
-            'exectype' => 'module',
-        }
-    } (
-        'modsec_vendor::add',
-        'modsec_vendor::remove',
-        'modsec_vendor::update',
-        'modsec_vendor::enable',
-        'modsec_vendor::disable',
-        'modsec_vendor::enable_updates',
-        'modsec_vendor::disable_updates',
-        'modsec_vendor::enable_configs',
-        'modsec_vendor::disable_configs',
-    );
     my @build_apache_conf = map {
         {
             'category' => 'scripts',
@@ -82,43 +50,7 @@ sub describe {
     } (
         'build_apache_conf',
     );
-    my @global_actions = map {
-        {
-            'category' => 'Whostmgr',
-            'event'    => $_,
-            'stage'    => 'post',
-            'hook'     => 'NginxHooks::_rebuild_global',
-            'exectype' => 'module',
-        }
-    } (
-        'ModSecurity::modsec_add_rule',
-        'ModSecurity::modsec_add_vendor',
-        'ModSecurity::modsec_assemble_config_text',
-        'ModSecurity::modsec_batch_settings',
-        'ModSecurity::modsec_clone_rule',
-        'ModSecurity::ModsecCpanelConf::manipulate',
-        'ModSecurity::modsec_deploy_all_rule_changes',
-        'ModSecurity::modsec_deploy_rule_changes',
-        'ModSecurity::modsec_deploy_settings_changes',
-        'ModSecurity::modsec_disable_rule',
-        'ModSecurity::modsec_disable_vendor',
-        'ModSecurity::modsec_disable_vendor_configs',
-        'ModSecurity::modsec_disable_vendor_updates',
-        'ModSecurity::modsec_discard_rule_changes',
-        'ModSecurity::modsec_edit_rule',
-        'ModSecurity::modsec_enable_vendor',
-        'ModSecurity::modsec_enable_vendor_configs',
-        'ModSecurity::modsec_enable_vendor_updates',
-        'ModSecurity::modsec_make_config_active',
-        'ModSecurity::modsec_make_config_inactive',
-        'ModSecurity::modsec_remove_rule',
-        'ModSecurity::modsec_remove_setting',
-        'ModSecurity::modsec_remove_vendor',
-        'ModSecurity::modsec_set_config_text',
-        'ModSecurity::modsec_set_setting',
-        'ModSecurity::modsec_undisable_rule',
-        'ModSecurity::modsec_update_vendor',
-    );
+
     my @just_clear_cache_actions = map {
         {
             'category' => 'Whostmgr',
@@ -131,6 +63,7 @@ sub describe {
         'Accounts::suspendacct',
         'Accounts::unsuspendacct',
     );
+
     my @rebuild_user_actions = map {
         {
             'category' => 'Whostmgr',
@@ -232,9 +165,6 @@ sub describe {
     my $hook_ar = [
         @adminbin_actions,
         @build_apache_conf,
-        @global_actions,
-        @modsecurity_category,
-        @modsec_vendor,
         @normal_actions,
         @rebuild_user_actions,
         @phpfpm_actions,
@@ -302,24 +232,6 @@ sub _possible_php_fpm {
         };
         return $@ ? ( 0, $@ ) : ( 1, "Success" );
     }
-}
-
-sub _modsecurity_user {
-    my ( $hook, $event ) = @_;
-
-    local $@;
-
-    if ( exists $event->{user} ) {
-        my $cpuser = $event->{user};
-
-        Cpanel::Debug::log_info("_modsecurity_user: adjust_secruleengineoff :$cpuser:");
-        eval {
-            require Cpanel::ServerTasks;
-            Cpanel::ServerTasks::schedule_task( ['NginxTasks'], NginxHooks::get_time_to_wait(0), "rebuild_user $cpuser" );
-        };
-    }
-
-    return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
 sub _php_fpm_config {
