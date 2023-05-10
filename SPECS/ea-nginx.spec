@@ -51,6 +51,7 @@ Requires: %{ruby_version}
 
 Requires: apache24-passenger
 Requires: ea-apache24-mod_remoteip
+Conflicts: ea-modsec30-connector-nginx < 1.0.3-2
 
 %if 0%{?rhel} >= 8
 # In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
