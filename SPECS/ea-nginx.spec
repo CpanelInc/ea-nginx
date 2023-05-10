@@ -530,15 +530,6 @@ rm -rf %{bdir}/_passenger_source_code
 /opt/cpanel/ea-nginx-ngxdev
 
 %pre
-if test -f "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf"; then
-    if test ! -f "/usr/lib64/nginx/modules/ngx_http_modsecurity_module.so"; then
-        echo "It looks like ea-nginx is upgrading but ea-modsec30-connector-nginx is not!"
-        echo "\tUntil ea-modsec30-connector-nginx is uphraded mod sec 3.0 for NGINX will not be active!"
-        echo "\tif ea-modsec30-connector-nginx is part of this transaction that may happen automatically!"
-        rm -rf /etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf
-    fi
-fi
-
 # Other nginx implementations can leave behind stray config files when they are removed.
 # As such, we make a best effort to ensure a clean config when ea-nginx is installed
 if [ $1 = 1 ]; then
@@ -613,16 +604,6 @@ getent passwd %{nginx_user} >/dev/null || \
 exit 0
 
 %post
-# not needed in SOURCES/pkg.postinst because this doe not apply to debs
-if test -f "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf"; then
-    if test ! -f "/usr/lib64/nginx/modules/ngx_http_modsecurity_module.so"; then
-        echo "It looks like ea-nginx is upgrading but ea-modsec30-connector-nginx is not!"
-        echo "\tUntil ea-modsec30-connector-nginx is uphraded mod sec 3.0 for NGINX will not be active!"
-        echo "\tif ea-modsec30-connector-nginx is part of this transaction that may happen automatically!"
-        rm -rf /etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf
-    fi
-fi
-
 # DRAGONS:  if you update this, then SOURCES/pkg.postinst needs updated with the same changes
 
 # Register the nginx service
