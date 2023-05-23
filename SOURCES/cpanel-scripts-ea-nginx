@@ -704,7 +704,7 @@ sub caching_defaults {    # do not want `our %caching_defaults` or a hash refere
         proxy_cache_background_update => "on",
         proxy_cache_revalidate        => "on",
         proxy_cache_min_uses          => 1,
-        proxy_cache_lock              => "on",
+        proxy_cache_lock              => "off",
     );
 }
 
@@ -1016,11 +1016,11 @@ sub _write_global_default {
 
     my @lines = split /\n/, $content;
     foreach my $line (@lines) {
-        if ( $line =~ /^(.*listen\s+(?:\[::\]:)?)443\s+ssl\s*(?:http2)?\s*;/ ) {
-            $line = _wants_http2() ? "${1}443 ssl http2;" : "${1}443 ssl;";
+        if ( $line =~ /^(.*listen\s+(?:\[::\]:)?)443\s+ssl\s*(?:http2)?\s+reuseport\s*;/ ) {
+            $line = _wants_http2() ? "${1}443 ssl http2 reuseport;" : "${1}443 ssl reuseport;";
         }
 
-        if ( $line =~ /^.*(listen\s+\[::\]:[0-9]+\s*(?:ssl)?(?:\s*http2)?\s*;)/ ) {
+        if ( $line =~ /^.*(listen\s+\[::\]:[0-9]+\s*(?:ssl)?(?:\s*http2)?\s+reuseport\s*;)/ ) {
             $line = "    $prefix$1";
         }
         elsif ( $line =~ /^\s*(ssl_certificate(?:_key)?)\s+/ ) {
@@ -1602,7 +1602,7 @@ A hashref similar to the following:
         '404' => '1m'
     },
     'zone_size' => '10m',
-    'proxy_cache_lock' => 'on',
+    'proxy_cache_lock' => 'off',
     'proxy_cache_revalidate' => 'on',
     'proxy_cache_background_update' => 'on',
     'levels' => '1:2',
