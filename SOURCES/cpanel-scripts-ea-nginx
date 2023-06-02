@@ -28,6 +28,7 @@ use Cpanel::HttpUtils::ApRestart::BgSafe     ();
 use Cpanel::HttpUtils::Vhosts::PrimaryReader ();
 use Cpanel::Hostname                         ();
 use Cpanel::JSON                             ();
+use Cpanel::Kernel                           ();
 use Cpanel::NAT                              ();
 use Cpanel::OpenSSL                          ();
 use Cpanel::PHP::Config                      ();
@@ -1925,6 +1926,7 @@ sub _render_and_append {
     my $secruleengineoff = -e "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf" ? _get_secruleengineoff( $user => $domains ) : 0;
     my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
+    my $reuseport        = Cpanel::Kernel::system_is_at_least('3.9.0') ? 1 : 0;
 
     # Include numeric UID if they want it
     my $uid = ( Cpanel::PwCache::getpwnam($user) )[2] if _wants_user_id();
@@ -1998,6 +2000,7 @@ sub _render_and_append {
             ip                           => $servername_ip,
             ipv6                         => $global_config_data->{ipv6},
             http2                        => $global_config_data->{http2},
+            reuseport                    => $reuseport,
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
             has_wordpress                => $has_wordpress,
