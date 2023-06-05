@@ -10,16 +10,36 @@ use strict;
 use warnings;
 
 use lib "../ea-tools/lib/ea4_tool";    # assumes ea-tools is checked out next to this repo
-use ea4_tool::util ();
+
+use ea4_tool::cmd::change  ();
+use ea4_tool::cmd::list    ();
+use ea4_tool::cmd::obs     ();
+use ea4_tool::cmd::refresh ();
+use ea4_tool::util         ();
+
 use File::chdir;
 use Path::Tiny;
+use Try::Tiny;
+
+our $case;
 
 exit( run(@ARGV) ? 0 : 1 ) if !caller;
 
 sub run {
     my ( $old_ver, $new_ver ) = @_;
 
-    # Update the include binary for debian to the newest sourceball version
+    _update_include_binary( $old_ver, $new_ver );
+    _update_nginx_module_pkgs($new_ver);
+
+    print "Done!\n";
+    return 1;
+}
+
+sub _update_include_binary {
+    my ( $old_ver, $new_ver ) = @_;
+
+    print "Update the include binary for debian to the newest sourceball version\n";
+
     my $file  = 'debify/debian/source/include-binaries';
     my @lines = path($file)->lines;
     foreach my $line (@lines) {
@@ -38,8 +58,82 @@ sub run {
     $git->run( commit => "-m", "$branch: ea4-tool-post-update update include-binaries to new tarball" );
     ea4_tool::util::pushup( $git, $branch );
 
-    print "Done!\n";
-    return 1;
+    return;
+}
+
+sub _update_nginx_module_pkgs {
+    my ($new_ver) = @_;
+
+    foreach my $repo ( ea4_tool::cmd::list::run() ) {
+        _check_if_repo_needs_update( $new_ver, $repo ) if $repo =~ m/^ea-nginx-/;
+    }
+
+    return;
+}
+
+sub _check_if_repo_needs_update {
+    my ( $new_ver, $repo ) = @_;
+
+    # need to get the case before we start changing CWD
+    my $case = _get_case();
+
+    local $CWD = try {
+        ea4_tool::util::get_path_of_repo($repo);
+    }
+    catch {
+        # ea4_tool::cmd::refresh::run();
+        ea4_tool::util::get_path_of_repo($repo);
+    };
+
+    my $spec       = ea4_tool::util::specfile($CWD);
+    my @spec_lines = path($spec)->lines;
+    foreach my $line (@spec_lines) {
+        if ( $line =~ m/^\s*BuildRequires:\s+ea-nginx-ngxdev\s*$/ ) {
+            _update_repo( $new_ver, $repo, $case );
+            last;
+        }
+    }
+
+    return;
+}
+
+sub _get_case {
+
+    return $case if $case;
+
+    my $git    = ea4_tool::util::git($CWD);
+    my $branch = $git->current_branch();
+
+    if ( $branch =~ m/^(.*)-ea-nginx$/ ) {
+        $case = $1;
+    }
+
+    die "Could not determine case" if !$case;
+    return $case;
+}
+
+sub _update_repo {
+    my ( $new_ver, $repo, $case ) = @_;
+
+    print "Updating “$repo” to show the version of nginx the module built against\n";
+
+    my $changelog = "Build against ea-nginx version v$new_ver";
+
+    ea4_tool::cmd::change::run( undef, $repo, $case, $changelog );
+
+    my $git    = ea4_tool::util::git($CWD);
+    my $branch = $git->current_branch();
+    ea4_tool::util::pushup( $git, $branch );
+
+    my $gitapi = ea4_tool::util::gitapi->new();
+    my $title  = "$case: $changelog";
+
+    $gitapi->create_pull_request( $repo => $title, $branch => "master" );
+
+    print "Build $repo in home directory\n";
+    ea4_tool::cmd::obs::run( undef, '--file-list-changed=0' );
+
+    return;
 }
 
 1;
