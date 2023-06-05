@@ -81,7 +81,7 @@ sub _check_if_repo_needs_update {
         ea4_tool::util::get_path_of_repo($repo);
     }
     catch {
-        # ea4_tool::cmd::refresh::run();
+        ea4_tool::cmd::refresh::run();
         ea4_tool::util::get_path_of_repo($repo);
     };
 
