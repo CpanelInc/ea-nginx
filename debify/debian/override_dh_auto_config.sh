@@ -28,8 +28,6 @@ export CFLAGS="$CFLAGS $WITH_CC_OPT -I/usr/include/x86_64-linux-gnu -I/usr/inclu
 export EXTRA_CFLAGS=$CFLAGS
 export EXTRA_CXXFLAGS=$CFLAGS
 export EXTRA_LDFLAGS=$LDFLAGS
-export MODSECURITY_LIB=/opt/cpanel/ea-modsec30/lib
-export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
 
 #sed -i '6iset -x' configure
 #sed -i '42iecho ""; echo "SHOW"; cat -n $NGX_AUTOTEST.c; echo "END SHOW"' auto/feature
@@ -38,10 +36,10 @@ export MODSECURITY_INC=/opt/cpanel/ea-modsec30/include
 #build debug
 ./configure $BASE_CONFIGURE_ARGS \
     --with-cc-opt="$WITH_CC_OPT" \
+    --with-ld-opt="$WITH_LD_OPT" \
     --with-debug \
     --with-ipv6 \
     --add-module=$bdir/_passenger_source_code/src/nginx_module \
-    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
     --add-dynamic-module=ngx_http_pipelog_module
 
@@ -55,7 +53,6 @@ mv $bdir/objs/nginx $bdir/objs/nginx-debug
     --with-ld-opt="$WITH_LD_OPT" \
     --with-ipv6 \
     --add-module=$bdir/_passenger_source_code/src/nginx_module \
-    --add-dynamic-module=/opt/cpanel/ea-modsec30-connector-nginx \
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
     --add-dynamic-module=ngx_http_pipelog_module
 
