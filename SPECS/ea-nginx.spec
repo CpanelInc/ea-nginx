@@ -132,7 +132,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -766,6 +766,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Jun 06 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.0-3
+- EA-11462: Return a 403 for htaccess file location match
+
 * Wed May 31 2023 Dan Muey <dan@cpanel.net> - 1.25.0-2
 - ZC-10395: Remove modsec 3 from build
 
