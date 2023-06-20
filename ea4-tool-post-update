@@ -65,7 +65,7 @@ sub _update_nginx_module_pkgs {
     my ($new_ver) = @_;
 
     foreach my $repo ( ea4_tool::cmd::list::run() ) {
-        _check_if_repo_needs_update( $new_ver, $repo ) if $repo =~ m/^ea-nginx-/;
+        _check_if_repo_needs_update( $new_ver, $repo ) if $repo =~ m/nginx/;
     }
 
     return;

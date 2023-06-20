@@ -848,7 +848,7 @@ describe "ea-nginx script" => sub {
                 proxy_cache_background_update => "on",
                 proxy_cache_revalidate        => "on",
                 proxy_cache_min_uses          => 1,
-                proxy_cache_lock              => "on",
+                proxy_cache_lock              => "off",
             };
         };
 
@@ -1905,7 +1905,7 @@ EOF
                 $mi{mock_path_tiny} = Test::MockModule->new('Path::Tiny');
                 $mi{mock_path_tiny}->redefine(
                     path  => sub { return bless {}, 'Path::Tiny'; },
-                    slurp => sub { return "    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    include conf.d/server-includes/*.conf;"; },
+                    slurp => sub { return "    listen 80 reuseport;\n    listen [::]:80 reuseport;\n    listen 443 ssl reuseport;\n    listen [::]:443 ssl reuseport;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    include conf.d/server-includes/*.conf;"; },
                     spew  => sub { $content = pop @_; },
                 );
                 yield;
@@ -1915,7 +1915,7 @@ EOF
 
             it 'should add a configuration for IPv6 if it is enabled (http2 disabled)' => sub {
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen \[::\]:80;/m );
+                like( $content, qr/^\s*listen \[::\]:80 reuseport;/m );
             };
 
             it 'should add a configuration for IPv6 if it is enabled (http2 enabled)' => sub {
@@ -1923,7 +1923,7 @@ EOF
                 local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
                 use warnings 'redefine';
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen \[::\]:80;/m );
+                like( $content, qr/^\s*listen \[::\]:80 reuseport;/m );
             };
 
             it 'should add a comment stating that IPv6 is not enabled if it is disabled (http2 disabled)' => sub {
@@ -1963,12 +1963,12 @@ EOF
                 use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen 443 ssl http2;/m );
+                like( $content, qr/^\s*listen 443 ssl http2 reuseport;/m );
             };
 
             it 'should not configure port 443 to use http2 if it is not enabled (ipv6 enabled)' => sub {
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen 443 ssl;/m );
+                like( $content, qr/^\s*listen 443 ssl reuseport;/m );
             };
 
             it 'should configure port 443 to use http2 if it is enabled (ipv6 disabled)' => sub {
@@ -1978,7 +1978,7 @@ EOF
                 use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl http2;/m );
+                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl http2 reuseport;/m );
             };
 
             it 'should not configure port 443 to use http2 if it is not enabled (ipv6 disabled)' => sub {
@@ -1987,7 +1987,7 @@ EOF
                 use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl;/m );
+                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl reuseport;/m );
             };
 
             it 'should configure USER_ID if the set-USER_ID touch file is in place (initially missing from file)' => sub {
@@ -2005,7 +2005,7 @@ EOF
                 use warnings 'redefine';
 
                 $mi{mock_path_tiny}->redefine(
-                    slurp => sub { return qq[    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
+                    slurp => sub { return qq[    listen 80 reuseport;\n    listen [::]:80 reuseport;\n    listen 443 ssl reuseport;\n    listen [::]:443 ssl reuseport;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
                 );
 
                 scripts::ea_nginx::_write_global_default();
@@ -2018,7 +2018,7 @@ EOF
                 use warnings 'redefine';
 
                 $mi{mock_path_tiny}->redefine(
-                    slurp => sub { return qq[    listen 80;\n    listen [::]:80;\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
+                    slurp => sub { return qq[    listen 80 reuseport;\n    listen [::]:80 reuseport;\n    listen 443 ssl reuseport;\n    listen [::]:443 ssl reuseport;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
                 );
 
                 scripts::ea_nginx::_write_global_default();
@@ -2068,8 +2068,8 @@ EOF
                 my $slurp = <<'EOF';
 server {
     server_name cpanel.*;
-    listen 80;
-    listen [::]:80;
+    listen 80 reuseport;
+    listen [::]:80 reuseport;
     # set $USER_ID "";
     return 301 https://$host$request_uri;
 }
@@ -2091,7 +2091,7 @@ EOF
                 use warnings 'redefine';
 
                 scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl();
-                like( $content, qr/listen \[::\]:80;/ );
+                like( $content, qr/listen \[::\]:80 reuseport;/ );
             };
 
             it 'should add a comment stating that IPv6 is not enabled if it is disabled' => sub {
