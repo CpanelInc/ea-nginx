@@ -1,7 +1,7 @@
 server {
     server_name[% FOREACH domain IN domains %] [% domain %][% END %][% IF ip %] [% ip %][% END %];
-    listen 80[% IF reuseport %] reuseport[% END %];
-    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80[% IF reuseport %] reuseport[% END %];
+    listen 80;
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
 
     [%- IF secruleengineoff %]
     modsecurity off;
@@ -41,8 +41,10 @@ server {
     [% END -%]
     [% END -%]
 
-    listen 443 ssl[% IF http2 %] http2[% END %][% IF reuseport %] reuseport[% END %];
-    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF http2 %] http2[% END %][% IF reuseport %] reuseport[% END %];
+    listen 443 ssl;
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl;
+
+    http2 [% http2 %];
 
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
@@ -254,11 +256,13 @@ server {
 }
 [%- IF ssl_certificate && ssl_certificate_key && proxysubdomains_enabled && service_subdomains.size %]
 server {
-    listen 80[% IF reuseport %] reuseport[% END %];
-    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80[% IF reuseport %] reuseport[% END %];
+    listen 80;
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80;
 
-    listen 443 ssl[% IF http2 %] http2[% END %][% IF reuseport %] reuseport[% END %];
-    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF http2 %] http2[% END %][% IF reuseport %] reuseport[% END %];
+    listen 443 ssl;
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl;
+
+    http2 [% http2 %];
 
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
