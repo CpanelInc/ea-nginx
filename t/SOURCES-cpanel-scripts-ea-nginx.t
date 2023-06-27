@@ -55,6 +55,7 @@ my $orig__do_other_global_config    = \&scripts::ea_nginx::_do_other_global_conf
 my $orig__update_for_custom_configs = \&scripts::ea_nginx::_update_for_custom_configs;
 my $orig__write_global_logging      = \&scripts::ea_nginx::_write_global_logging;
 my $orig__write_global_passenger    = \&scripts::ea_nginx::_write_global_passenger;
+my $orig__write_global_default      = \&scripts::ea_nginx::_write_global_default;
 my $orig__get_global_config_data    = \&scripts::ea_nginx::_get_global_config_data;
 my $orig__populate_wordpress_cache  = \&scripts::ea_nginx::_populate_wordpress_cache;
 
@@ -66,6 +67,7 @@ no warnings "redefine";
 *scripts::ea_nginx::_update_for_custom_configs = sub { };
 *scripts::ea_nginx::_write_global_logging      = sub { };
 *scripts::ea_nginx::_write_global_passenger    = sub { };
+*scripts::ea_nginx::_write_global_default      = sub { };
 *scripts::ea_nginx::_get_global_config_data    = sub { return {}; };
 *scripts::ea_nginx::_populate_wordpress_cache  = sub { };
 use warnings "redefine";
@@ -193,7 +195,6 @@ describe "ea-nginx script" => sub {
 
                 local *scripts::ea_nginx::_write_global_cpanel_localhost     = sub { };
                 local *scripts::ea_nginx::_write_global_nginx_conf           = sub { };
-                local *scripts::ea_nginx::_write_global_default              = sub { };
                 local *scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl = sub { };
                 local *scripts::ea_nginx::ensure_valid_nginx_config          = sub { };
 
@@ -1893,136 +1894,38 @@ EOF
         };
 
         describe "_write_global_default" => sub {
-            share my %mi;
-            my $content;
+            my $data;
             around {
-                my $mockfile = Test::MockFile->file( "/var/cpanel/ssl/cpanel/mycpanel.pem", "this is an ssl for real though" );
+                no warnings 'redefine', 'once';
+                local *scripts::ea_nginx::_write_global_default = $orig__write_global_default;
 
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_has_ipv6    = sub { return 1; };
-                local *scripts::ea_nginx::_wants_http2 = sub { return 0; };
-
-                $mi{mock_path_tiny} = Test::MockModule->new('Path::Tiny');
-                $mi{mock_path_tiny}->redefine(
-                    path  => sub { return bless {}, 'Path::Tiny'; },
-                    slurp => sub { return "    listen 80 reuseport;\n    listen [::]:80 reuseport;\n    listen 443 ssl reuseport;\n    listen [::]:443 ssl reuseport;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    include conf.d/server-includes/*.conf;"; },
-                    spew  => sub { $content = pop @_; },
+                my $mock_cpanel_kernel = Test::MockModule->new('Cpanel::Kernel')->redefine(
+                    system_is_at_least => sub { return 1; },
                 );
+
+                local *scripts::ea_nginx::_has_ipv6      = sub { return 1; };
+                local *scripts::ea_nginx::_wants_http2   = sub { return 1; };
+                local *scripts::ea_nginx::_wants_user_id = sub { return 1; };
+
+                my $mock_mycpanel_pem = Test::MockFile->file( '/var/cpanel/ssl/cpanel/mycpanel.pem', 'I am groot' );
+
+                local *scripts::ea_nginx::_render_tt_to_file = sub { $data = pop @_; };
                 yield;
             };
 
-            before each => sub { $content = undef; };
-
-            it 'should add a configuration for IPv6 if it is enabled (http2 disabled)' => sub {
+            it 'should render ‘default.conf.tt’ to ‘default.conf’ with the expected data' => sub {
                 scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen \[::\]:80 reuseport;/m );
-            };
-
-            it 'should add a configuration for IPv6 if it is enabled (http2 enabled)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
-                use warnings 'redefine';
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen \[::\]:80 reuseport;/m );
-            };
-
-            it 'should add a comment stating that IPv6 is not enabled if it is disabled (http2 disabled)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_has_ipv6 = sub { return 0; };
-                use warnings 'redefine';
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/# server does not have IPv6 enabled:/ );
-            };
-
-            it 'should add a comment stating that IPv6 is not enabled if it is disabled (http2 enabled)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_has_ipv6    = sub { return 0; };
-                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
-                use warnings 'redefine';
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/# server does not have IPv6 enabled:/ );
-            };
-
-            it 'should set default.conf to use mycpanel.pem for its ssl certificate if it exists' => sub {
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr{ssl_certificate_key\s+/var/cpanel/ssl/cpanel/mycpanel\.pem} );
-            };
-
-            it 'should set default.conf to use cpanel.pem for its ssl certificate if mycpanel.pem is missing' => sub {
-                unlink '/var/cpanel/ssl/cpanel/mycpanel.pem';
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr{ssl_certificate_key\s+/var/cpanel/ssl/cpanel/cpanel\.pem} );
-            };
-
-            it 'should configure port 443 to use http2 if it is enabled (ipv6 enabled)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
-                use warnings 'redefine';
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen 443 ssl http2 reuseport;/m );
-            };
-
-            it 'should not configure port 443 to use http2 if it is not enabled (ipv6 enabled)' => sub {
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*listen 443 ssl reuseport;/m );
-            };
-
-            it 'should configure port 443 to use http2 if it is enabled (ipv6 disabled)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_has_ipv6    = sub { return 0; };
-                local *scripts::ea_nginx::_wants_http2 = sub { return 1; };
-                use warnings 'redefine';
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl http2 reuseport;/m );
-            };
-
-            it 'should not configure port 443 to use http2 if it is not enabled (ipv6 disabled)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_has_ipv6 = sub { return 0; };
-                use warnings 'redefine';
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*# server does not have IPv6 enabled: listen \[::\]:443 ssl reuseport;/m );
-            };
-
-            it 'should configure USER_ID if the set-USER_ID touch file is in place (initially missing from file)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_wants_user_id = sub { return 1; };
-                use warnings 'redefine';
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*set \$USER_ID "";/m );
-            };
-
-            it 'should configure USER_ID if the set-USER_ID touch file is in place (comment out in file)' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_wants_user_id = sub { return 1; };
-                use warnings 'redefine';
-
-                $mi{mock_path_tiny}->redefine(
-                    slurp => sub { return qq[    listen 80 reuseport;\n    listen [::]:80 reuseport;\n    listen 443 ssl reuseport;\n    listen [::]:443 ssl reuseport;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
-                );
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*set \$USER_ID "";/m );
-            };
-
-            it 'should comment USER_ID out if it is set and the set-USER_ID touch file is missing' => sub {
-                no warnings 'redefine';
-                local *scripts::ea_nginx::_wants_user_id = sub { return 0; };
-                use warnings 'redefine';
-
-                $mi{mock_path_tiny}->redefine(
-                    slurp => sub { return qq[    listen 80 reuseport;\n    listen [::]:80 reuseport;\n    listen 443 ssl reuseport;\n    listen [::]:443 ssl reuseport;\n    ssl_certificate /var/cpanel/ssl/cpanel/cpanel.pem;\n    ssl_certificate_key /var/cpanel/ssl/cpanel/cpanel.pem;\n    # set \$USER_ID "";\n    include conf.d/server-includes/*.conf;]; },
-                );
-
-                scripts::ea_nginx::_write_global_default();
-                like( $content, qr/^\s*# set \$USER_ID "";/m );
+                is_deeply(
+                    $data,
+                    {
+                        reuseport           => 1,
+                        ipv6                => 1,
+                        http2               => 'on',
+                        ssl_certificate     => '/var/cpanel/ssl/cpanel/mycpanel.pem',
+                        ssl_certificate_key => '/var/cpanel/ssl/cpanel/mycpanel.pem',
+                        uid                 => 1,
+                    },
+                ) or diag explain $data;
             };
         };
 

@@ -453,6 +453,7 @@ rm -rf %{bdir}/_passenger_source_code
 %{_sysconfdir}/nginx/ea-nginx/cpanel-wordpress-location.tt
 %{_sysconfdir}/nginx/ea-nginx/ea-nginx.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
+%{_sysconfdir}/nginx/ea-nginx/default.conf.tt
 %config %{_sysconfdir}/nginx/ea-nginx/cache.json
 %{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
@@ -768,6 +769,7 @@ fi
 %changelog
 * Thu Jun 15 2023 Cory McIntire <cory@cpanel.net> - 1.25.1-1
 - EA-11496: Update ea-nginx from v1.25.0 to v1.25.1
+- EA-11512: Update config script to use new http2 directive instead of deprecated http2 on listen directive
 
 * Tue Jun 13 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.25.0-4
 - ZC-10945: Implement findings from evaluating our web stack performance improvements

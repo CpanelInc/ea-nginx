@@ -1,0 +1,35 @@
+server {
+    listen 80[% IF reuseport %] reuseport[% END %];
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:80[% IF reuseport %] reuseport[% END %];
+
+    # We want SSL for this server so http:// and https:// work the same for these server_name’s
+    listen 443 ssl[% IF reuseport %] reuseport[% END %];
+    [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF reuseport %] reuseport[% END %];
+
+    http2 [% http2 %];
+
+    ssl_certificate [% ssl_certificate %];
+    ssl_certificate_key [% ssl_certificate_key %];
+
+    # $hostname because we do not want the machine's hostname to be treated as a service subdomain
+    #   (e.g. $hostname is cpanel.example.com)
+    # 127.0.0.1 and localhost so that those are handled consistently like $hostname
+    server_name 127.0.0.1 localhost $hostname;
+
+    location / {
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass http://$CPANEL_APACHE_PROXY_IP:$CPANEL_APACHE_PROXY_PORT;
+    }
+
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+    }
+
+    [%- IF uid %]
+    set $USER_ID "";
+    [% END -%]
+
+    include conf.d/server-includes/*.conf;
+}
+
