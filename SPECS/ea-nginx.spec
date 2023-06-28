@@ -30,26 +30,13 @@ BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 # also ensures Apache has it and Application Manager will be available
 
 %if 0%{?rhel} == 9
-BuildRequires: ea-apache24-mod-passenger
-BuildRequires: ea-passenger-src
 BuildRequires: ruby
-BuildRequires: ruby-devel
-BuildRequires: rubygem-rake
-%else
-BuildRequires: %{ruby_version}-mod_passenger >= 6.0.4-2
-BuildRequires: %{ruby_version}-rubygem-rake >= 0.8.1
-BuildRequires: %{ruby_version}-rubygem-passenger
-BuildRequires: %{ruby_version}-ruby-devel
 %endif
-
-# ea-ruby24-mod_passenger conflicts with ea-ruby27-mod_passenger
-# because they both provide and conflict with apache24-passenger
 
 %if 0%{?rhel} != 9
 Requires: %{ruby_version}
 %endif
 
-Requires: apache24-passenger
 Requires: ea-apache24-mod_remoteip
 Conflicts: ea-modsec30-connector-nginx < 1.0.3-2
 
@@ -111,14 +98,14 @@ BuildRequires: systemd
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
 %if 0%{?rhel} < 8
-%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
+%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 %else
 %if 0%{?rhel} == 9
-%define BASE_WITH_CC_OPT "-fPIC -I/opt/cpanel/ea-passenger-src/passenger-release-6.0.10/src/nginx_module",
-%define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl
+%define BASE_WITH_CC_OPT -std=gnu89
+%define BASE_WITH_LD_OPT ""
 %else
-%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/%{ruby_version}/root/usr/include -I%{bdir}/_passenger_source_code/src/nginx_module
+%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/%{ruby_version}/root/usr/include
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 %endif
 %endif
@@ -225,22 +212,9 @@ cp %{SOURCE21} ngx_http_pipelog_module/config
 %build
 
 %if 0%{?rhel} == 9
+export CC=gcc
 mkdir -p ngx_http_pipelog_module/
-rm -rf %{bdir}/_passenger_source_code
-cp -rf /opt/cpanel/ea-passenger-src/passenger-release-*/ %{bdir}/_passenger_source_code
-%else
-export PATH=/opt/cpanel/%{ruby_version}/root/usr/bin:/opt/cpanel/libcurl/bin:$PATH
-source /opt/cpanel/%{ruby_version}/enable
-ruby -v
-rm -rf %{bdir}/_passenger_source_code
-cp -rf /opt/cpanel/%{ruby_version}/src/passenger-*/ %{bdir}/_passenger_source_code
 %endif
-
-export LDFLAGS="$LDFLAGS %{WITH_LD_OPT}"
-export CFLAGS="$CFLAGS %{WITH_CC_OPT}"
-export EXTRA_CFLAGS=$CFLAGS
-export EXTRA_CXXFLAGS=$CFLAGS
-export EXTRA_LDFLAGS=$LDFLAGS
 
 %if 0%{?rhel} > 6
 export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
@@ -251,7 +225,6 @@ export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
-    --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
@@ -263,7 +236,6 @@ make %{?_smp_mflags}
 ./configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
-    --add-module=%{bdir}/_passenger_source_code/src/nginx_module \
 %if 0%{?rhel} > 6
     --add-dynamic-module=/opt/cpanel/ea-ngx-brotli-src \
 %endif
@@ -404,10 +376,6 @@ mkdir -p $RPM_BUILD_ROOT/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDC
 mkdir -p %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures
 install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-nginx-toggle_nginx_caching
 
-%if 0%{?rhel} != 9
-rm -rf %{bdir}/_passenger_source_code
-%endif
-
 %clean
 %{__rm} -rf $RPM_BUILD_ROOT
 
@@ -421,7 +389,6 @@ rm -rf %{bdir}/_passenger_source_code
 %dir %{_sysconfdir}/nginx/conf.d
 %dir %{_sysconfdir}/nginx/conf.d/modules
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
-%ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/passenger.conf
 %attr(700, nobody, root) /var/cache/ea-nginx/proxy
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
@@ -455,7 +422,6 @@ rm -rf %{bdir}/_passenger_source_code
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/default.conf.tt
 %config %{_sysconfdir}/nginx/ea-nginx/cache.json
-%{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx

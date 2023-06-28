@@ -19,6 +19,5 @@ if test -x "/usr/bin/apt"; then
     fi
 
     rm -f /etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf
-    rm -f /etc/nginx/conf.d/passenger.conf
 fi
 

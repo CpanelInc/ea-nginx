@@ -54,7 +54,6 @@ my $orig_clear_cache                = \&scripts::ea_nginx::clear_cache;
 my $orig__do_other_global_config    = \&scripts::ea_nginx::_do_other_global_config;
 my $orig__update_for_custom_configs = \&scripts::ea_nginx::_update_for_custom_configs;
 my $orig__write_global_logging      = \&scripts::ea_nginx::_write_global_logging;
-my $orig__write_global_passenger    = \&scripts::ea_nginx::_write_global_passenger;
 my $orig__write_global_default      = \&scripts::ea_nginx::_write_global_default;
 my $orig__get_global_config_data    = \&scripts::ea_nginx::_get_global_config_data;
 my $orig__populate_wordpress_cache  = \&scripts::ea_nginx::_populate_wordpress_cache;
@@ -66,7 +65,6 @@ no warnings "redefine";
 *scripts::ea_nginx::clear_cache                = sub { push @clear_cache, [@_] };
 *scripts::ea_nginx::_update_for_custom_configs = sub { };
 *scripts::ea_nginx::_write_global_logging      = sub { };
-*scripts::ea_nginx::_write_global_passenger    = sub { };
 *scripts::ea_nginx::_write_global_default      = sub { };
 *scripts::ea_nginx::_get_global_config_data    = sub { return {}; };
 *scripts::ea_nginx::_populate_wordpress_cache  = sub { };
@@ -1543,42 +1541,6 @@ EOF
             };
         };
 
-        describe "_write_global_passenger" => sub {
-            my $data;
-            around {
-                no warnings 'redefine', 'once';
-                local *scripts::ea_nginx::_write_global_passenger = $orig__write_global_passenger;
-
-                local *scripts::ea_nginx::_get_application_paths = sub {
-                    my ($hr) = @_;
-                    $hr->{ruby} = '/opt/cpanel/ea-ruby24/root/usr/libexec/passenger-ruby24';
-                    return;
-                };
-
-                local *scripts::ea_nginx::_render_tt_to_file = sub { $data = pop @_; };
-                yield;
-            };
-
-            it 'should render ‘ngx_http_passenger_module.conf.tt’ to ‘passenger.conf’ with the expected data' => sub {
-                scripts::ea_nginx::_write_global_passenger();
-                is_deeply(
-                    $data,
-                    {
-                        passenger => {
-                            global => {
-                                passenger_root                  => '/opt/cpanel/ea-ruby24/root/usr/libexec/../share/passenger/phusion_passenger/locations.ini',
-                                passenger_instance_registry_dir => '/opt/cpanel/ea-ruby24/root/usr/libexec/../../var/run/passenger-instreg',
-                                default                         => {
-                                    name => 'global passenger defaults',
-                                    ruby => '/opt/cpanel/ea-ruby24/root/usr/libexec/passenger-ruby24',
-                                },
-                            },
-                        },
-                    },
-                ) or diag explain $data;
-            };
-        };
-
         describe "_get_application_paths" => sub {
             it 'should populate the given hashref with the paths to the ruby, python, and nodejs binaries if they exist' => sub {
                 my $hr = {};
@@ -2298,7 +2260,6 @@ EOF
                 local *scripts::ea_nginx::_get_basic_auth        = sub { };
                 local *scripts::ea_nginx::_get_redirects         = sub { };
                 local *scripts::ea_nginx::_get_ssl_redirect      = sub { };
-                local *scripts::ea_nginx::_get_passenger_apps    = sub { };
                 local *scripts::ea_nginx::_get_caching_hr        = sub { };
                 local *scripts::ea_nginx::_get_domains_with_ssls = sub { };
                 local *scripts::ea_nginx::_get_httpd_vhosts_hash = sub { };
@@ -2580,90 +2541,6 @@ EOF
                         c => 0,
                     },
                 );
-            };
-        };
-
-        describe "_get_passenger_apps" => sub {
-            around {
-                no warnings 'redefine', 'once';
-                local *scripts::ea_nginx::_get_application_paths = sub { };
-                yield;
-            };
-
-            it 'should return an empty array reference if the user does not have an applications.json file' => sub {
-                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine( LoadFile => sub { die; }, );
-
-                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', ['foo.tld'] );
-                is_deeply( $res, [] );
-            };
-
-            it 'should return an empty array reference if none of the apps listed in applications.json are enabled' => sub {
-                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
-                    LoadFile => sub {
-                        return {
-                            yo => {
-                                enabled => 0,
-                            },
-                        };
-                    },
-                );
-
-                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', ['foo.tld'] );
-                is_deeply( $res, [] );
-            };
-
-            it 'should return an empty array reference if none of the apps listed in applications.json are for one of the domains passed in' => sub {
-                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
-                    LoadFile => sub {
-                        return {
-                            yo => {
-                                enabled => 1,
-                                domain  => 'bar.tld',
-                            },
-                        };
-                    },
-                );
-
-                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', ['foo.tld'] );
-                is_deeply( $res, [] );
-            };
-
-            it 'should return array reference of hashes for any apps that are enabled and belong to one of the domains passed in' => sub {
-                my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
-                    LoadFile => sub {
-                        return {
-                            yo => {
-                                base_uri        => '/bar',
-                                deployment_mode => 'development',
-                                domain          => 'bar.tld',
-                                enabled         => 1,
-                                envvars         => {},
-                                name            => 'yo',
-                                path            => '/home/foo/bar',
-                                python          => '/usr/bin/python',
-                                ruby            => '/opt/cpanel/ea-ruby27/root/usr/libexec/passenger-ruby27',
-                            },
-                        };
-                    },
-                );
-
-                my $res = scripts::ea_nginx::_get_passenger_apps( 'foo', [ 'foo.tld', 'bar.tld' ] );
-                is_deeply(
-                    $res,
-                    [
-                        {
-                            envvars         => {},
-                            base_uri        => '/bar',
-                            deployment_mode => 'development',
-                            name            => 'yo',
-                            path            => '/home/foo/bar',
-                            enabled         => 1,
-                            python          => '/usr/bin/python',
-                            domain          => 'bar.tld',
-                            ruby            => '/opt/cpanel/ea-ruby27/root/usr/libexec/passenger-ruby27',
-                        },
-                    ],
-                ) or diag explain $res;
             };
         };
 
