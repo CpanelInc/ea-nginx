@@ -14,7 +14,6 @@ use Cpanel::Config::LoadCpConf               ();
 use Cpanel::Config::LoadUserDomains          ();
 use Cpanel::Config::LoadWwwAcctConf          ();
 use Cpanel::Config::userdata                 ();
-use Cpanel::Config::userdata::PassengerApps  ();
 use Cpanel::DIp::IsDedicated                 ();
 use Cpanel::DomainIp                         ();
 use Cpanel::DomainLookup::DocRoot            ();
@@ -845,27 +844,6 @@ sub _do_other_global_config {
     }
 
     return;
-}
-
-=head2 _get_application_paths()
-
-Populates a given hashref with the path to the binaries for the global default
-versions of ruby, python, and nodejs.
-
-=over
-
-=item app
-
-A hashref to populate with the paths to the binaries.  Note, the given hashref
-will be altered by this sub.
-
-=back
-
-=cut
-
-sub _get_application_paths {
-    my ($app) = @_;
-    return Cpanel::Config::userdata::PassengerApps->ensure_paths( $app, 0 );
 }
 
 =head2 _write_global_cpanel_localhost()
