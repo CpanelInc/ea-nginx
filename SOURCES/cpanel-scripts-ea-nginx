@@ -14,6 +14,7 @@ use Cpanel::Config::LoadCpConf               ();
 use Cpanel::Config::LoadUserDomains          ();
 use Cpanel::Config::LoadWwwAcctConf          ();
 use Cpanel::Config::userdata                 ();
+use Cpanel::Config::userdata::PassengerApps  ();
 use Cpanel::DIp::IsDedicated                 ();
 use Cpanel::DomainIp                         ();
 use Cpanel::DomainLookup::DocRoot            ();
@@ -311,6 +312,7 @@ sub config {
 
         _write_global_cpanel_localhost();
         _write_global_logging();
+        _write_global_passenger();
         _write_global_ea_nginx();
         _write_global_nginx_conf();
         _write_global_default();
@@ -846,6 +848,27 @@ sub _do_other_global_config {
     return;
 }
 
+=head2 _get_application_paths()
+
+Populates a given hashref with the path to the binaries for the global default
+versions of ruby, python, and nodejs.
+
+=over
+
+=item app
+
+A hashref to populate with the paths to the binaries.  Note, the given hashref
+will be altered by this sub.
+
+=back
+
+=cut
+
+sub _get_application_paths {
+    my ($app) = @_;
+    return Cpanel::Config::userdata::PassengerApps->ensure_paths( $app, 0 );
+}
+
 =head2 _write_global_cpanel_localhost()
 
 Write '/etc/nginx/conf.d/includes-optional/cpanel-proxy-xt.conf' with a unique
@@ -1003,6 +1026,44 @@ sub _write_global_default {
             ssl_certificate     => $ssl_certificate,
             ssl_certificate_key => $ssl_certificate,
             uid                 => $wants_uid,
+        },
+    );
+}
+
+=head2 _write_global_passenger()
+
+Write '/etc/nginx/conf.d/passenger.conf' with the correct application paths for
+ruby, python, and nodejs
+
+=cut
+
+sub _write_global_passenger {
+
+    my $defaults_hr = { name => "global passenger defaults" };
+    _get_application_paths($defaults_hr);
+
+    my $passenger_root = $defaults_hr->{ruby};
+    $passenger_root =~ s{/[^/]+$}{/../share/passenger/phusion_passenger/locations.ini};
+
+    my $passenger_instance_registry_dir = $defaults_hr->{ruby};
+    if ( $passenger_instance_registry_dir =~ m{^/opt/cpanel} ) {
+        $passenger_instance_registry_dir =~ s{/[^/]+$}{/../../var/run/passenger-instreg};
+    }
+    else {
+        $passenger_instance_registry_dir = '/opt/cpanel/ea-passenger/run/passenger-instreg';
+    }
+    File::Path::Tiny::mk($passenger_instance_registry_dir);
+
+    return _render_tt_to_file(
+        'ngx_http_passenger_module.conf.tt' => 'passenger.conf',
+        {
+            passenger => {
+                global => {
+                    passenger_root                  => $passenger_root,
+                    passenger_instance_registry_dir => $passenger_instance_registry_dir,
+                    default                         => $defaults_hr,
+                },
+            },
         },
     );
 }
@@ -1840,6 +1901,7 @@ sub _render_and_append {
     my $redirects        = _get_redirects( $domains, $cpanel_redirects );
     my $ssl_redirect     = _get_ssl_redirect( $user => $domains );
     my $secruleengineoff = -e "/etc/nginx/conf.d/modules/ngx_http_modsecurity_module.conf" ? _get_secruleengineoff( $user => $domains ) : 0;
+    my $passenger_apps   = _get_passenger_apps( $user => $domains );
     my $caching_hr       = _get_caching_hr($user);
 
     # Include numeric UID if they want it
@@ -1926,6 +1988,9 @@ sub _render_and_append {
             logging    => $global_config_data->{logging},
             ea4conf    => $global_config_data->{e4c},
             settings   => $global_config_data->{cur_settings},
+            passenger  => {
+                apps => $passenger_apps,
+            },
             behavior => {
                 standalone => $global_config_data->{standalone},
                 caching    => $caching_hr,
@@ -2057,6 +2122,51 @@ The path to the user's homedir
 sub _get_homedir {
     my ($user) = @_;
     return ( getpwnam($user) )[7];
+}
+
+=head2 _get_passenger_apps()
+
+Given a user and an array reference of domains, it consumes the applications
+userdatafile for the user, and returns an array reference of hashes for any
+applications that are enabled for one of the given domains.
+
+=over
+
+=item user
+
+A cPanel username
+
+=item domains
+
+A arrayreferences of domains owned by the user
+
+=back
+
+=head3 RETURNS
+
+An array reference of hashes containing application data for any enabled
+passenger applications
+
+=cut
+
+sub _get_passenger_apps {
+    my ( $user, $domains ) = @_;
+    my @apps;
+
+    my %domains;
+    @domains{ @{$domains} } = ();
+
+    my $apps_hr = eval { Cpanel::JSON::LoadFile("/var/cpanel/userdata/$user/applications.json") } || {};
+
+    for my $app_name ( sort keys %{$apps_hr} ) {
+        my $app = $apps_hr->{$app_name};
+        if ( $app->{enabled} && exists $domains{ $app->{domain} } ) {
+            _get_application_paths($app);
+            push @apps, $app;
+        }
+    }
+
+    return \@apps;
 }
 
 =head2 _get_userdata_for()

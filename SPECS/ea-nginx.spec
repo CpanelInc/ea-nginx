@@ -26,13 +26,6 @@ BuildRequires: ea-openssl11 >= %{ea_openssl_ver}
 BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 %endif
 
-# 6.0.4-2 is when the source is included w/ the apache module
-# also ensures Apache has it and Application Manager will be available
-
-%if 0%{?rhel} == 9
-BuildRequires: ruby
-%endif
-
 %if 0%{?rhel} != 9
 Requires: %{ruby_version}
 %endif
@@ -119,7 +112,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -389,6 +382,7 @@ install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-ngin
 %dir %{_sysconfdir}/nginx/conf.d
 %dir %{_sysconfdir}/nginx/conf.d/modules
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
+%ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/passenger.conf
 %attr(700, nobody, root) /var/cache/ea-nginx/proxy
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
@@ -422,6 +416,7 @@ install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-ngin
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/default.conf.tt
 %config %{_sysconfdir}/nginx/ea-nginx/cache.json
+%{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
@@ -733,6 +728,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Jul 19 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.25.1-3
+- ZC-10396: Remove ea-passenger-src dependency and other passenger code
+
 * Thu Jul 20 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.1-2
 - EA-11561: Make it so that scripts/ea-nginx is not aware of config syntax for template files
 
