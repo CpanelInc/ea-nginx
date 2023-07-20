@@ -6,7 +6,7 @@ server {
     listen 443 ssl[% IF reuseport %] reuseport[% END %];
     [% IF !ipv6 %]# server does not have IPv6 enabled: [% END %]listen [::]:443 ssl[% IF reuseport %] reuseport[% END %];
 
-    http2 [% http2 %];
+    http2 [% http2 ? "on" : "off" %];
 
     ssl_certificate [% ssl_certificate %];
     ssl_certificate_key [% ssl_certificate_key %];
