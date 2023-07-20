@@ -18,7 +18,6 @@
         "libcurl4-gnutls-dev",
         "libopenssl-devel",
         "redhat-lsb-core",
-        "ea-ruby27",
         "initscripts"
     ],
     "add_to_build_requires": [
