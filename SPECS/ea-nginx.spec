@@ -382,7 +382,6 @@ install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-ngin
 %dir %{_sysconfdir}/nginx/conf.d
 %dir %{_sysconfdir}/nginx/conf.d/modules
 %ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/modules/ngx_http_pipelog_module.conf
-%ghost %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/passenger.conf
 %attr(700, nobody, root) /var/cache/ea-nginx/proxy
 
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
