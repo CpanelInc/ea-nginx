@@ -1009,7 +1009,7 @@ USER_ID, reuseport, and the correct default ssl certificate to use on the system
 sub _write_global_default {
     my $reuseport = Cpanel::Kernel::system_is_at_least('3.9.0') ? 1 : 0;
     my $ipv6      = _has_ipv6();
-    my $http2     = _wants_http2() ? 'on' : 'off';
+    my $http2     = _wants_http2();
     my $wants_uid = _wants_user_id();
 
     my $ssl_certificate =
@@ -1975,7 +1975,7 @@ sub _render_and_append {
             proxy_ip                     => $ip,
             ip                           => $servername_ip,
             ipv6                         => $global_config_data->{ipv6},
-            http2                        => $global_config_data->{http2} ? 'on' : 'off',
+            http2                        => $global_config_data->{http2},
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
             has_wordpress                => $has_wordpress,

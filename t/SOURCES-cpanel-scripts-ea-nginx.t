@@ -1920,7 +1920,7 @@ EOF
                     {
                         reuseport           => 1,
                         ipv6                => 1,
-                        http2               => 'on',
+                        http2               => 1,
                         ssl_certificate     => '/var/cpanel/ssl/cpanel/mycpanel.pem',
                         ssl_certificate_key => '/var/cpanel/ssl/cpanel/mycpanel.pem',
                         uid                 => 1,
