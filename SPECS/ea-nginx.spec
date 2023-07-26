@@ -415,7 +415,6 @@ install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-ngin
 %{_sysconfdir}/nginx/ea-nginx/server.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/default.conf.tt
 %config %{_sysconfdir}/nginx/ea-nginx/cache.json
-%{_sysconfdir}/nginx/ea-nginx/ngx_http_passenger_module.conf.tt
 %{_sysconfdir}/nginx/ea-nginx/global-logging.tt
 
 %attr(755, root, root) /usr/local/cpanel/scripts/ea-nginx
