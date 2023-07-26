@@ -132,7 +132,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -767,6 +767,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Jul 20 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.1-2
+- EA-11561: Make it so that scripts/ea-nginx is not aware of config syntax for template files
+
 * Thu Jun 15 2023 Cory McIntire <cory@cpanel.net> - 1.25.1-1
 - EA-11496: Update ea-nginx from v1.25.0 to v1.25.1
 - EA-11512: Update config script to use new http2 directive instead of deprecated http2 on listen directive
