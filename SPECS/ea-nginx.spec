@@ -30,6 +30,8 @@ BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 Requires: %{ruby_version}
 %endif
 
+Requires: apache24-passenger
+
 Requires: ea-apache24-mod_remoteip
 Conflicts: ea-modsec30-connector-nginx < 1.0.3-2
 
