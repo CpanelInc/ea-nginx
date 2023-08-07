@@ -728,7 +728,7 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
-* Wed Jul 19 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.25.1-3
+* Mon Aug 07 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.25.1-3
 - ZC-10396: Remove ea-passenger-src dependency and other passenger code
 
 * Thu Jul 20 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.1-2
