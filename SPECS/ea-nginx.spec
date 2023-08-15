@@ -51,6 +51,12 @@ Requires: initscripts >= 8.36
 Requires(post): chkconfig
 %endif
 
+# To mantain consistency with C7 and C8, since ea-nginx-passenger requires a certain ea-nginx version, which includes Epoch=1
+%if 0%{?rhel} > 8
+%define epoch 1
+Epoch: %{epoch}
+%endif
+
 %if 0%{?rhel} == 7
 BuildRequires: redhat-lsb-core
 %define _group System Environment/Daemons
