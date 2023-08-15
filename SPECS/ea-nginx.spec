@@ -51,8 +51,8 @@ Requires: initscripts >= 8.36
 Requires(post): chkconfig
 %endif
 
-# To mantain consistency with C7 and C8, since ea-nginx-passenger requires a certain ea-nginx version, which includes Epoch=1
-%if 0%{?rhel} > 8
+# ea-nginx-passenger requires a certain ea-nginx version, which includes Epoch=1
+%if 0%{?rhel} > 6
 %define epoch 1
 Epoch: %{epoch}
 %endif
@@ -60,8 +60,6 @@ Epoch: %{epoch}
 %if 0%{?rhel} == 7
 BuildRequires: redhat-lsb-core
 %define _group System Environment/Daemons
-%define epoch 1
-Epoch: %{epoch}
 Requires(pre): shadow-utils
 Requires: systemd
 BuildRequires: systemd
@@ -75,8 +73,6 @@ BuildRequires: systemd
 
 %if 0%{?rhel} == 8
 %define _group System Environment/Daemons
-%define epoch 1
-Epoch: %{epoch}
 Requires(pre): shadow-utils
 Requires: systemd
 BuildRequires: systemd
