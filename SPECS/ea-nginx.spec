@@ -116,7 +116,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -730,6 +730,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Aug 21 2023 Dan Muey <dan@cpanel.net> - 1.25.1-4
+- ZC-11149: support touchfile for nginx cpwrap that will ignore memory limits and set it to unlimited
+
 * Mon Aug 07 2023 Brian Mendoza <brian.mendoza@cpanel.net> - 1.25.1-3
 - ZC-10396: Remove ea-passenger-src dependency and other passenger code
 
