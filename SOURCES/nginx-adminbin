@@ -15,6 +15,7 @@ use lib '/var/cpanel/perl5/lib';
 use Cpanel::Debug ();
 use Cpanel        ();
 use Capture::Tiny 'capture_merged';
+use Cpanel::Rlimit ();
 
 eval { require '/usr/local/cpanel/scripts/ea-nginx' };    # Prefer the package’s script …
 if ($@) {                                                 # … if its not installed do the devbox version
@@ -94,7 +95,17 @@ sub _silent_running {
     my (@args) = @_;
 
     my $rv;
+
+    my $limits_hr;
+    if ( -f '/etc/cpanel/ea4/option-flags/give-cpsrvd-nginx-operations-unlimited-memory' ) {
+        warn "Doing NGINX operation without memory restriction per /etc/cpanel/ea4/option-flags/give-cpsrvd-nginx-operations-unlimited-memory\n";
+        $limits_hr = Cpanel::Rlimit::get_current_rlimits();
+        Cpanel::Rlimit::set_rlimit_to_infinity();
+    }
+
     capture_merged { $rv = scripts::ea_nginx::run(@args) };
+
+    Cpanel::Rlimit::restore_rlimits($limits_hr) if $limits_hr;
 
     return $rv;
 }

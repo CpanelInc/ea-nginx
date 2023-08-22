@@ -131,8 +131,6 @@ cp debian/tmp/opt/cpanel/root/usr/sbin/nginx debian/tmp/usr/sbin
 cp /usr/src/packages/BUILD/objs/nginx-debug debian/tmp/usr/sbin
 gzip debian/tmp/usr/share/man/man8/nginx.8
 
-rm -rf ${bdir}/_passenger_source_code
-
 echo "FILE LIST" `pwd`
 find /usr/src/packages/BUILD -type f -print | sort
 
