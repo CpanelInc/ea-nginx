@@ -116,7 +116,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -391,7 +391,7 @@ install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-ngin
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/cpanel-proxy-non-ssl.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-fastcgi.conf
 %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-proxy.conf
-%config %attr(644, root, root) /var/nginx/conf.d/includes-optional/cpanel-proxy.conf
+%attr(644, root, root) /var/nginx/conf.d/includes-optional/cpanel-proxy.conf
 %config(noreplace) %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/set-CACHE_KEY_PREFIX.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-cgi-location.conf
 %attr(644, root, root) %{_sysconfdir}/nginx/conf.d/includes-optional/cpanel-server-parsed-location.conf
@@ -730,6 +730,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Aug 28 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.2-2
+- EA-11502: Do not mark cpanel-proxy.conf as a config file
+
 * Thu Aug 24 2023 Cory McIntire <cory@cpanel.net> - 1.25.2-1
 - EA-11631: Update ea-nginx from v1.25.1 to v1.25.2
 
