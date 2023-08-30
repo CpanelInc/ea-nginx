@@ -312,8 +312,7 @@ sub config {
 
         _write_global_cpanel_localhost();
         _write_global_logging();
-        unlink '/etc/nginx/conf.d/passenger.conf';    # will get re-written fresh below if its needed, otherwsie we want it gone
-        _write_global_passenger() if -e '/etc/nginx/modules/ngx_http_passenger_module.so';
+        _write_global_passenger();
         _write_global_ea_nginx();
         _write_global_nginx_conf();
         _write_global_default();
@@ -1039,6 +1038,8 @@ ruby, python, and nodejs
 =cut
 
 sub _write_global_passenger {
+    unlink '/etc/nginx/conf.d/passenger.conf';    # will get re-written fresh below if its needed, otherwise we want it gone
+    return 1 unless -e '/etc/nginx/modules/ngx_http_passenger_module.so';
 
     my $defaults_hr = { name => "global passenger defaults" };
     _get_application_paths($defaults_hr);
