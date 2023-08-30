@@ -116,7 +116,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -730,6 +730,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Aug 30 2023 Dan Muey <dan@cpanel.net> - 1.25.2-3
+- EA-11646: Clean up global passenger conf
+
 * Mon Aug 28 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.2-2
 - EA-11502: Do not mark cpanel-proxy.conf as a config file
 
