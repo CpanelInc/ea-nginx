@@ -313,7 +313,7 @@ sub config {
         _write_global_cpanel_localhost();
         _write_global_logging();
         unlink '/etc/nginx/conf.d/passenger.conf';    # will get re-written fresh below if its needed, otherwsie we want it gone
-        _write_global_passenger() if -e '/etc/nginx/ea-nginx/ngx_http_passenger_module.conf.tt';
+        _write_global_passenger() if -e '/etc/nginx/modules/ngx_http_passenger_module.so';
         _write_global_ea_nginx();
         _write_global_nginx_conf();
         _write_global_default();
