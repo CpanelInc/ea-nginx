@@ -1556,7 +1556,19 @@ EOF
                 };
 
                 local *scripts::ea_nginx::_render_tt_to_file = sub { $data = pop @_; };
+
+                my $mock_passenger_so = Test::MockFile->file( '/etc/nginx/modules/ngx_http_passenger_module.so', '' );
+
                 yield;
+            };
+
+            before each => sub { $data = undef; };
+
+            it 'should not render ‘passenger.conf’ if ‘ngx_http_passenger_module.so’ does not exist' => sub {
+                unlink '/etc/nginx/modules/ngx_http_passenger_module.so';
+
+                scripts::ea_nginx::_write_global_passenger();
+                is( $data, undef );
             };
 
             it 'should render ‘ngx_http_passenger_module.conf.tt’ to ‘passenger.conf’ with the expected data' => sub {
