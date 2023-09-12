@@ -80,6 +80,8 @@ sub describe {
         'SSL::installssl',
         'Domain::park',
         'Domain::unpark',
+        'Domain::addsubdomain',
+        'Domain::delsubdomain',
     );
     my @normal_actions = map {
         {
