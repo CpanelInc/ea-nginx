@@ -41,8 +41,10 @@ sub run {
         die "Apache is still bound to ports 80/443\n" if $httpd_is_listening;
     }
 
+    # hard restart here in order to ensure that the new binary is used
+    # in the event that this is an nginx upgrade
     print "Starting nginx …\n";
-    system('/usr/local/cpanel/scripts/ea-nginx reload');
+    system('/usr/local/cpanel/scripts/restartsrv_nginx --hard');
 
     print "Waiting on nginx to come up …\n";
 
