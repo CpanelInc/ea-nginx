@@ -116,7 +116,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -730,6 +730,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Sep 12 2023 Tim Mullin <tim@cpanel.net> - 1.25.2-5
+- EA-11648: Add hooks needed to update config when whmapi1 delete_domain is called
+
 * Fri Sep 01 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.2-4
 - EA-11657: Ensure nginx is hard restarted during deb/rpm transactions
 
