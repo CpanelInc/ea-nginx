@@ -51,18 +51,6 @@ BANNER
 
     /usr/bin/systemctl start nginx.service >/dev/null 2>&1 ||:
 
-    # record the current value of fileprotect
-    if [ -e /var/cpanel/fileprotect ];
-    then
-        touch /etc/nginx/ea-nginx/meta/fileprotect
-    else
-        rm -f /etc/nginx/ea-nginx/meta/fileprotect
-    fi
-
-    # disable file protect
-
-    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
-
     # I move this to here, to deal with the craziness of the order of operations
     # on yum upgrade and downgrades.
     # No need to restart nginx here since that is handled in the universal-hook
@@ -70,6 +58,15 @@ BANNER
 
     /usr/local/cpanel/bin/manage_hooks prune; /bin/true;
     /usr/local/cpanel/bin/manage_hooks add module NginxHooks
+
+    # Go ahead and enable fileprotect if we disabled it via this package and the
+    # ea-nginx-standlone package is not installed
+    # Note, ea-nginx-standalone owns /etc/nginx/ea-nginx/enable.standalone so it
+    # should only exist if that package is installed
+    if [[ -e /etc/nginx/ea-nginx/meta/fileprotect && ! -e /etc/nginx/ea-nginx/enable.standalone ]]; then
+        rm -f /etc/nginx/ea-nginx/meta/fileprotect
+        /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
+    fi
 
     # also ensure that queueprocd is kicked so that it reads in the custom task
     # processor that we wrote for it

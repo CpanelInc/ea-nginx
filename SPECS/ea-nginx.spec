@@ -116,7 +116,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -629,18 +629,6 @@ fi
     /sbin/service nginx start  >/dev/null 2>&1 ||:
 %endif
 
-# record the current value of fileprotect
-if [ -e /var/cpanel/fileprotect ];
-then
-    touch /etc/nginx/ea-nginx/meta/fileprotect
-else
-    rm -f /etc/nginx/ea-nginx/meta/fileprotect
-fi
-
-# disable file protect
-
-/usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=0
-
 %posttrans
 # DRAGONS:  if you update this, then SOURCES/pkg.postinst needs updated with the same changes
 
@@ -655,6 +643,15 @@ if [ $cpversion -ge 80 ]; then
     # Ignore failures in case you are on a version of cPanel too old for feature
     /usr/local/cpanel/bin/manage_hooks prune; /bin/true;
     /usr/local/cpanel/bin/manage_hooks add module NginxHooks
+fi
+
+# Go ahead and enable fileprotect if we disabled it via this package and the
+# ea-nginx-standlone package is not installed
+# Note, ea-nginx-standalone owns /etc/nginx/ea-nginx/enable.standalone so it
+# should only exist if that package is installed
+if [[ -e /etc/nginx/ea-nginx/meta/fileprotect && ! -e /etc/nginx/ea-nginx/enable.standalone ]]; then
+    rm -f /etc/nginx/ea-nginx/meta/fileprotect
+    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
 fi
 
 # also ensure that queueprocd is kicked so that it reads in the custom task
@@ -699,10 +696,6 @@ sed -i '/nginx:1/d' /etc/chkserv.d/chkservd.conf
 
 %{_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
 
-if [ -e /etc/nginx/ea-nginx/meta/fileprotect ]; then
-    rm -f /etc/nginx/ea-nginx/meta/fileprotect
-    /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
-fi
 fi
 
 %postun
@@ -730,6 +723,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Oct 02 2023 Travis Holloway <t.holloway@cpanel.net> - 1.25.2-6
+- EA-11530: Do not disable file protect when in reverse proxy mode
+
 * Tue Sep 12 2023 Tim Mullin <tim@cpanel.net> - 1.25.2-5
 - EA-11648: Add hooks needed to update config when whmapi1 delete_domain is called
 

@@ -289,16 +289,34 @@ server {
     location /.well-known/cpanel-dcv {
         root "[% docroot %]";
         disable_symlinks if_not_owner;
+
+        [%- IF !behavior.standalone %]
+        # pass to Apache
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
+        [%- END %]
     }
 
     location /.well-known/pki-validation {
         root "[% docroot %]";
         disable_symlinks if_not_owner;
+
+        [%- IF !behavior.standalone %]
+        # pass to Apache
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
+        [%- END %]
     }
 
     location /.well-known/acme-challenge {
         root "[% docroot %]";
         disable_symlinks if_not_owner;
+
+        [%- IF !behavior.standalone %]
+        # pass to Apache
+        include conf.d/includes-optional/cpanel-proxy.conf;
+        proxy_pass $CPANEL_APACHE_PROXY_PASS;
+        [%- END %]
     }
 
     location / {

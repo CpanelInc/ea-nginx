@@ -25,11 +25,6 @@ if test -x "/usr/bin/apt"; then
 
         ${_sysconfdir}/nginx/ea-nginx/meta/apache move_apache_back_to_orig_ports
 
-        if [ -e /etc/nginx/ea-nginx/meta/fileprotect ]; then
-            rm -f /etc/nginx/ea-nginx/meta/fileprotect
-            /usr/local/cpanel/bin/whmapi1 set_tweaksetting key=enablefileprotect value=1
-        fi
-
         rm -rf /var/log/nginx.uninstall ||:
         mv -fv /var/log/nginx /var/log/nginx.uninstall ||:
     fi
