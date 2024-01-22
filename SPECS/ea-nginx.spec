@@ -30,8 +30,6 @@ BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 Requires: %{ruby_version}
 %endif
 
-Requires: apache24-passenger
-
 Requires: ea-apache24-mod_remoteip
 Conflicts: ea-modsec30-connector-nginx < 1.0.3-2
 
@@ -116,7 +114,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -723,6 +721,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Jan 22 2024 Dan Muey <dan@cpanel.net> - 1.25.3-2
+- ZC-11549: No longer pull in Apache’s passenger in reverse proxy mode
+
 * Thu Oct 26 2023 Cory McIntire <cory@cpanel.net> - 1.25.3-1
 - EA-11772: Update ea-nginx from v1.25.2 to v1.25.3
 
