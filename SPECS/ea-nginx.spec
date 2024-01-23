@@ -10,16 +10,6 @@
 
 %define ea_openssl_ver 1.1.1d-1
 
-%if 0%{?rhel} < 7
-%define ruby_version ea-ruby24
-Requires: %{ruby_version}
-%else
-%if 0%{?rhel} < 9
-%define ruby_version ea-ruby27
-Requires: %{ruby_version}
-%endif
-%endif
-
 %if 0%{?rhel} >= 8
 # In C8 we use system openssl. See DESIGN.md in ea-openssl11 git repo for details
 BuildRequires: openssl, openssl-devel
@@ -96,8 +86,8 @@ BuildRequires: systemd
 %define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/ea-openssl11/include -I/opt/cpanel/libcurl/include
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -L/opt/cpanel/ea-openssl11/%{_lib} -ldl -Wl,-rpath=/opt/cpanel/ea-openssl11/%{_lib} -L/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/libcurl/%{_lib} -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 %else
-%if %{defined ruby_version}
-%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC -I/opt/cpanel/%{ruby_version}/root/usr/include
+%if 0%{?rhel} < 9
+%define BASE_WITH_CC_OPT $(echo %{optflags} $(pcre-config --cflags)) -fPIC
 %define BASE_WITH_LD_OPT -Wl,-z,relro -Wl,-z,now -pie -ldl -Wl,-rpath=/opt/cpanel/ea-brotli/lib
 %else
 %define BASE_WITH_CC_OPT -std=gnu89
