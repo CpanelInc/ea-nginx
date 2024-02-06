@@ -124,8 +124,7 @@ install -p ${SOURCE27} $DEB_INSTALL_ROOT/etc/apt/universal-hooks/multi_pkgs/Post
 
 mkdir -p debian/tmp/etc/nginx/ea-nginx/html
 cp $SOURCE17 debian/tmp/etc/nginx/ea-nginx/html
-mkdir -p debian/tmp/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__
-cp $SOURCE27 debian/tmp/etc/yum/universal-hooks/multi_pkgs/posttrans/ea-__WILDCARD__nginx__WILDCARD__
+
 mkdir -p debian/tmp/usr/sbin
 cp debian/tmp/opt/cpanel/root/usr/sbin/nginx debian/tmp/usr/sbin
 cp /usr/src/packages/BUILD/objs/nginx-debug debian/tmp/usr/sbin

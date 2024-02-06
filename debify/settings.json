@@ -18,7 +18,6 @@
         "libcurl4-gnutls-dev",
         "libopenssl-devel",
         "redhat-lsb-core",
-        "ea-ruby27",
         "initscripts"
     ],
     "add_to_build_requires": [
@@ -40,15 +39,15 @@
         ]
     },
     "adjust_install_file_src": [
-        [ 
-            "etc/yum/universal-hooks/multi_pkgs/posttrans",
-            "debian/tmp/etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+        [
+            "etc/dnf/universal-hooks/multi_pkgs/transaction",
+            "etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
         ]
     ],
     "adjust_install_file_dst": [
-        [ 
-            "etc/yum/universal-hooks/multi_pkgs/posttrans",
-            "/etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+        [
+            "etc/dnf/universal-hooks/multi_pkgs/transaction",
+            "etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
         ]
     ]
 }
