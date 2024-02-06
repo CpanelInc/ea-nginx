@@ -712,7 +712,7 @@ fi
 
 %changelog
 * Mon Jan 22 2024 Dan Muey <dan@cpanel.net> - 1.25.3-2
-- ZC-11549: No longer pull in Apache’s passenger in reverse proxy mode
+- ZC-11555: No longer pull in Apache’s passenger in reverse proxy mode
 
 * Thu Oct 26 2023 Cory McIntire <cory@cpanel.net> - 1.25.3-1
 - EA-11772: Update ea-nginx from v1.25.2 to v1.25.3
