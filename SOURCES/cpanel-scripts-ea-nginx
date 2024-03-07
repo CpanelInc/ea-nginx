@@ -3090,6 +3090,7 @@ sub _update_nginx_settings_config_file {
         # do not allow specifying apache_ ones
         my $new = Cpanel::JSON::LoadFile($custom_settings_file);
         my $cur = _get_settings_hr();
+        $settings_hr = undef;    # clear _get_settings_hr() cache since we are changing settings
         for my $key (qw(apache_port apache_port_ip apache_ssl_port apache_ssl_port_ip)) {
             $new->{$key} = $cur->{$key};
         }

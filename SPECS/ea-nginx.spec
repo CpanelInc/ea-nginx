@@ -713,6 +713,7 @@ fi
 %changelog
 * Thu Mar 07 2024 Dan Muey <dan@cpanel.net> - 1.25.4-2
 - ZC-11679: Account for circumstance where wwwacct.conf is missing
+- ZC-11680: clear cache after lookup for pre-install /var override
 
 * Wed Feb 14 2024 Cory McIntire <cory@cpanel.net> - 1.25.4-1
 - EA-11973: Update ea-nginx from v1.25.3 to v1.25.4
