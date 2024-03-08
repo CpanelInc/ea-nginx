@@ -1700,8 +1700,10 @@ This returns a hashref similar to the following:
 sub _get_logging_hr {
     return $logging_hr if $logging_hr;
 
-    $logging_hr->{piped_logs}          = Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
-    $logging_hr->{default_format_name} = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf()->{LOGSTYLE} || "combined";
+    $logging_hr->{piped_logs} = Whostmgr::TweakSettings::get_value( Main => 'enable_piped_logs' );
+
+    my $wwwacct = Cpanel::Config::LoadWwwAcctConf::loadwwwacctconf() // {};
+    $logging_hr->{default_format_name} = $wwwacct->{LOGSTYLE} || "combined";
 
     my $global_caching = caching_global();
     $logging_hr->{enable_cache_log} = $global_caching->{logging};
@@ -3088,6 +3090,7 @@ sub _update_nginx_settings_config_file {
         # do not allow specifying apache_ ones
         my $new = Cpanel::JSON::LoadFile($custom_settings_file);
         my $cur = _get_settings_hr();
+        $settings_hr = undef;    # clear _get_settings_hr() cache since we are changing settings
         for my $key (qw(apache_port apache_port_ip apache_ssl_port apache_ssl_port_ip)) {
             $new->{$key} = $cur->{$key};
         }
