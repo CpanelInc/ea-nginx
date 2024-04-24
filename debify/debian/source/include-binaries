@@ -1,2 +1,2 @@
 debian/SOURCES_FROM_SPEC/cpanel.tar.gz
-debian/SOURCES_FROM_SPEC/nginx-1.25.5.tar.gz
+debian/SOURCES_FROM_SPEC/nginx-1.26.0.tar.gz
