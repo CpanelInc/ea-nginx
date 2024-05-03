@@ -58,6 +58,7 @@ our $settings_file                     = "$etc_ea_nginx/settings.json";
 our $cache_file                        = "$etc_ea_nginx/cache.json";
 our $proxy_header_file                 = "$etc_ea_nginx/cpanel_localhost_header.json";
 our $serial_touch_file                 = "$etc_ea_nginx/serial_config_mode";
+our $skip_clearing_cache_touch_file    = "$etc_ea_nginx/do_not_clear_cache_on_reload_i_understand_the_risks"; #This is highly discouraged, we do not want to document this functionality. See ZC-11741
 our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
@@ -333,7 +334,7 @@ sub config {
 
         if ($reload) {
             _reload();
-            clear_cache();
+            clear_cache() if !-e $skip_clearing_cache_touch_file;
         }
 
         if ( keys %$errors ) {
@@ -357,7 +358,7 @@ sub config {
         _write_user_conf( $user, $global_config_data );
         if ($reload) {
             _reload("/etc/nginx/conf.d/users/$user.conf");
-            clear_cache($user);
+            clear_cache($user) if !-e $skip_clearing_cache_touch_file;
         }
     }
 
@@ -568,7 +569,10 @@ Reload nginx configuration
 
 =cut
 
-sub reload { _reload(); clear_cache(); }
+sub reload {
+    _reload();
+    clear_cache() if !-e $skip_clearing_cache_touch_file; 
+}
 
 ###############
 #### helpers ##
