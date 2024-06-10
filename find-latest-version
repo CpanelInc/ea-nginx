@@ -27,7 +27,7 @@ sub _get_required {
         die "Could not GET nginx dist page ($res->{status} $res->{reason})\n";
     }
 
-    my @nginx_1 = sort { $b <=> $a } ( $res->{content} =~ m{href="/download/nginx-1\.([0-9]+.[0-9]+)\.tar\.gz"}g );
+    my @nginx_1 = sort { $b <=> $a } ( $res->{content} =~ m{href="/download/nginx-1\.(26.[0-9]+)\.tar\.gz"}g );
     if ( !@nginx_1 ) {
         die "Could not find Nginx versions\n";
     }
