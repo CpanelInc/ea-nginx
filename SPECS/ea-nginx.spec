@@ -78,7 +78,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.26.0
+%define main_version 1.26.1
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -711,6 +711,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Jun 10 2024 Cory McIntire <cory@cpanel.net> - 1.26.1-1
+- EA-12203: Update ea-nginx from v1.26.0 to v1.26.1
+
 * Fri May 03 2024 Brian Mendoza <brian.mendoza@cpanel.net> - 1.26.0-2
 - ZC-11741: Reload touch file mechanism
 
