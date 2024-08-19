@@ -78,7 +78,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.26.1
+%define main_version 1.26.2
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -711,6 +711,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Aug 14 2024 Cory McIntire <cory@cpanel.net> - 1.26.2-1
+- EA-12337: Update ea-nginx from v1.26.1 to v1.26.2
+
 * Mon Jun 10 2024 Cory McIntire <cory@cpanel.net> - 1.26.1-1
 - EA-12203: Update ea-nginx from v1.26.0 to v1.26.1
 
