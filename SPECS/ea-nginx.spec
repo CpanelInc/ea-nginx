@@ -713,6 +713,8 @@ fi
 %changelog
 * Wed Aug 14 2024 Cory McIntire <cory@cpanel.net> - 1.26.2-1
 - EA-12337: Update ea-nginx from v1.26.1 to v1.26.2
+- *) Security: processing of a specially crafted mp4 file by the ngx_http_mp4_module might cause a worker process crash (CVE-2024-7347).
+  Thanks to Nils Bars.
 
 * Mon Jun 10 2024 Cory McIntire <cory@cpanel.net> - 1.26.1-1
 - EA-12203: Update ea-nginx from v1.26.0 to v1.26.1
