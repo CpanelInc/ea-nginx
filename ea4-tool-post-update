@@ -123,7 +123,7 @@ sub _update_repo {
 
     my $git     = ea4_tool::util::git($CWD);
     my $branch  = $git->current_branch();
-    my $default = $git->default_branch();
+    my $default = ea4_tool::util::git_default_branch($git);
 
     ea4_tool::util::pushup( $git, $branch );
 
