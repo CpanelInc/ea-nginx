@@ -713,6 +713,9 @@ fi
 %changelog
 * Tue Feb 11 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.26.3-1
 - EA-12703: Update ea-nginx from v1.26.2 to v1.26.3
+- Security: insufficient check in virtual servers handling with TLSv1.3
+  SNI allowed to reuse SSL sessions in a different virtual server, to
+  bypass client SSL certificates verification (CVE-2025-23419)
 
 * Wed Aug 14 2024 Cory McIntire <cory@cpanel.net> - 1.26.2-1
 - EA-12337: Update ea-nginx from v1.26.1 to v1.26.2
