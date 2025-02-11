@@ -78,7 +78,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.26.2
+%define main_version 1.26.3
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -711,6 +711,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Feb 11 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.26.3-1
+- EA-12703: Update ea-nginx from v1.26.2 to v1.26.3
+
 * Wed Aug 14 2024 Cory McIntire <cory@cpanel.net> - 1.26.2-1
 - EA-12337: Update ea-nginx from v1.26.1 to v1.26.2
 - *) Security: processing of a specially crafted mp4 file by the ngx_http_mp4_module might cause a worker process crash (CVE-2024-7347).
