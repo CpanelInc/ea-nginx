@@ -121,14 +121,16 @@ sub _update_repo {
 
     ea4_tool::cmd::change::run( undef, $repo, $case, $changelog );
 
-    my $git    = ea4_tool::util::git($CWD);
-    my $branch = $git->current_branch();
+    my $git     = ea4_tool::util::git($CWD);
+    my $branch  = $git->current_branch();
+    my $default = ea4_tool::util::git_default_branch($git);
+
     ea4_tool::util::pushup( $git, $branch );
 
     my $gitapi = ea4_tool::util::gitapi->new();
     my $title  = "$case: $changelog";
 
-    $gitapi->create_pull_request( $repo => $title, $branch => "master" );
+    $gitapi->create_pull_request( $repo => $title, $branch => $default );
 
     print "Build $repo in home directory\n";
     ea4_tool::cmd::obs::run( undef, '--file-list-changed=0' );
