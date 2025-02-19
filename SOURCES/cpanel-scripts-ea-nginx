@@ -1969,10 +1969,7 @@ sub _render_and_append {
 
     my $include_cloudflare = 1;
     my $settings_hr        = _get_settings_hr();
-    if ( exists $settings_hr->{include_cloudflare} ) {
-        my $value = $settings_hr->{include_cloudflare};
-        $include_cloudflare = 0 if ( $value eq "false" || $value eq "0" );
-    }
+    $include_cloudflare = $settings_hr->{include_cloudflare} if ( exists $settings_hr->{include_cloudflare} );
 
     $tt->process(
         \$server_tt,
