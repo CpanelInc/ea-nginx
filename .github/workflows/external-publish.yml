@@ -1,0 +1,11 @@
+name: Publish to external sites
+
+on:
+  push:
+    branches:
+      - main
+      - production
+jobs:
+  build:
+    uses: webpros-cpanel/ea-tools/.github/workflows/reusable-external-publish.yml@ghes
+    secrets: inherit
