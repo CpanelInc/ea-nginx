@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -711,6 +711,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Feb 18 2025 Julian Brown <julian.brown@webpros.com> - 1.26.3-2
+- ZC-12573: Create setting to include or not include cloudflare.conf
+
 * Tue Feb 11 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.26.3-1
 - EA-12703: Update ea-nginx from v1.26.2 to v1.26.3
 - Security: insufficient check in virtual servers handling with TLSv1.3
