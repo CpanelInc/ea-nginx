@@ -16,7 +16,9 @@ server {
     access_log /var/log/nginx/domains/[% domains.0 %]-bytes_log cp_bytes_server;
     [% END -%]
 
+    [%- IF include_cloudflare %]
     include conf.d/includes-optional/cloudflare.conf;
+    [% END -%]
 
     set $CPANEL_APACHE_PROXY_PASS $scheme://apache_backend_${scheme}_[% proxy_ip ? proxy_ip.replace("\\.", "_") : settings.apache_port_ip.replace("\\.", "_") %];
 
@@ -277,7 +279,9 @@ server {
     set $USER_ID [% uid %];
     [% END -%]
 
+    [%- IF include_cloudflare %]
     include conf.d/includes-optional/cloudflare.conf;
+    [% END -%]
 
     set $CPANEL_APACHE_PROXY_PASS $scheme://apache_backend_${scheme}_[% proxy_ip ? proxy_ip.replace("\\.", "_") : settings.apache_port_ip.replace("\\.", "_") %];
 

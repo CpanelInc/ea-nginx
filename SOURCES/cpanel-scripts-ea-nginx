@@ -58,7 +58,7 @@ our $settings_file                     = "$etc_ea_nginx/settings.json";
 our $cache_file                        = "$etc_ea_nginx/cache.json";
 our $proxy_header_file                 = "$etc_ea_nginx/cpanel_localhost_header.json";
 our $serial_touch_file                 = "$etc_ea_nginx/serial_config_mode";
-our $skip_clearing_cache_touch_file    = "$etc_ea_nginx/do_not_clear_cache_on_reload_i_understand_the_risks"; #This is highly discouraged, we do not want to document this functionality. See ZC-11741
+our $skip_clearing_cache_touch_file    = "$etc_ea_nginx/do_not_clear_cache_on_reload_i_understand_the_risks";    #This is highly discouraged, we do not want to document this functionality. See ZC-11741
 our $wp_toolkit_bin                    = '/usr/local/bin/wp-toolkit';
 our $wordpress_cache_dir               = '/etc/nginx/wordpress_info_cache';
 our $disable_wordpress_info_cache_file = '/var/cpanel/nginx_disable_wordpress_info_cache';
@@ -571,7 +571,7 @@ Reload nginx configuration
 
 sub reload {
     _reload();
-    clear_cache() if !-e $skip_clearing_cache_touch_file; 
+    clear_cache() if !-e $skip_clearing_cache_touch_file;
 }
 
 ###############
@@ -1967,6 +1967,10 @@ sub _render_and_append {
     my $wordpress_hr  = _get_wordpress_info( $user, $user_docroots->{ $domains->[0] } );
     my $has_wordpress = ( $wordpress_hr->{docroot_install} || scalar @{ $wordpress_hr->{non_docroot_uris} } ) ? 1 : 0;
 
+    my $include_cloudflare = 1;
+    my $settings_hr        = _get_settings_hr();
+    $include_cloudflare = $settings_hr->{include_cloudflare} if ( exists $settings_hr->{include_cloudflare} );
+
     $tt->process(
         \$server_tt,
         {
@@ -2004,6 +2008,7 @@ sub _render_and_append {
                 caching    => $caching_hr,
             },
             proxysubdomains_enabled => $global_config_data->{cpconf}->{proxysubdomains},
+            include_cloudflare      => $include_cloudflare,
         },
         sub {
             my ($out) = @_;
