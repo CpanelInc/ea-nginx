@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 4
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -711,6 +711,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Apr 09 2025 Chris Castillo <chris.castillo@webpros.com> - 1.26.3-4
+- ZC-12765: Collect traffic logs.
+
 * Thu Mar 27 2025 Chris Castillo <chris.castillo@webpros.com> - 1.26.3-3
 - ZC-12245: Remove domlogs on account removal.
 

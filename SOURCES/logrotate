@@ -13,3 +13,15 @@
                 fi
         endscript
 }
+
+/var/log/cpanel-server-traffic/web/traffic-nginx.log {
+    copytruncate
+    rotate 5
+    daily
+    compress
+    missingok
+    extension traffic-nginx.log
+    dateext
+    dateformat %Y-%m-%d-
+    dateyesterday
+}
