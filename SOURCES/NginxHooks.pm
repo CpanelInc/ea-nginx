@@ -83,6 +83,7 @@ sub describe {
         'Domain::addsubdomain',
         'Domain::delsubdomain',
     );
+
     my @normal_actions = map {
         {
             'category' => 'Whostmgr',
@@ -99,6 +100,19 @@ sub describe {
         'TweakSettings::Basic',
         'TweakSettings::Main',
     );
+
+    my @cleanup_actions = map {
+        {
+            'category' => 'Whostmgr',
+            'event'    => $_,
+            'stage'    => 'pre',
+            'hook'     => 'NginxHooks::_perform_cleanup',
+            'exectype' => 'module',
+        }
+    } (
+        'Accounts::Remove',
+    );
+
     my @adminbin_actions = map {
         {
             'category' => 'Cpanel',
@@ -168,6 +182,7 @@ sub describe {
         @adminbin_actions,
         @build_apache_conf,
         @normal_actions,
+        @cleanup_actions,
         @rebuild_user_actions,
         @phpfpm_actions,
         @script_php_fpm_config_actions,
@@ -264,6 +279,81 @@ sub _php_fpm_config {
     return $@ ? ( 0, $@ ) : ( 1, "Success" );
 }
 
+sub _perform_cleanup {
+    my ( $hook, $event ) = @_;
+
+    Cpanel::Debug::log_info("_perform_cleanup: 001");
+
+    my $user = $event->{user};
+
+    if ($user) {
+        Cpanel::Debug::log_info("_perform_cleanup: 002 User :$user:");
+
+        require Cpanel::Config::LoadCpUserFile;
+        my $cpuser_data = Cpanel::Config::LoadCpUserFile::load_or_die($user);
+
+        my $dir = '/var/log/nginx/domains';
+        if ( -e "$dir/$user" ) {
+            require File::Path;
+            File::Path::remove_tree("$dir/$user");
+        }
+
+        my $domain      = $cpuser_data->{'DOMAIN'};
+        my @PDS              = @{ $cpuser_data->{'DOMAINS'}     || [] };
+        my @_raw_deaddomains = @{ $cpuser_data->{'DEADDOMAINS'} || [] };
+
+        require Cpanel::Domains;
+        my @true_deaddomains = Cpanel::Domains::get_true_user_deaddomains( \@_raw_deaddomains );
+
+        ## case 9010: remove domlogs for deaddomains, as well
+        my @paths = (
+            "${user}-imapbytes_log.offset",
+            "${user}-imapbytes_log",
+            "${user}-popbytes_log.offset",
+            "${user}-popbytes_log",
+            $user,
+        );
+
+        my @domains = ( $domain, "www.$domain", @PDS, @true_deaddomains );
+        for (@domains) {
+            next if index( $_, '.' ) == 0;
+
+            push @paths, (
+                $_,
+                "${_}.bkup",
+                "${_}.bkup2",
+                "${_}.offset",
+                "${_}.bkup.offset",
+                "${_}-ssl_log",
+                "${_}-ssl_log.bkup",
+                "${_}-ssl_log.bkup2",
+                "${_}-ssl_log.offset",
+                "${_}-ssl_log.bkup.offset",
+                "${_}-bytes_log",
+                "${_}-bytes_log.offset",
+                "ftp.${_}-ftp_log",
+                "${_}-smtpbytes_log",
+                "${_}-smtpbytes_log.offset",
+            );
+        }
+
+        eval { _unlink_or_warn_if_exists("$dir/$_") for @paths; };
+        Cpanel::Debug::log_info("_perform_cleanup 003 Complete :$user:");
+    }
+    else {
+        Cpanel::Debug::log_error("_perform_cleanup: 004 Missing User :$user:");
+        return ( 0, "Missing User" );
+    }
+
+    return $@ ? ( 0, $@ ) : ( 1, "Success" );
+}
+
+sub _unlink_or_warn_if_exists {
+    local $!;
+    return unlink $_[0] || do {
+        warn "unlink($_[0]): $!" if $! != _ENOENT();
+    };
+}
 sub _just_clear_user_cache {
     my ( $hook, $event ) = @_;
 

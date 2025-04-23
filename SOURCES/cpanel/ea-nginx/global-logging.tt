@@ -2,6 +2,10 @@ map $msec $msec_no_microseconds {
     ~([0-9]+)\. $1;
 }
 
+map $time_iso8601 $date {
+  ~^([0-9-]+)T $1;
+}
+
 error_log /var/log/nginx/error.log [% logging.loglevel %];
 
 log_format cp_combined '$server_name:$server_port $remote_addr - $remote_user [$time_local] '
@@ -25,9 +29,19 @@ pipelog_format combinedvhost '$server_name:$server_port $remote_addr - $remote_u
 
 pipelog "/usr/local/cpanel/bin/splitlogs --dir=/var/log/nginx/domains --main=[% hostname %] --suffix=-bytes_log" bytesvhost;
 pipelog "/usr/local/cpanel/bin/splitlogs --dir=/var/log/nginx/domains --main=[% hostname %] --mainout=/var/log/nginx/access.log" combinedvhost;
+
+pipelog_format traffic_log 'nginx-traffic.log $date $server_protocol $ssl_protocol '
+    '$host $request_length $bytes_sent '
+    '$remote_addr $realip_remote_addr';
+pipelog "/usr/local/cpanel/bin/splitlogs --main=nginx-traffic.log --mainout=/var/log/cpanel-server-traffic/web/traffic-nginx.log" traffic_log;
 [% ELSE %]
 # access_log format can be set in WHM under 'Basic WebHost Manager® Setup'
 access_log /var/log/nginx/access.log cp_[% logging.default_format_name %];
+
+log_format traffic_log '$date $server_protocol $ssl_protocol '
+    '$host $request_length $bytes_sent '
+    '$remote_addr $realip_remote_addr';
+access_log /var/log/cpanel-server-traffic/web/traffic-nginx.log traffic_log;
 [% END -%]
 
 [%- IF logging.enable_cache_log %]
