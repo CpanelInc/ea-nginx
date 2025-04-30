@@ -148,11 +148,21 @@ License: 2-clause BSD-like license
 
 BuildRoot: %{_tmppath}/%{upstream_name}-%{main_version}-%{release}-root
 BuildRequires: zlib-devel
+
+%if 0%{?rhel} < 10
 BuildRequires: pcre-devel
+%else
+BuildRequires: pcre2-devel
+%endif
 
 %if 0%{?rhel} > 6
 BuildRequires: ea-ngx-brotli-src
+%endif
+
+%if 0%{?rhel} >= 6 && 0%{?rhel} < 10
 BuildRequires: ea-brotli
+%else
+BuildRequires: brotli
 %endif
 
 Provides: webserver
@@ -166,7 +176,12 @@ and often less load on a busy server.
 %package ngxdev
 Group: Development/Tools
 Summary: Simplify making EA4 pkgs of NGINX modules
+%if 0%{?rhel} < 10
 Requires: pcre-devel
+%else
+Requires: pcre2-devel
+%endif
+
 %if 0%{?rhel} == 7
 Requires: ea-openssl11, ea-openssl11-devel
 %else
@@ -201,7 +216,7 @@ export CC=gcc
 mkdir -p ngx_http_pipelog_module/
 %endif
 
-%if 0%{?rhel} > 6
+%if 0%{?rhel} > 6 && 0%{?rhel} < 10
 export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
 %endif
 
