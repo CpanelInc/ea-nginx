@@ -1,5 +1,5 @@
 {
-    "put_source0_in_sources" : true,
+    "put_source0_in_sources": true,
     "override_vars": {
         "use_systemd": 1,
         "BASE_WITH_CC_OPT": "",
@@ -23,13 +23,19 @@
     "add_to_build_requires": [
         "libcurl4-openssl-dev",
         "libaio-dev",
-        "libaio1",
+        [
+            "libaio1t64",
+            "libaio1"
+        ],
         "linux-libc-dev",
         "libc6-dev"
     ],
     "add_to_requires": {
         "ea-nginx": [
-            "libaio1"
+            "libaio1",
+            [
+                "libaio1t64"
+            ]
         ]
     },
     "fix_dh_usrlocal": 1,
@@ -51,4 +57,3 @@
         ]
     ]
 }
-
