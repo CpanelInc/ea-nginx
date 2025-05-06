@@ -1,59 +1,59 @@
 {
-    "put_source0_in_sources": true,
-    "override_vars": {
-        "use_systemd": 1,
-        "BASE_WITH_CC_OPT": "",
-        "BASE_WITH_LD_OPT": "",
-        "_builddir": "",
-        "_sysconfdir": "/etc",
-        "_datadir": "/usr/share",
-        "_localstatedir": "/var",
-        "_libdir": "/usr/lib64",
-        "_sbindir": "/usr/sbin",
-        "_libexecdir": "/usr/libexec",
-        "nginx_loggroup": "adm"
-    },
-    "source_tarball_regex": "nginx",
-    "remove_from_requires": [
-        "libcurl4-gnutls-dev",
-        "libopenssl-devel",
-        "redhat-lsb-core",
-        "initscripts"
-    ],
-    "add_to_build_requires": [
-        "libcurl4-openssl-dev",
-        "libaio-dev",
-        [
+   "add_to_build_requires" : [
+      "libcurl4-openssl-dev",
+      "libaio-dev",
+      [
+         "libaio1t64",
+         "libaio1"
+      ],
+      "linux-libc-dev",
+      "libc6-dev"
+   ],
+   "add_to_requires" : {
+      "ea-nginx" : [
+         [
             "libaio1t64",
             "libaio1"
-        ],
-        "linux-libc-dev",
-        "libc6-dev"
-    ],
-    "add_to_requires": {
-        "ea-nginx": [
-            [
-               "libaio1t64",
-               "libaio1"
-            ]
-        ]
-    },
-    "fix_dh_usrlocal": 1,
-    "remove_from_specific_install": {
-        "ea-nginx": [
-            "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf"
-        ]
-    },
-    "adjust_install_file_src": [
-        [
-            "etc/dnf/universal-hooks/multi_pkgs/transaction",
-            "etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
-        ]
-    ],
-    "adjust_install_file_dst": [
-        [
-            "etc/dnf/universal-hooks/multi_pkgs/transaction",
-            "etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
-        ]
-    ]
+         ]
+      ]
+   },
+   "adjust_install_file_dst" : [
+      [
+         "etc/dnf/universal-hooks/multi_pkgs/transaction",
+         "etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+      ]
+   ],
+   "adjust_install_file_src" : [
+      [
+         "etc/dnf/universal-hooks/multi_pkgs/transaction",
+         "etc/apt/universal-hooks/multi_pkgs/Post-Invoke"
+      ]
+   ],
+   "fix_dh_usrlocal" : 1,
+   "override_vars" : {
+      "BASE_WITH_CC_OPT" : "",
+      "BASE_WITH_LD_OPT" : "",
+      "_builddir" : "",
+      "_datadir" : "/usr/share",
+      "_libdir" : "/usr/lib64",
+      "_libexecdir" : "/usr/libexec",
+      "_localstatedir" : "/var",
+      "_sbindir" : "/usr/sbin",
+      "_sysconfdir" : "/etc",
+      "nginx_loggroup" : "adm",
+      "use_systemd" : 1
+   },
+   "put_source0_in_sources" : true,
+   "remove_from_requires" : [
+      "libcurl4-gnutls-dev",
+      "libopenssl-devel",
+      "redhat-lsb-core",
+      "initscripts"
+   ],
+   "remove_from_specific_install" : {
+      "ea-nginx" : [
+         "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf"
+      ]
+   },
+   "source_tarball_regex" : "nginx"
 }
