@@ -32,9 +32,9 @@
     ],
     "add_to_requires": {
         "ea-nginx": [
-            "libaio1",
             [
-                "libaio1t64"
+               "libaio1t64",
+               "libaio1"
             ]
         ]
     },
