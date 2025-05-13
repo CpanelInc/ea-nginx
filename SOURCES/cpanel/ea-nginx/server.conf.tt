@@ -14,6 +14,8 @@ server {
     [%- IF !logging.piped_logs %]
     access_log /var/log/nginx/domains/[% domains.0 %] cp_combined;
     access_log /var/log/nginx/domains/[% domains.0 %]-bytes_log cp_bytes_server;
+
+    access_log /var/log/cpanel-server-traffic/web/traffic-nginx.log traffic_log;
     [% END -%]
 
     [%- IF include_cloudflare %]

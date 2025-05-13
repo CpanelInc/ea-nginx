@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 4
+%define release_prefix 5
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -148,11 +148,21 @@ License: 2-clause BSD-like license
 
 BuildRoot: %{_tmppath}/%{upstream_name}-%{main_version}-%{release}-root
 BuildRequires: zlib-devel
+
+%if 0%{?rhel} < 10
 BuildRequires: pcre-devel
+%else
+BuildRequires: pcre2-devel
+%endif
 
 %if 0%{?rhel} > 6
 BuildRequires: ea-ngx-brotli-src
+%endif
+
+%if 0%{?rhel} >= 6 && 0%{?rhel} < 10
 BuildRequires: ea-brotli
+%else
+BuildRequires: brotli
 %endif
 
 Provides: webserver
@@ -166,7 +176,12 @@ and often less load on a busy server.
 %package ngxdev
 Group: Development/Tools
 Summary: Simplify making EA4 pkgs of NGINX modules
+%if 0%{?rhel} < 10
 Requires: pcre-devel
+%else
+Requires: pcre2-devel
+%endif
+
 %if 0%{?rhel} == 7
 Requires: ea-openssl11, ea-openssl11-devel
 %else
@@ -201,7 +216,7 @@ export CC=gcc
 mkdir -p ngx_http_pipelog_module/
 %endif
 
-%if 0%{?rhel} > 6
+%if 0%{?rhel} > 6 && 0%{?rhel} < 10
 export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
 %endif
 
@@ -711,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu May 08 2025 Julian Brown <julian.brown@webpros.com> - 1.26.3-5
+- ZC-12825: Correct traffic log issue when not using piped logs
+
 * Wed Apr 09 2025 Chris Castillo <chris.castillo@webpros.com> - 1.26.3-4
 - ZC-12765: Collect traffic logs.
 
