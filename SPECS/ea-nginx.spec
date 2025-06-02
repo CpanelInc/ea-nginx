@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 5
+%define release_prefix 6
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Jun 02 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-6
+- ZC-12882: Re-order traffic log IPs format to match actual use
+
 * Thu May 08 2025 Julian Brown <julian.brown@webpros.com> - 1.26.3-5
 - ZC-12825: Correct traffic log issue when not using piped logs
 

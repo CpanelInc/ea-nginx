@@ -32,7 +32,7 @@ pipelog "/usr/local/cpanel/bin/splitlogs --dir=/var/log/nginx/domains --main=[% 
 
 pipelog_format traffic_log 'nginx-traffic.log $date $server_protocol $ssl_protocol '
     '$host $request_length $bytes_sent '
-    '$remote_addr $realip_remote_addr';
+    '$realip_remote_addr $remote_addr';
 pipelog "/usr/local/cpanel/bin/splitlogs --main=nginx-traffic.log --mainout=/var/log/cpanel-server-traffic/web/traffic-nginx.log" traffic_log;
 [% ELSE %]
 # access_log format can be set in WHM under 'Basic WebHost Manager® Setup'
@@ -40,7 +40,7 @@ access_log /var/log/nginx/access.log cp_[% logging.default_format_name %];
 
 log_format traffic_log '$date $server_protocol $ssl_protocol '
     '$host $request_length $bytes_sent '
-    '$remote_addr $realip_remote_addr';
+    '$realip_remote_addr $remote_addr';
 access_log /var/log/cpanel-server-traffic/web/traffic-nginx.log traffic_log;
 [% END -%]
 
