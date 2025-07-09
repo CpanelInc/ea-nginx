@@ -1,19 +1,21 @@
 {
    "add_to_build_requires" : [
-      "libcurl4-openssl-dev",
       "libaio-dev",
       [
          "libaio1t64",
          "libaio1"
       ],
       "linux-libc-dev",
-      "libc6-dev"
+      "libc6-dev",
+      "libcurl4",
+      "libcurl4-openssl-dev"
    ],
    "add_to_requires" : {
       "ea-nginx" : [
          [
             "libaio1t64",
-            "libaio1"
+            "libaio1",
+            "libcurl4"
          ]
       ]
    },
