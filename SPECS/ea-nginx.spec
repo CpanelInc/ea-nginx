@@ -727,7 +727,7 @@ fi
 
 %changelog
 * Wed Jul 09 2025 Julian Brown <julian.brown@webpros.com> - 1.26.3-7
-- ZC-11765: fix warnings from /etc/nginx/ea-nginx/meta/apache
+- ZC-12940: fix warnings from /etc/nginx/ea-nginx/meta/apache
 
 * Mon Jun 02 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-6
 - ZC-12882: Re-order traffic log IPs format to match actual use
