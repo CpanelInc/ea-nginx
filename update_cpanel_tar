@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -x
+
+if [ ! -d SOURCES/cpanel ]; then
+    echo "PLEASE RUN FROM TOP DIR OF REPO!"
+    exit 1
+fi
+
+cd SOURCES/cpanel && rm -f ../cpanel.tar.gz && tar czf ../cpanel.tar.gz conf.d ea-nginx && cd ../.. && git add SOURCES/cpanel.tar.gz
+
+echo "Done"
+

@@ -52,6 +52,8 @@ Since `SOURCES/` must be flat it is cleaner to generate a tarball as a single so
 
 Just run: `cd SOURCES/cpanel && rm -f ../cpanel.tar.gz && tar czf ../cpanel.tar.gz conf.d ea-nginx && cd ../.. && git add SOURCES/cpanel.tar.gz`
 
+A convenience script has been added that does the above, `./update_cpanel_tar`.
+
 ## Make sure any `proxy_pass` directives do not introduce XSS vulnerability
 
 TL;DR: simply ensure it does not end in a `/`

@@ -130,7 +130,8 @@ sub _get_apicall {
     else {
         my $hr = eval { JSON::Syck::Load( $run->stdout() ) };
         if ( !$hr || !$hr->{metadata}{result} ) {
-            warn "whmapi1 $function failed: $hr->{metadata}{reason}\n";
+            my $reason = $hr->{metadata}{reason} // "API did not specify metadata.reason";
+            warn "whmapi1 $function failed: $reason\n";
             return;
         }
 
