@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 7
+%define release_prefix 8
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Jul 16 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-8
+- EA-13028: Address 421 from Apache v2.4.64 SNI fix
+
 * Wed Jul 09 2025 Julian Brown <julian.brown@webpros.com> - 1.26.3-7
 - ZC-12940: fix warnings from /etc/nginx/ea-nginx/meta/apache
 
