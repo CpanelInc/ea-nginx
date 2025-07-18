@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 10
+%define release_prefix 11
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Fri Jul 18 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.26.3-11
+- EA-13040: Remove SNI fix as we've removed the offending changes in ea-apache24 for now.
+
 * Thu Jul 17 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.26.3-10
 - EA-13014: Update to 421 Fix, order matters
 
