@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 8
+%define release_prefix 9
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Jul 17 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.26.3-9
+- EA-13014: Fix '421 Misdirected Request' error with the first hit with on a fresh server
+
 * Wed Jul 16 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-8
 - EA-13028: Address 421 from Apache v2.4.64 SNI fix
 
