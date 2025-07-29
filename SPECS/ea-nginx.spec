@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 12
+%define release_prefix 13
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Jul 29 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-13
+- EA4-62: disable proxy_ssl_session_reuse for more reliable SNI
+
 * Thu Jul 24 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-12
 - EA4-56: Address 421 from Apache v2.4.64 SNI fix
 

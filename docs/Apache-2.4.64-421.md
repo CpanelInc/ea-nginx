@@ -31,11 +31,13 @@ These errors appear intermittently due to connection reuse patterns.
 
 ## Workaround: Switching to HTTP/1.0
 
-To avoid `421` errors without sacrificing performance entirely:
+To avoid `421` errors without sacrificing performance entirely, in NGINX we:
 
-- We **unset `proxy_http_version`** in Nginx.
-- This forces **HTTP/1.0** on the backend, adding `Connection: close` to each request.
-- Each request now triggers a fresh TCP/TLS handshake with a matching SNI and `Host:` header.
+- Unset `proxy_http_version`
+  - This forces **HTTP/1.0** on the backend, adding `Connection: close` to each request.
+  - Each request now triggers a fresh TCP/TLS handshake with a matching SNI and `Host:` header.
+- Turn off `proxy_ssl_session_reuse` as a complementary setting
+
 
 ### Benefits
 
