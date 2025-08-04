@@ -48,6 +48,16 @@ To avoid `421` errors without sacrificing performance entirely, in NGINX we:
 ### Trade-offs
 
 - Slightly increased CPU usage and latency due to more frequent TLS handshakes.
+- Nginx cannot tunnel a protocol switch to Apache over HTTP/1.0, so any WebSocket endpoint through the proxy will fail. For WebSocket support with proxy_http_version 1.1, setup it up in a user's custom config. For example /etc/nginx/conf.d/users/USER/DOMAIN/ws.conf.
+  ```
+    location /wsapp {
+      proxy_pass http://your_apache_backend;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+      # ... other proxy configurations
+    }
+  ```
 
 ## Broader Implications for Other Proxies
 
