@@ -22,19 +22,18 @@ ea4_tool::util::find_latest_version( \&_get_required, \&_add_sum ) if !caller();
 sub _get_required {
     my ($http) = @_;
 
-    my $res = $http->get("https://nginx.org/en/download.html");
+    my $res = $http->get("https://api.github.com/repos/nginx/nginx/releases");
     if ( !$res->{success} ) {
-        die "Could not GET nginx dist page ($res->{status} $res->{reason})\n";
+        die "Could not GET NGINX info from github ($res->{status} $res->{reason})\n\t Throttled? `curl -I https://api.github.com/rate_limit 2>&1 | grep ^X-RateLimit`\n";
     }
 
-    my @nginx_1 = sort { $b <=> $a } ( $res->{content} =~ m{href="/download/nginx-1\.([0-9]+.[0-9]+)\.tar\.gz"}g );
-    if ( !@nginx_1 ) {
-        die "Could not find Nginx versions\n";
-    }
+    # get $version, $url, $name from $res
+    my $version = ea4_tool::util::json2ref( $res->{content} )->[0]{tag_name};
+    $version =~ s/release-//;
+    die "Could not determine version from github\n" if !$version;
 
-    my $version = "1.$nginx_1[0]";
-    my $name    = "nginx-$version.tar.gz";
-    my $url     = "https://nginx.org/download/$name";
+    my $name = "release-$version.tar.gz";
+    my $url  = "https://github.com/nginx/nginx/archive/$name";
 
     return ( $version, $url, $name );
 }
