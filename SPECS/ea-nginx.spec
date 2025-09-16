@@ -730,7 +730,7 @@ fi
 - EA-13069: Update ea-nginx from v1.26.3 to v1.29.1
 - CVE-2025-53859: A security issue in ngx_mail_smtp_module,which might allow an attacker to cause buffer over-read
 
-* Mon Aug 06 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-15
+* Wed Aug 06 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-15
 - Newer release_prefix for build precendence issue
 
 * Tue Jul 29 2025 Dan Muey <daniel.muey@webpros.com> - 1.26.3-13
