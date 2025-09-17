@@ -194,7 +194,7 @@ Requires: zlib-devel
 Provides tools to make it easier to make an EA4 pkg for an nginx module.
 
 %prep
-%setup -q -n nginx-release-%{version}
+%setup -q -n nginx-%{version}
 cp %{SOURCE2} .
 sed -e 's|%%DEFAULTSTART%%|2 3 4 5|g' -e 's|%%DEFAULTSTOP%%|0 1 6|g' \
     -e 's|%%PROVIDES%%|nginx|g' < %{SOURCE2} > nginx.init
@@ -221,7 +221,7 @@ export LDFLAGS="$LDFLAGS -Wl,-rpath=/opt/cpanel/ea-brotli/lib"
 %endif
 
 # build debug
-./configure %{BASE_CONFIGURE_ARGS} \
+./auto/configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
     --with-debug \
@@ -233,7 +233,7 @@ make %{?_smp_mflags}
 %{__mv} %{bdir}/objs/nginx %{bdir}/objs/nginx-debug
 
 # build actual
-./configure %{BASE_CONFIGURE_ARGS} \
+./auto/configure %{BASE_CONFIGURE_ARGS} \
     --with-cc-opt="%{WITH_CC_OPT}" \
     --with-ld-opt="%{WITH_LD_OPT}" \
 %if 0%{?rhel} > 6
