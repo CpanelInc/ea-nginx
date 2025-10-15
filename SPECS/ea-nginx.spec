@@ -114,7 +114,7 @@ Provides: ea-nginx = %{version}-%{release}
 Conflicts: nginx
 AutoReq: no
 
-Source0: http://nginx.org/download/nginx-%{version}.tar.gz
+Source0: https://github.com/nginx/nginx/archive/release-%{version}.tar.gz
 Source1: logrotate
 Source2: nginx.init.in
 Source3: nginx.sysconf
