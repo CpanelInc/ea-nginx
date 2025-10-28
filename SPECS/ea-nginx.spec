@@ -1,5 +1,5 @@
 #
-%define upstream_name nginx
+%define upstream_name nginx-release
 %define nginx_home %{_localstatedir}/cache/nginx
 %define nginx_user nobody
 %define nginx_group nobody
@@ -194,7 +194,7 @@ Requires: zlib-devel
 Provides tools to make it easier to make an EA4 pkg for an nginx module.
 
 %prep
-%setup -q -n nginx-release-%{version}
+%setup -q -n %{upstream_name}-%{version}
 cp %{SOURCE2} .
 sed -e 's|%%DEFAULTSTART%%|2 3 4 5|g' -e 's|%%DEFAULTSTOP%%|0 1 6|g' \
     -e 's|%%PROVIDES%%|nginx|g' < %{SOURCE2} > nginx.init
