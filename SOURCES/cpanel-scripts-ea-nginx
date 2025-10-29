@@ -36,6 +36,7 @@ use Cpanel::PHPFPM::Get                      ();
 use Cpanel::PwCache                          ();
 use Cpanel::Rand::Get                        ();
 use Cpanel::SafeRun::Object                  ();
+use Cpanel::Server::Type                     ();
 use Cpanel::Transaction::File::JSON          ();
 use Cpanel::Validate::URL                    ();
 use Cpanel::Validate::Username               ();
@@ -1939,9 +1940,19 @@ sub _render_and_append {
 
     $domains_with_ssl ||= _get_domains_with_ssls();
 
+    my $is_wp_squared = Cpanel::Server::Type::is_wp_squared() ? 1 : 0;
+
     my @service_subdomains;
     $httpd_vhosts_hr ||= _get_httpd_vhosts_hash();
     if ( exists $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains} ) {
+
+        if ($is_wp_squared) {
+            # Add wp and wp2 service subdomains
+            my $domain = $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains}{(keys %{$httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains}})[0]};
+            $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains}{wp} = $domain;
+            $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains}{wp2} = $domain;
+        }
+
         for my $sub ( sort keys %{ $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains} } ) {
             push @service_subdomains, map { "$sub.$_" } @{ $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains}{$sub} };
         }
