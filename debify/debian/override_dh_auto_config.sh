@@ -30,7 +30,7 @@ export EXTRA_LDFLAGS=$LDFLAGS
 #sed -i '51iecho "ERR"; cat $NGX_AUTOCONF_ERR; echo ""; echo "XXX: 001"; echo $ngx_test; echo "XXX: 002"; echo ""; echo "XXX: 003"' auto/feature
 
 #build debug
-./configure $BASE_CONFIGURE_ARGS \
+./auto/configure $BASE_CONFIGURE_ARGS \
     --with-cc-opt="$WITH_CC_OPT" \
     --with-ld-opt="$WITH_LD_OPT" \
     --with-debug \
@@ -43,7 +43,7 @@ make
 mv $bdir/objs/nginx $bdir/objs/nginx-debug
 
 # build actual
-./configure $BASE_CONFIGURE_ARGS \
+./auto/configure $BASE_CONFIGURE_ARGS \
     --with-cc-opt="$WITH_CC_OPT" \
     --with-ld-opt="$WITH_LD_OPT" \
     --with-ipv6 \
