@@ -78,7 +78,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.29.1
+%define main_version 1.29.3
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Oct 28 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.3-1
+- EA-13235: Update ea-nginx from v1.29.1 to v1.29.3
+
 * Wed Aug 13 2025 Dan Muey <daniel.muey@webpros.com> - 1.29.1-1
 - EA-13069: Update ea-nginx from v1.26.3 to v1.29.1
 - CVE-2025-53859: A security issue in ngx_mail_smtp_module,which might allow an attacker to cause buffer over-read
