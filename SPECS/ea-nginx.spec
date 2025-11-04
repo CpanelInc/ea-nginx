@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -256,7 +256,7 @@ export SPACE_ESCAPED_WITH_CC_OPT=$(echo "%{WITH_CC_OPT}" | sed 's/ /+/g')
 export SPACE_ESCAPED_WITH_LD_OPT=$(echo "%{WITH_LD_OPT}" | sed 's/ /+/g')
 echo "%{BASE_CONFIGURE_ARGS} --with-cc-opt=$SPACE_ESCAPED_WITH_CC_OPT --with-ld-opt=$SPACE_ESCAPED_WITH_LD_OPT" > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/ngx-configure-args
 echo -n %{version} > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/nginx-ver
-/bin/cp -f %{SOURCE0} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
+/bin/cp -f %{SOURCE0} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/nginx-%{version}.tar.gz
 %{__install} -p %{SOURCE29} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
 
 %{__make} DESTDIR=$RPM_BUILD_ROOT INSTALLDIRS=vendor install
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Nov 04 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.3-2
+- EA-13235: Fix ngxdev tarball filename to match what nginx module packages expect
+
 * Tue Oct 28 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.3-1
 - EA-13235: Update ea-nginx from v1.29.1 to v1.29.3
 
