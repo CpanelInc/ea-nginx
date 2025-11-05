@@ -1,5 +1,5 @@
 #
-%define upstream_name nginx
+%define upstream_name nginx-release
 %define nginx_home %{_localstatedir}/cache/nginx
 %define nginx_user nobody
 %define nginx_group nobody
@@ -78,7 +78,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.29.1
+%define main_version 1.29.3
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -114,7 +114,7 @@ Provides: ea-nginx = %{version}-%{release}
 Conflicts: nginx
 AutoReq: no
 
-Source0: http://nginx.org/download/nginx-%{version}.tar.gz
+Source0: https://github.com/nginx/nginx/archive/release-%{version}.tar.gz
 Source1: logrotate
 Source2: nginx.init.in
 Source3: nginx.sysconf
@@ -194,7 +194,7 @@ Requires: zlib-devel
 Provides tools to make it easier to make an EA4 pkg for an nginx module.
 
 %prep
-%setup -q -n nginx-%{version}
+%setup -q -n %{upstream_name}-%{version}
 cp %{SOURCE2} .
 sed -e 's|%%DEFAULTSTART%%|2 3 4 5|g' -e 's|%%DEFAULTSTOP%%|0 1 6|g' \
     -e 's|%%PROVIDES%%|nginx|g' < %{SOURCE2} > nginx.init
@@ -256,7 +256,7 @@ export SPACE_ESCAPED_WITH_CC_OPT=$(echo "%{WITH_CC_OPT}" | sed 's/ /+/g')
 export SPACE_ESCAPED_WITH_LD_OPT=$(echo "%{WITH_LD_OPT}" | sed 's/ /+/g')
 echo "%{BASE_CONFIGURE_ARGS} --with-cc-opt=$SPACE_ESCAPED_WITH_CC_OPT --with-ld-opt=$SPACE_ESCAPED_WITH_LD_OPT" > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/ngx-configure-args
 echo -n %{version} > $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/nginx-ver
-/bin/cp -f %{SOURCE0} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
+/bin/cp -f %{SOURCE0} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/nginx-%{version}.tar.gz
 %{__install} -p %{SOURCE29} $RPM_BUILD_ROOT/opt/cpanel/ea-nginx-ngxdev/
 
 %{__make} DESTDIR=$RPM_BUILD_ROOT INSTALLDIRS=vendor install
@@ -726,6 +726,12 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Nov 04 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.3-2
+- EA-13235: Fix ngxdev tarball filename to match what nginx module packages expect
+
+* Tue Oct 28 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.3-1
+- EA-13235: Update ea-nginx from v1.29.1 to v1.29.3
+
 * Wed Aug 13 2025 Dan Muey <daniel.muey@webpros.com> - 1.29.1-1
 - EA-13069: Update ea-nginx from v1.26.3 to v1.29.1
 - CVE-2025-53859: A security issue in ngx_mail_smtp_module,which might allow an attacker to cause buffer over-read

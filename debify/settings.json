@@ -57,5 +57,5 @@
          "/etc/nginx/conf.d/modules/ngx_http_pipelog_module.conf"
       ]
    },
-   "source_tarball_regex" : "nginx"
+   "source_tarball_regex" : "release"
 }
