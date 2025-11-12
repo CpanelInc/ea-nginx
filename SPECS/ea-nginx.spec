@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 3
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Nov 06 2025 Brian Mendoza <brian.mendoza@webpros.com> - 1.29.3-3
+- CPANEL-50009: Add wp and wp2 service subdomains for wp2 servers
+
 * Mon Nov 04 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.3-2
 - EA-13235: Fix ngxdev tarball filename to match what nginx module packages expect
 
