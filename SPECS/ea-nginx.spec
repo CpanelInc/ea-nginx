@@ -78,7 +78,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.29.3
+%define main_version 1.29.4
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 3
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -726,6 +726,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Dec 09 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.4-1
+- EA-13286: Update ea-nginx from v1.29.3 to v1.29.4
+
 * Thu Nov 06 2025 Brian Mendoza <brian.mendoza@webpros.com> - 1.29.3-3
 - CPANEL-50009: Add wp and wp2 service subdomains for wp2 servers
 
