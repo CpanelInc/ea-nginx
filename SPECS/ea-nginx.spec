@@ -20,7 +20,12 @@ BuildRequires: ea-openssl11 >= %{ea_openssl_ver}
 BuildRequires: ea-openssl11-devel >= %{ea_openssl_ver}
 %endif
 
+%if 0%{?rhel} >= 8
+Requires: (rocket-nginx-pre or ea-apache24-mod_remoteip)
+%else
 Requires: ea-apache24-mod_remoteip
+%endif
+
 Conflicts: ea-modsec30-connector-nginx < 1.0.3-2
 
 %if 0%{?rhel} >= 8
