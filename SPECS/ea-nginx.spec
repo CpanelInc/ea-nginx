@@ -104,7 +104,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -141,6 +141,7 @@ Source25: nginx-adminbin.conf
 Source27: 007-restartsrv_nginx
 Source28: whm_feature_addon
 Source29: set_NGINX_CONFIGURE_array.sh
+Source30: LSAPI_50x.html
 
 Patch1: 0001-Fix-auto-feature-test-C-code-to-not-fail-due-to-its-.patch
 
@@ -323,6 +324,7 @@ ln -s restartsrv_base $RPM_BUILD_ROOT/usr/local/cpanel/scripts/restartsrv_nginx
 
 %{__mkdir} -m 755 -p $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html
 %{__install} -m 644 -p %{SOURCE17} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
+%{__install} -m 644 -p %{SOURCE30} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/ea-nginx/html/LSAPI_50x.html
 
 %if %{use_systemd}
 # install systemd-specific files
@@ -485,6 +487,7 @@ install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-ngin
 
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/html
 %attr(644, root, root) %{_sysconfdir}/nginx/ea-nginx/html/FPM_50x.html
+%attr(644, root, root) %{_sysconfdir}/nginx/ea-nginx/html/LSAPI_50x.html
 
 %attr(600, root, root) /var/cpanel/perl/Cpanel/ServiceManager/Services/Nginx.pm
 
@@ -726,6 +729,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Dec 11 2025 Chris Castillo <chris.castillo@webpros.com> - 1.29.4-2
+- CPANEL-50596: Add support for lsapi to nginx standalone
+
 * Tue Dec 09 2025 Cory McIntire <cory.mcintire@webpros.com> - 1.29.4-1
 - EA-13286: Update ea-nginx from v1.29.3 to v1.29.4
 

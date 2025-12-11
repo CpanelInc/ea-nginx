@@ -33,6 +33,8 @@ use Cpanel::NAT                              ();
 use Cpanel::OpenSSL                          ();
 use Cpanel::PHP::Config                      ();
 use Cpanel::PHPFPM::Get                      ();
+use Cpanel::ProgLang                         ();
+use Cpanel::ProgLang::Conf                   ();
 use Cpanel::PwCache                          ();
 use Cpanel::Rand::Get                        ();
 use Cpanel::SafeRun::Object                  ();
@@ -1918,6 +1920,15 @@ sub _render_and_append {
 
     my $fpm_socket;
     my $fpm_socket_php_major_version;
+
+    # Check if the LSAPI flag file exists
+    my $lsapi_flag_file = "/etc/nginx/conf.d/modules/ea-nginx-lsapi-module.conf";
+    my $lsapi_available = -e $lsapi_flag_file;
+    my $lsapi_handler;
+
+    my $php      = Cpanel::ProgLang->new( type => 'php' );
+    my $php_conf = Cpanel::ProgLang::Conf->new( type => $php->type() );
+
     foreach my $dom (@$domains) {
         my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $dom );
         if ($has_fpm) {
@@ -1936,6 +1947,25 @@ sub _render_and_append {
 
             last;
         }
+        elsif ($lsapi_available) {
+            my $php_config_ref;
+            eval { $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [$dom] )->{$dom}; };
+
+            # Skip to next domain if there was an error or if the phpversion is not set
+            next unless $php_config_ref && $php_config_ref->{'phpversion'};
+            my $php_handler = $php_conf->get_package_info( package => $php_config_ref->{'phpversion'} );
+
+            if ( $php_config_ref->{'phpversion'} =~ m/\w+-php(\d)\d/ ) {
+                $fpm_socket_php_major_version = $1;
+            }
+
+            # go next if domain's handler is not lsapi
+            next unless $php_handler eq 'lsapi';
+
+            # Construct the lsapi_handler variable
+            $lsapi_handler = "application/x-httpd-" . $php_config_ref->{'phpversion'} . "___lsphp";
+            last;
+        }
     }
 
     $domains_with_ssl ||= _get_domains_with_ssls();
@@ -1944,7 +1974,7 @@ sub _render_and_append {
     if ( defined &Cpanel::Server::Type::is_wp_squared ) {
         $is_wp_squared = Cpanel::Server::Type::is_wp_squared() ? 1 : 0;
     }
-   
+
     my @service_subdomains;
     $httpd_vhosts_hr ||= _get_httpd_vhosts_hash();
     if ( exists $httpd_vhosts_hr->{"$domains->[0]_SSL"}{proxy_subdomains} ) {
@@ -2006,6 +2036,7 @@ sub _render_and_append {
             fpm_socket                   => $fpm_socket,
             fpm_socket_php_major_version => $fpm_socket_php_major_version,
             has_wordpress                => $has_wordpress,
+            lsapi_handler                => $lsapi_handler,
             wordpress                    => {
                 docroot_install  => $wordpress_hr->{docroot_install},
                 non_docroot_uris => $wordpress_hr->{non_docroot_uris},
