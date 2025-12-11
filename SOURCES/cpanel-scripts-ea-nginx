@@ -1919,7 +1919,7 @@ sub _render_and_append {
     my $uid = ( Cpanel::PwCache::getpwnam($user) )[2] if _wants_user_id();
 
     my $fpm_socket;
-    my $fpm_socket_php_major_version;
+    my $php_major_version;
 
     # Check if the LSAPI flag file exists
     my $lsapi_flag_file = "/etc/nginx/conf.d/modules/ea-nginx-lsapi-module.conf";
@@ -1931,14 +1931,21 @@ sub _render_and_append {
 
     foreach my $dom (@$domains) {
         my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $dom );
-        if ($has_fpm) {
-            my $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [$dom] )->{$dom};
 
+        my $php_config_ref;
+        eval { $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [$dom] )->{$dom}; };
+
+        if ( $php_config_ref->{'phpversion'} =~ m/\w+-php(\d)\d/ ) {
+            $php_major_version = $1;
+        }
+
+        if ($has_fpm) {
             if ($php_config_ref) {
                 my ( $proxy, $socket ) = Cpanel::PHPFPM::Get::get_proxy_from_php_config_for_domain($php_config_ref);
                 $fpm_socket = $socket;
+
                 if ( $fpm_socket =~ m{/\w+-php(\d)\d/} ) {
-                    $fpm_socket_php_major_version = $1;
+                    $php_major_version = $1;
                 }
             }
             elsif ( $global_config_data->{standalone} ) {
@@ -1948,16 +1955,10 @@ sub _render_and_append {
             last;
         }
         elsif ($lsapi_available) {
-            my $php_config_ref;
-            eval { $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [$dom] )->{$dom}; };
 
             # Skip to next domain if there was an error or if the phpversion is not set
             next unless $php_config_ref && $php_config_ref->{'phpversion'};
             my $php_handler = $php_conf->get_package_info( package => $php_config_ref->{'phpversion'} );
-
-            if ( $php_config_ref->{'phpversion'} =~ m/\w+-php(\d)\d/ ) {
-                $fpm_socket_php_major_version = $1;
-            }
 
             # go next if domain's handler is not lsapi
             next unless $php_handler eq 'lsapi';
@@ -2029,15 +2030,15 @@ sub _render_and_append {
             user                => $user,
             group               => $group,
             ( defined $uid ? ( uid => $uid ) : () ),
-            proxy_ip                     => $ip,
-            ip                           => $servername_ip,
-            ipv6                         => $global_config_data->{ipv6},
-            http2                        => $global_config_data->{http2},
-            fpm_socket                   => $fpm_socket,
-            fpm_socket_php_major_version => $fpm_socket_php_major_version,
-            has_wordpress                => $has_wordpress,
-            lsapi_handler                => $lsapi_handler,
-            wordpress                    => {
+            proxy_ip          => $ip,
+            ip                => $servername_ip,
+            ipv6              => $global_config_data->{ipv6},
+            http2             => $global_config_data->{http2},
+            fpm_socket        => $fpm_socket,
+            php_major_version => $php_major_version,
+            has_wordpress     => $has_wordpress,
+            lsapi_handler     => $lsapi_handler,
+            wordpress         => {
                 docroot_install  => $wordpress_hr->{docroot_install},
                 non_docroot_uris => $wordpress_hr->{non_docroot_uris},
             },

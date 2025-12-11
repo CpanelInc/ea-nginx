@@ -1,5 +1,5 @@
 [% IF lsapi_handler %]
-location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _ "?" : "" %]$ {
+location ~ \.php[% php_major_version ? php_major_version _ "?" : "" %]$ {
     try_files $uri =404;
     include conf.d/includes-optional/cpanel-lsapi.conf;
     lsapi_handler [% lsapi_handler %];
@@ -9,7 +9,7 @@ location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _
     error_page 502 503 /LSAPI_50x.html;
 }
 [% ELSIF fpm_socket %]
-location ~ \.php[% fpm_socket_php_major_version ? fpm_socket_php_major_version _ "?" : "" %]$ {
+location ~ \.php[% php_major_version ? php_major_version _ "?" : "" %]$ {
     try_files $uri =404;
     include conf.d/includes-optional/cpanel-fastcgi.conf;
     fastcgi_pass unix:[% fpm_socket %];
