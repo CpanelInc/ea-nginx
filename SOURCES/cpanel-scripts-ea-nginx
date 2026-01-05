@@ -1954,14 +1954,7 @@ sub _render_and_append {
 
             last;
         }
-        elsif ($lsapi_available) {
-
-            # Skip to next domain if there was an error or if the phpversion is not set
-            next unless $php_config_ref && $php_config_ref->{'phpversion'};
-            my $php_handler = $php_conf->get_package_info( package => $php_config_ref->{'phpversion'} );
-
-            # go next if domain's handler is not lsapi
-            next unless $php_handler eq 'lsapi';
+        elsif ( $lsapi_available && $global_config_data->{standalone} ) {    # we have CL’s lsapi NGINX module && we’re under standalone NGINX
 
             # Construct the lsapi_handler variable
             $lsapi_handler = "application/x-httpd-" . $php_config_ref->{'phpversion'} . "___lsphp";
