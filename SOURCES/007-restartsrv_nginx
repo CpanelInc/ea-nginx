@@ -20,25 +20,29 @@ Ensure nginx is able to bind to port 80/443 by forcing apache to release them if
 =cut
 
 sub run {
-    my $stopped_apache = 0;
-    if ( _is_listening_on_80_or_443('httpd') ) {
-        print "Stopping apache …\n";
-        system('/usr/local/cpanel/scripts/restartsrv_httpd --stop');
-        $stopped_apache = 1;
-    }
+    my $is_standalone = -e '/etc/nginx/ea-nginx/enable.standalone' ? 1 : 0;
 
-    # Ensure apache stops before continuing
-    if ($stopped_apache) {
-        print "Waiting on apache to fully stop before continuing …\n";
-
-        my $httpd_is_listening = 0;
-        for ( 1 .. 5 ) {
-            $httpd_is_listening = _is_listening_on_80_or_443('httpd');
-            last unless $httpd_is_listening;
-            select( undef, undef, undef, 0.25 );
+    if ( !$is_standalone ) {
+        my $stopped_apache = 0;
+        if ( _is_listening_on_80_or_443('httpd') ) {
+            print "Stopping apache …\n";
+            system('/usr/local/cpanel/scripts/restartsrv_httpd --stop');
+            $stopped_apache = 1;
         }
 
-        die "Apache is still bound to ports 80/443\n" if $httpd_is_listening;
+        # Ensure apache stops before continuing
+        if ($stopped_apache) {
+            print "Waiting on apache to fully stop before continuing …\n";
+
+            my $httpd_is_listening = 0;
+            for ( 1 .. 5 ) {
+                $httpd_is_listening = _is_listening_on_80_or_443('httpd');
+                last unless $httpd_is_listening;
+                select( undef, undef, undef, 0.25 );
+            }
+
+            die "Apache is still bound to ports 80/443\n" if $httpd_is_listening;
+        }
     }
 
     # hard restart here in order to ensure that the new binary is used
@@ -57,8 +61,10 @@ sub run {
 
     die "Nginx was unable to start\n" unless $nginx_is_listening;
 
-    print "Starting apache …\n";
-    system('/usr/local/cpanel/scripts/restartsrv_httpd --start');
+    if ( !$is_standalone ) {
+        print "Starting apache …\n";
+        system('/usr/local/cpanel/scripts/restartsrv_httpd --start');
+    }
 
     print "… done\n";
     return 0;

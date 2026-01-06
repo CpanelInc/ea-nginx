@@ -124,6 +124,7 @@ install -p ${SOURCE27} $DEB_INSTALL_ROOT/etc/apt/universal-hooks/multi_pkgs/Post
 
 mkdir -p debian/tmp/etc/nginx/ea-nginx/html
 cp $SOURCE17 debian/tmp/etc/nginx/ea-nginx/html
+cp $SOURCE30 debian/tmp/etc/nginx/ea-nginx/html
 
 mkdir -p debian/tmp/usr/sbin
 cp debian/tmp/opt/cpanel/root/usr/sbin/nginx debian/tmp/usr/sbin
