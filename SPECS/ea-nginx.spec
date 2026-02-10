@@ -736,6 +736,7 @@ fi
 %changelog
 * Wed Feb 04 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.5-1
 - EA-13333: Update ea-nginx from v1.29.4 to v1.29.5
+- Security: an attacker might inject plain text data in the response from an SSL backend (CVE-2026-1642).
 
 * Thu Dec 11 2025 Chris Castillo <chris.castillo@webpros.com> - 1.29.4-2
 - CPANEL-50596: Add support for lsapi to nginx standalone
