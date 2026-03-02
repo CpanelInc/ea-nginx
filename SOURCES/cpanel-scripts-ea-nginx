@@ -33,8 +33,6 @@ use Cpanel::NAT                              ();
 use Cpanel::OpenSSL                          ();
 use Cpanel::PHP::Config                      ();
 use Cpanel::PHPFPM::Get                      ();
-use Cpanel::ProgLang                         ();
-use Cpanel::ProgLang::Conf                   ();
 use Cpanel::PwCache                          ();
 use Cpanel::Rand::Get                        ();
 use Cpanel::SafeRun::Object                  ();
@@ -1926,16 +1924,13 @@ sub _render_and_append {
     my $lsapi_available = -e $lsapi_flag_file;
     my $lsapi_handler;
 
-    my $php      = Cpanel::ProgLang->new( type => 'php' );
-    my $php_conf = Cpanel::ProgLang::Conf->new( type => $php->type() );
-
     foreach my $dom (@$domains) {
         my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $dom );
 
         my $php_config_ref;
         eval { $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [$dom] )->{$dom}; };
 
-        if ( $php_config_ref->{'phpversion'} =~ m/\w+-php(\d)\d/ ) {
+        if ( $php_config_ref && $php_config_ref->{'phpversion'} =~ m/\w+-php(\d)\d/ ) {
             $php_major_version = $1;
         }
 
@@ -1957,8 +1952,10 @@ sub _render_and_append {
         elsif ( $lsapi_available && $global_config_data->{standalone} ) {    # we have CL’s lsapi NGINX module && we’re under standalone NGINX
 
             # Construct the lsapi_handler variable
-            $lsapi_handler = "application/x-httpd-" . $php_config_ref->{'phpversion'} . "___lsphp";
-            last;
+            if ( $php_config_ref && $php_config_ref->{'phpversion'} ) {
+                $lsapi_handler = "application/x-httpd-" . $php_config_ref->{'phpversion'} . "___lsphp";
+                last;
+            }
         }
     }
 

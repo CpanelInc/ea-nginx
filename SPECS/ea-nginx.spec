@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Mar 02 2026 Gary Stanley <gary.stanley@webpros.com> - 1.29.5-2
+- EA4-250: Fix ea-nginx bug when PHP is not installed
+
 * Wed Feb 04 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.5-1
 - EA-13333: Update ea-nginx from v1.29.4 to v1.29.5
 - Security: an attacker might inject plain text data in the response from an SSL backend (CVE-2026-1642).
