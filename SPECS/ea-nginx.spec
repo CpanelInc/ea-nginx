@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.29.5
+%define main_version 1.29.6
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Mar 10 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.6-1
+- EA-13369: Update ea-nginx from v1.29.5 to v1.29.6
+
 * Mon Mar 02 2026 Gary Stanley <gary.stanley@webpros.com> - 1.29.5-2
 - EA4-250: Fix ea-nginx bug when PHP is not installed
 
