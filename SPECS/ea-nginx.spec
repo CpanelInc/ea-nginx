@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.29.6
+%define main_version 1.29.7
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,18 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Mar 31 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.7-2
+- EA4-257: Explicitly set proxy_http_version 1.0 to avoid 421 Misdirected Request
+
+* Tue Mar 24 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.7-1
+- EA-13381: Update ea-nginx from v1.29.6 to v1.29.7
+- Security: buffer overflow in COPY or MOVE request handling with "alias" directive (CVE-2026-27654).
+- Security: processing of a specially crafted MP4 file by ngx_http_mp4_module on 32-bit platforms might cause a worker process crash (CVE-2026-27784).
+- Security: processing of a specially crafted MP4 file by ngx_http_mp4_module might cause a worker process crash (CVE-2026-32647).
+- Security: segmentation fault in worker process with CRAM-MD5 or APOP authentication when retry enabled (CVE-2026-27651).
+- Security: PTR DNS record injection in auth_http requests and XCLIENT command (CVE-2026-28753).
+- Security: SSL handshake succeeds despite OCSP rejecting client certificate in stream module (CVE-2026-28755).
+
 * Tue Mar 10 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.6-1
 - EA-13369: Update ea-nginx from v1.29.5 to v1.29.6
 
