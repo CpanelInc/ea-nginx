@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Mon Mar 31 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.7-2
+- EA4-257: Explicitly set proxy_http_version 1.0 to avoid 421 Misdirected Request
+
 * Tue Mar 24 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.7-1
 - EA-13381: Update ea-nginx from v1.29.6 to v1.29.7
 
