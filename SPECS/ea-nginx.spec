@@ -739,6 +739,12 @@ fi
 
 * Tue Mar 24 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.7-1
 - EA-13381: Update ea-nginx from v1.29.6 to v1.29.7
+- Security: buffer overflow in COPY or MOVE request handling with "alias" directive (CVE-2026-27654).
+- Security: processing of a specially crafted MP4 file by ngx_http_mp4_module on 32-bit platforms might cause a worker process crash (CVE-2026-27784).
+- Security: processing of a specially crafted MP4 file by ngx_http_mp4_module might cause a worker process crash (CVE-2026-32647).
+- Security: segmentation fault in worker process with CRAM-MD5 or APOP authentication when retry enabled (CVE-2026-27651).
+- Security: PTR DNS record injection in auth_http requests and XCLIENT command (CVE-2026-28753).
+- Security: SSL handshake succeeds despite OCSP rejecting client certificate in stream module (CVE-2026-28755).
 
 * Tue Mar 10 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.6-1
 - EA-13369: Update ea-nginx from v1.29.5 to v1.29.6
