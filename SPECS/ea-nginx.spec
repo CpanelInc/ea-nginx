@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.29.7
+%define main_version 1.29.8
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Apr 08 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.29.8-1
+- EA-13402: Update ea-nginx from v1.29.7 to v1.29.8
+
 * Mon Mar 31 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.29.7-2
 - EA4-257: Explicitly set proxy_http_version 1.0 to avoid 421 Misdirected Request
 
