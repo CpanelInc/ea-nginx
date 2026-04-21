@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.29.8
+%define main_version 1.30.0
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Apr 16 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.30.0-1
+- EA-13411: Update ea-nginx from v1.29.8 to v1.30.0
+
 * Wed Apr 08 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.29.8-1
 - EA-13402: Update ea-nginx from v1.29.7 to v1.29.8
 
