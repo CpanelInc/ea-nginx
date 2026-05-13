@@ -736,6 +736,7 @@ fi
 %changelog
 * Wed May 13 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.31.0-1
 - EA-13436: Update ea-nginx from v1.30.0 to v1.31.0
+- Security: heap buffer overflow in ngx_http_rewrite_module (CVE-2026-42945).
 
 * Thu Apr 16 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.30.0-1
 - EA-13411: Update ea-nginx from v1.29.8 to v1.30.0
