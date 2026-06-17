@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.31.1
+%define main_version 1.31.2
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Jun 17 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.31.2-2
+- EA-13466: Update ea-nginx from v1.31.1 to v1.31.2 (CVE-2026-42055, CVE-2026-48142)
+
 * Fri May 22 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.31.1-1
 - EA-13448: Update ea-nginx from v1.31.0 to v1.31.1
 - Security: remote code execution via worker process memory pool handling (CVE-2026-9256).
