@@ -736,6 +736,9 @@ fi
 %changelog
 * Thu Jul 16 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.31.3-1
 - EA-13503: Update ea-nginx from v1.31.2 to v1.31.3
+- Security: heap buffer overflow when using map with regex, potentially allowing remote code execution or worker process denial of service via a crafted HTTP request (CVE-2026-42533).
+- Security: memory disclosure when using the ngx_http_slice_module (CVE-2026-60005).
+- Security: use-after-free when using the ngx_http_ssi_module (CVE-2026-56434).
 
 * Wed Jun 17 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.31.2-2
 - EA-13466: Update ea-nginx from v1.31.1 to v1.31.2 (CVE-2026-42055, CVE-2026-48142)
