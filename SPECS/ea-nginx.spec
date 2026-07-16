@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.31.2
+%define main_version 1.31.3
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,12 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Jul 16 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.31.3-1
+- EA-13503: Update ea-nginx from v1.31.2 to v1.31.3
+- Security: heap buffer overflow when using map with regex, potentially allowing remote code execution or worker process denial of service via a crafted HTTP request (CVE-2026-42533).
+- Security: memory disclosure when using the ngx_http_slice_module (CVE-2026-60005).
+- Security: use-after-free when using the ngx_http_ssi_module (CVE-2026-56434).
+
 * Wed Jun 17 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.31.2-2
 - EA-13466: Update ea-nginx from v1.31.1 to v1.31.2 (CVE-2026-42055, CVE-2026-48142)
 
