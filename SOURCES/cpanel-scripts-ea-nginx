@@ -1568,7 +1568,7 @@ sub _write_user_conf {
     return 1;
 }
 
-our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching );
+our ( $server_tt, $docroots, $logging_hr, $caching_cache, $global_caching, $php_config_cache );
 
 =head2 caching_global()
 
@@ -1924,11 +1924,12 @@ sub _render_and_append {
     my $lsapi_available = -e $lsapi_flag_file;
     my $lsapi_handler;
 
+    my $php_config_for_user = _get_php_config_for($user);
+
     foreach my $dom (@$domains) {
         my $has_fpm = Cpanel::PHPFPM::Get::get_php_fpm( $user, $dom );
 
-        my $php_config_ref;
-        eval { $php_config_ref = Cpanel::PHP::Config::get_php_config_for_domains( [$dom] )->{$dom}; };
+        my $php_config_ref = $php_config_for_user->{$dom};
 
         if ( $php_config_ref && $php_config_ref->{'phpversion'} =~ m/\w+-php(\d)\d/ ) {
             $php_major_version = $1;
@@ -3280,6 +3281,42 @@ sub _get_docroots_for {
     my ($user) = @_;
     $docroots->{$user} ||= { Cpanel::DomainLookup::DocRoot::getdocroots($user) };
     return $docroots->{$user};
+}
+
+=head2 _get_php_config_for($user)
+
+=over
+
+=item user
+
+A valid cPanel username
+
+=back
+
+=head3 RETURNS
+
+A hashref where the keys are all the domains owned by the given user and the
+values are that domain's PHP configuration.
+
+Resolved once per user and memoized. Asking C<Cpanel::PHP::Config> for a
+single domain at a time is deceptively expensive: each call re-reads and
+re-deserializes the whole userdata cache for the owning user, so on an
+account with thousands of domains the same file is decoded thousands of
+times. Fetching the user in one call and looking domains up in the result
+avoids that entirely.
+
+Domains with no entry (C<www.> and C<mail.> service names, for example)
+simply come back undef, which is the same thing the previous per-domain
+lookup produced for them.
+
+=cut
+
+sub _get_php_config_for {
+    my ($user) = @_;
+
+    $php_config_cache->{$user} ||= eval { Cpanel::PHP::Config::get_php_config_for_users( [$user] ) } || {};
+
+    return $php_config_cache->{$user};
 }
 
 =head2 _get_domain_ips()

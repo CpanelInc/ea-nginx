@@ -2316,6 +2316,7 @@ EOF
                 local *scripts::ea_nginx::_get_httpd_vhosts_hash = sub { };
                 local *scripts::ea_nginx::_wants_user_id         = sub { return 0; };
                 local *scripts::ea_nginx::_get_docroots_for      = sub { return { 'foo.tld' => '/home/foo/public_html' }; };
+                local *scripts::ea_nginx::_get_php_config_for    = sub { return {}; };
                 local *scripts::ea_nginx::_get_wordpress_info    = sub {
                     return {
                         docroot_install  => undef,
@@ -2367,9 +2368,10 @@ EOF
                     get_php_fpm => sub { return 1; },
                 );
 
-                my $mock_cpanel_php_config = Test::MockModule->new('Cpanel::PHP::Config')->redefine(
-                    get_php_config_for_domains => sub { return {}; },
-                );
+                # No PHP config resolves for the domain, which is the condition
+                # this example is about.
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_php_config_for = sub { return {}; };
 
                 trap {
                     scripts::ea_nginx::_render_and_append(
@@ -2545,6 +2547,54 @@ EOF
                         },
                     },
                 ) or diag explain $res;
+            };
+        };
+
+        describe "_get_php_config_for" => sub {
+            my $calls;
+
+            around {
+                $calls = 0;
+                no warnings 'once';
+                local $scripts::ea_nginx::php_config_cache = undef;
+
+                my $mock_cpanel_php_config = Test::MockModule->new('Cpanel::PHP::Config')->redefine(
+                    get_php_config_for_users => sub {
+                        $calls++;
+                        return { 'foo.tld' => { phpversion => 'ea-php81' } };
+                    },
+                );
+                yield;
+            };
+
+            it 'should return the PHP config for every domain the user owns' => sub {
+                is_deeply(
+                    scripts::ea_nginx::_get_php_config_for('foo'),
+                    { 'foo.tld' => { phpversion => 'ea-php81' } },
+                );
+            };
+
+            # The whole point of resolving per user: asking Cpanel::PHP::Config
+            # per domain re-reads and re-deserializes the user's entire
+            # userdata cache on every call, which is quadratic-ish on accounts
+            # with thousands of domains.
+            it 'should only ask Cpanel::PHP::Config once per user' => sub {
+                scripts::ea_nginx::_get_php_config_for('foo') for 1 .. 5;
+                is( $calls, 1, 'the underlying lookup happened exactly once' );
+            };
+
+            it 'should ask again for a different user' => sub {
+                scripts::ea_nginx::_get_php_config_for('foo');
+                scripts::ea_nginx::_get_php_config_for('bar');
+                is( $calls, 2 );
+            };
+
+            it 'should return an empty hashref if the lookup dies' => sub {
+                my $mock_cpanel_php_config = Test::MockModule->new('Cpanel::PHP::Config')->redefine(
+                    get_php_config_for_users => sub { die "nope\n"; },
+                );
+
+                is_deeply( scripts::ea_nginx::_get_php_config_for('baz'), {} );
             };
         };
 
