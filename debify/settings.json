@@ -1,5 +1,6 @@
 {
    "add_to_build_requires" : [
+      "libpcre2-dev",
       "libaio-dev",
       [
          "libaio1t64",
