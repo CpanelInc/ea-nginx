@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.31.3
+%define main_version 1.31.4
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -734,6 +734,12 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Tue Aug 25 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.31.4-2
+- EA4-317: Build against PCRE2 on Debian so nginx and its modules agree
+
+* Thu Aug 20 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.31.4-1
+- EA-13535: Update ea-nginx from v1.31.3 to v1.31.4
+
 * Wed Jul 29 2026 Andy Baugh <andy.baugh@webpros.com> - 1.31.3-2
 - EA-13513: Speed up config rebuilds significantly for users with thousands of domains.
 
