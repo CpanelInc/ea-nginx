@@ -2543,6 +2543,29 @@ sub _get_basic_auth {
         }
     }
 
+    # nginx expands variables in `auth_basic` and `auth_basic_user_file` and has
+    # no way to escape `$`, so we can not safely write these if the realm (read
+    # from the user's .htaccess) or the auth file path (from directory names)
+    # contains a `$` or a control character.
+    my $unsafe = qr/[\$\x00-\x1f\x7f]/;
+
+    if ($basic_auth) {
+        if ( ( $basic_auth->{realm_name} // '' ) =~ $unsafe || ( $basic_auth->{auth_file} // '' ) =~ $unsafe ) {
+            warn "Skipping basic auth for $user’s $docroot, its realm or auth file contains a “\$” or a control character";
+            $basic_auth = undef;
+        }
+    }
+
+    if ( $basic_auth && $basic_auth->{locations} ) {
+        for my $loc ( keys %{ $basic_auth->{locations} } ) {
+            my $entry = $basic_auth->{locations}{$loc};
+            if ( ( $entry->{realm_name} // '' ) =~ $unsafe || ( $entry->{auth_file} // '' ) =~ $unsafe ) {
+                warn "Skipping basic auth for $user’s $docroot$loc, its realm or auth file contains a “\$” or a control character";
+                delete $basic_auth->{locations}{$loc};
+            }
+        }
+    }
+
     return $basic_auth;
 }
 

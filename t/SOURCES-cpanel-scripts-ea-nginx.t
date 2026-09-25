@@ -2665,6 +2665,72 @@ EOF
                     },
                 ) or diag explain $res;
             };
+
+            it 'should drop the docroot-level basic auth if the realm contains a character nginx can not safely use' => sub {
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'restricted$x',
+                        },
+                    },
+                );
+
+                is( $res, undef, 'unsafe realm results in no basic auth' );
+            };
+
+            it 'should drop a location whose auth file path contains a character nginx can not safely use' => sub {
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'docroot',
+                        },
+                        '/public_html/\$bad' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'bad',
+                        },
+                    },
+                );
+
+                is( $res, undef,
+                    'the only location is unsafe so there is no basic auth left to render' );
+            };
+
+            it 'should drop only the unsafe locations and keep the safe ones' => sub {
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'docroot',
+                        },
+                        '/public_html/safe' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'safe',
+                        },
+                        '/public_html/bad' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'bad$x',
+                        },
+                        '/public_html/other' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'other',
+                        },
+                    },
+                );
+
+                is_deeply(
+                    [ sort keys %{ $res->{locations} } ],
+                    [ '/other', '/safe' ],
+                    'only locations with safe realms are kept',
+                ) or diag explain $res;
+            };
         };
 
         describe "_get_php_config_for" => sub {
