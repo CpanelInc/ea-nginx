@@ -2667,6 +2667,8 @@ EOF
             };
 
             it 'should drop the docroot-level basic auth if the realm contains a character nginx can not safely use' => sub {
+                my @warnings;
+                local $SIG{__WARN__} = sub { push @warnings, @_ };
                 my $res = scripts::ea_nginx::_get_basic_auth(
                     'foo',
                     '/home/foo/public_html',
@@ -2679,9 +2681,16 @@ EOF
                 );
 
                 is( $res, undef, 'unsafe realm results in no basic auth' );
+                is_deeply(
+                    \@warnings,
+                    ["Skipping basic auth for foo’s /home/foo/public_html, its realm or auth file contains a “\$” or a control character\n"],
+                    'warns about the skipped basic auth',
+                );
             };
 
             it 'should drop a location whose auth file path contains a character nginx can not safely use' => sub {
+                my @warnings;
+                local $SIG{__WARN__} = sub { push @warnings, @_ };
                 my $res = scripts::ea_nginx::_get_basic_auth(
                     'foo',
                     '/home/foo/public_html',
@@ -2690,18 +2699,33 @@ EOF
                             '_htaccess_mtime' => 1234,
                             'realm_name'      => 'docroot',
                         },
-                        '/public_html/\$bad' => {
+                        '/public_html/$bad' => {
                             '_htaccess_mtime' => 1234,
                             'realm_name'      => 'bad',
                         },
                     },
                 );
 
-                is( $res, undef,
-                    'the only location is unsafe so there is no basic auth left to render' );
+                is_deeply(
+                    $res,
+                    {
+                        realm_name      => 'docroot',
+                        auth_file       => '/home/foo/.htpasswds/public_html/passwd',
+                        _htaccess_mtime => 1234,
+                        locations       => {},
+                    },
+                    'the unsafe location is dropped but the safe docroot-level basic auth is kept',
+                ) or diag explain $res;
+                is_deeply(
+                    \@warnings,
+                    ["Skipping basic auth for foo’s /home/foo/public_html/\$bad, its realm or auth file contains a “\$” or a control character\n"],
+                    'warns about the skipped location',
+                );
             };
 
             it 'should drop only the unsafe locations and keep the safe ones' => sub {
+                my @warnings;
+                local $SIG{__WARN__} = sub { push @warnings, @_ };
                 my $res = scripts::ea_nginx::_get_basic_auth(
                     'foo',
                     '/home/foo/public_html',
@@ -2730,6 +2754,11 @@ EOF
                     [ '/other', '/safe' ],
                     'only locations with safe realms are kept',
                 ) or diag explain $res;
+                is_deeply(
+                    \@warnings,
+                    ["Skipping basic auth for foo’s /home/foo/public_html/bad, its realm or auth file contains a “\$” or a control character\n"],
+                    'warns about the skipped location',
+                );
             };
         };
 
