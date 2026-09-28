@@ -63,7 +63,7 @@ server {
         [% END -%]
     [% END -%]
 
-    root "[% docroot %]";
+    root "[% docroot.dquote %]";
 
     location /cpanelwebcall {
         include conf.d/includes-optional/cpanel-proxy.conf;
@@ -177,8 +177,8 @@ server {
     }
     [% END -%]
     [%- FOREACH wordpress_uri IN wordpress.non_docroot_uris %]
-    # $docroot/[% wordpress_uri %] wordpress install
-    location /[% wordpress_uri %] {
+    # $docroot/[% wordpress_uri.dquote %] wordpress install
+    location "/[% wordpress_uri.dquote %]" {
 
         [%- FOREACH location IN basic_auth.locations.keys.sort %]
             [%- IF location == "/" _ wordpress_uri %]
@@ -293,7 +293,7 @@ server {
     set $CPANEL_SERVICE_SUBDOMAIN 1;
 
     location /.well-known/cpanel-dcv {
-        root "[% docroot %]";
+        root "[% docroot.dquote %]";
         disable_symlinks if_not_owner;
 
         [%- IF !behavior.standalone %]
@@ -304,7 +304,7 @@ server {
     }
 
     location /.well-known/pki-validation {
-        root "[% docroot %]";
+        root "[% docroot.dquote %]";
         disable_symlinks if_not_owner;
 
         [%- IF !behavior.standalone %]
@@ -315,7 +315,7 @@ server {
     }
 
     location /.well-known/acme-challenge {
-        root "[% docroot %]";
+        root "[% docroot.dquote %]";
         disable_symlinks if_not_owner;
 
         [%- IF !behavior.standalone %]

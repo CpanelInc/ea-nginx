@@ -2019,6 +2019,10 @@ EOF
             };
 
             it 'should leave USER_ID commented out if the set-USER_ID touch file is not present' => sub {
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_wants_user_id = sub { return 0; };
+                use warnings 'redefine';
+
                 scripts::ea_nginx::_write_global_cpanel_proxy_non_ssl();
                 like( $content, qr/# set \$USER_ID "";/ );
             };
@@ -2323,6 +2327,7 @@ EOF
                         non_docroot_uris => [],
                     };
                 };
+                local $scripts::ea_nginx::settings_hr = {};
 
                 my $mock_cpanel_json = Test::MockModule->new('Cpanel::JSON')->redefine(
                     LoadFile => sub { },
@@ -2361,6 +2366,8 @@ EOF
                 );
 
                 yield;
+
+                undef $mock_template;
             };
 
             it 'should warn if it is in standalone mode, the domain has php fpm enabled, and it is unable to gather the php config settings for the domain' => sub {
@@ -2404,6 +2411,116 @@ EOF
                     );
                 };
                 like( $trap->die(), qr/no process tt for you/ );
+            };
+
+            it 'should warn and skip the domains if the document root contains characters nginx can not safely use' => sub {
+                my $processed = 0;
+                $mock_template->redefine( process => sub { $processed++ } );
+
+                for my $docroot ( '/home/foo/public_html/$http_x', "/home/foo/public_html/x\ny" ) {
+                    no warnings 'redefine';
+                    local *scripts::ea_nginx::_get_docroots_for = sub { return { 'foo.tld' => $docroot }; };
+                    use warnings 'redefine';
+
+                    trap {
+                        scripts::ea_nginx::_render_and_append(
+                            {
+                                user                  => 'foo',
+                                domains               => ['foo.tld'],
+                                global_config_data    => {},
+                                mail_subdomain_exists => 0,
+                            }
+                        );
+                    };
+                    like( $trap->stderr(), qr/Skipping foo\.tld for foo, document root contains/ );
+                }
+                is( $processed, 0, 'no server block was rendered' );
+            };
+
+            it 'should warn and skip WordPress sub-directories that contain characters nginx can not safely use' => sub {
+                my $vars;
+                $mock_template->redefine( process => sub { $vars = $_[2] } );
+
+                no warnings 'redefine';
+                local *scripts::ea_nginx::_get_wordpress_info = sub {
+                    return {
+                        docroot_install  => 0,
+                        non_docroot_uris => [ 'blog', 'shop$http_x', "news\nx" ],
+                    };
+                };
+                use warnings 'redefine';
+
+                trap {
+                    scripts::ea_nginx::_render_and_append(
+                        {
+                            user                  => 'foo',
+                            domains               => ['foo.tld'],
+                            global_config_data    => {},
+                            mail_subdomain_exists => 0,
+                        }
+                    );
+                };
+                my @warnings = $trap->stderr() =~ m/Skipping WordPress location for foo’s foo\.tld/g;
+                is( scalar(@warnings), 2, 'warned for each unsafe sub-directory' );
+                is_deeply( $vars->{wordpress}{non_docroot_uris}, ['blog'], 'only the safe sub-directory is rendered' );
+                is( $vars->{has_wordpress}, 1, 'still has WordPress' );
+            };
+        };
+
+        describe "server.conf.tt" => sub {
+            my $render = sub {
+                my ( $docroot, %vars ) = @_;
+
+                my $tt = Template->new( { INCLUDE_PATH => "$FindBin::Bin/../SOURCES/cpanel" } );
+                my $output;
+                $tt->process(
+                    "ea-nginx/server.conf.tt",
+                    {
+                        docroot                 => $docroot,
+                        user                    => 'foo',
+                        domains                 => ['foo.tld'],
+                        ssl_certificate         => '/etc/foo.combined',
+                        ssl_certificate_key     => '/etc/foo.combined',
+                        proxysubdomains_enabled => 1,
+                        service_subdomains      => ['cpanel.foo.tld'],
+                        settings                => { apache_port_ip => '127.0.0.1' },
+                        %vars,
+                    },
+                    \$output,
+                ) or die $tt->error();
+
+                return $output;
+            };
+
+            it 'should render a normal docroot as a plain quoted root directive' => sub {
+                my @roots = grep { /^\s*root\b/ } split /\n/, $render->('/home/foo/public_html');
+                is_deeply( [ map { s/^\s+//r } @roots ], [ ('root "/home/foo/public_html";') x 4 ] );
+            };
+
+            it 'should escape the docroot so it cannot add nginx directives' => sub {
+                my $output = $render->(qq{/home/foo/public_html/x" ; pipelog "/bin/sh -c id" combinedvhost ; #\nfoo\\});
+
+                my @roots = grep { /^\s*root\b/ } split /\n/, $output;
+                is( scalar(@roots), 4, 'one root directive per root site' );
+                like( $_, qr/^\s*root "(?:[^"\\]|\\.)*";$/, 'root directive is a single quoted string' ) for @roots;
+                unlike( $output, qr/(?<!\\)"\s*;\s*pipelog\b/, 'no injected pipelog directive' );
+                unlike( $output, qr/^foo/m,          'newline did not split the directive' );
+            };
+
+            it 'should quote a normal WordPress sub-directory install' => sub {
+                my $output = $render->( '/home/foo/public_html', behavior => { standalone => 1 }, wordpress => { non_docroot_uris => ['blog'] } );
+
+                like( $output, qr{^\s*location "/blog" \{$}m,                              'location is quoted' );
+                like( $output, qr{^\s*try_files \$uri \$uri/ "/blog/index\.php\?\$args";$}m, 'try_files fallback is quoted' );
+            };
+
+            it 'should escape a WordPress sub-directory so it cannot add nginx directives' => sub {
+                my $output = $render->( '/home/foo/public_html', behavior => { standalone => 1 }, wordpress => { non_docroot_uris => [qq{blog" { } pipelog "/bin/sh -c id" combinedvhost ; #\nfoo\\}] } );
+
+                like( $output, qr{^\s*location "/(?:[^"\\]|\\.)*" \{$}m,                           'location is a single quoted string' );
+                like( $output, qr{^\s*try_files \$uri \$uri/ "/(?:[^"\\]|\\.)*/index\.php\?\$args";$}m, 'try_files fallback is a single quoted string' );
+                unlike( $output, qr/(?<!\\)"\s*[;{]\s*\}?\s*pipelog\b/, 'no injected pipelog directive' );
+                unlike( $output, qr/^foo/m,                             'newline did not split the comment or directive' );
             };
         };
 
@@ -2547,6 +2664,101 @@ EOF
                         },
                     },
                 ) or diag explain $res;
+            };
+
+            it 'should drop the docroot-level basic auth if the realm contains a character nginx can not safely use' => sub {
+                my @warnings;
+                local $SIG{__WARN__} = sub { push @warnings, @_ };
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'restricted$x',
+                        },
+                    },
+                );
+
+                is( $res, undef, 'unsafe realm results in no basic auth' );
+                is_deeply(
+                    \@warnings,
+                    ["Skipping basic auth for foo’s /home/foo/public_html, its realm or auth file contains a “\$” or a control character\n"],
+                    'warns about the skipped basic auth',
+                );
+            };
+
+            it 'should drop a location whose auth file path contains a character nginx can not safely use' => sub {
+                my @warnings;
+                local $SIG{__WARN__} = sub { push @warnings, @_ };
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'docroot',
+                        },
+                        '/public_html/$bad' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'bad',
+                        },
+                    },
+                );
+
+                is_deeply(
+                    $res,
+                    {
+                        realm_name      => 'docroot',
+                        auth_file       => '/home/foo/.htpasswds/public_html/passwd',
+                        _htaccess_mtime => 1234,
+                        locations       => {},
+                    },
+                    'the unsafe location is dropped but the safe docroot-level basic auth is kept',
+                ) or diag explain $res;
+                is_deeply(
+                    \@warnings,
+                    ["Skipping basic auth for foo’s /home/foo/public_html/\$bad, its realm or auth file contains a “\$” or a control character\n"],
+                    'warns about the skipped location',
+                );
+            };
+
+            it 'should drop only the unsafe locations and keep the safe ones' => sub {
+                my @warnings;
+                local $SIG{__WARN__} = sub { push @warnings, @_ };
+                my $res = scripts::ea_nginx::_get_basic_auth(
+                    'foo',
+                    '/home/foo/public_html',
+                    {
+                        '/public_html' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'docroot',
+                        },
+                        '/public_html/safe' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'safe',
+                        },
+                        '/public_html/bad' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'bad$x',
+                        },
+                        '/public_html/other' => {
+                            '_htaccess_mtime' => 1234,
+                            'realm_name'      => 'other',
+                        },
+                    },
+                );
+
+                is_deeply(
+                    [ sort keys %{ $res->{locations} } ],
+                    [ '/other', '/safe' ],
+                    'only locations with safe realms are kept',
+                ) or diag explain $res;
+                is_deeply(
+                    \@warnings,
+                    ["Skipping basic auth for foo’s /home/foo/public_html/bad, its realm or auth file contains a “\$” or a control character\n"],
+                    'warns about the skipped location',
+                );
             };
         };
 
