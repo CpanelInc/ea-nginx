@@ -1911,7 +1911,7 @@ sub _render_and_append {
 
     # nginx expands variables in `root` and has no way to escape `$`, so we can not safely write these
     if ( defined $docroot && $docroot =~ m/[\$\x00-\x1f\x7f]/ ) {
-        warn "Skipping @$domains for $user, document root contains a “\$” or a control character";
+        warn "Skipping @$domains for $user, document root contains a “\$” or a control character\n";
         return;
     }
 
@@ -2016,7 +2016,7 @@ sub _render_and_append {
     my @wordpress_uris;
     for my $wordpress_uri ( @{ $wordpress_hr->{non_docroot_uris} } ) {
         if ( $wordpress_uri =~ m/[\$\x00-\x1f\x7f]/ ) {
-            warn "Skipping WordPress location for $user’s $domains->[0], its path contains a “\$” or a control character";
+            warn "Skipping WordPress location for $user’s $domains->[0], its path contains a “\$” or a control character\n";
             next;
         }
         push @wordpress_uris, $wordpress_uri;
@@ -2551,7 +2551,7 @@ sub _get_basic_auth {
 
     if ($basic_auth) {
         if ( ( $basic_auth->{realm_name} // '' ) =~ $unsafe || ( $basic_auth->{auth_file} // '' ) =~ $unsafe ) {
-            warn "Skipping basic auth for $user’s $docroot, its realm or auth file contains a “\$” or a control character";
+            warn "Skipping basic auth for $user’s $docroot, its realm or auth file contains a “\$” or a control character\n";
             $basic_auth = undef;
         }
     }
@@ -2560,7 +2560,7 @@ sub _get_basic_auth {
         for my $loc ( keys %{ $basic_auth->{locations} } ) {
             my $entry = $basic_auth->{locations}{$loc};
             if ( ( $entry->{realm_name} // '' ) =~ $unsafe || ( $entry->{auth_file} // '' ) =~ $unsafe ) {
-                warn "Skipping basic auth for $user’s $docroot$loc, its realm or auth file contains a “\$” or a control character";
+                warn "Skipping basic auth for $user’s $docroot$loc, its realm or auth file contains a “\$” or a control character\n";
                 delete $basic_auth->{locations}{$loc};
             }
         }
