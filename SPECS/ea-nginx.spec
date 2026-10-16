@@ -735,7 +735,7 @@ fi
 
 %changelog
 * Thu Oct 15 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.31.7-1
-- EA-13600: Update ea-nginx from v1.31.6 to v1.31.7
+- EA-13600: Update ea-nginx from v1.31.6 to v1.31.7 (CVE-2026-15176, CVE-2026-93479, CVE-2026-97205, CVE-2026-97629)
 
 * Thu Sep 24 2026 Dan Muey <daniel.muey@webpros.com> - 1.31.6-2
 - EA4-332: Improve config template output escaping
