@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.31.6
+%define main_version 1.31.7
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 2
+%define release_prefix 1
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Oct 15 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.31.7-1
+- EA-13600: Update ea-nginx from v1.31.6 to v1.31.7 (CVE-2026-15176, CVE-2026-93479, CVE-2026-97205, CVE-2026-97629)
+
 * Thu Sep 24 2026 Dan Muey <daniel.muey@webpros.com> - 1.31.6-2
 - EA4-332: Improve config template output escaping
 
