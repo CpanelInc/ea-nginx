@@ -83,7 +83,7 @@ BuildRequires: systemd
 
 # end of distribution specific definitions
 
-%define main_version 1.31.7
+%define main_version 1.31.8
 
 %define bdir %{_builddir}/%{upstream_name}-%{main_version}
 
@@ -734,6 +734,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Thu Oct 22 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.31.8-1
+- EA-13617: Update ea-nginx from v1.31.7 to v1.31.8
+
 * Thu Oct 15 2026 EA4 Update Bot <cory.mcintire@webpros.com> - 1.31.7-1
 - EA-13600: Update ea-nginx from v1.31.6 to v1.31.7 (CVE-2026-15176, CVE-2026-93479, CVE-2026-97205, CVE-2026-97629)
 
