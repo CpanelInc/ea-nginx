@@ -1,0 +1,131 @@
+name: Request bot review
+
+# Every pull request gets a review request addressed to the review bot, so nobody has to remember
+# to add it by hand. The bot reviews first; a person reviews after it.
+#
+# Installed by /bot-review-install from the engineering-kit-bot-review plugin. This file is the
+# MECHANISM only. What the bot checks, and what a person still signs, is the code review practice,
+# which AI Platform owns (rubber-ducks-hub issues 81 and 84).
+#
+# WHEN. `opened`, drafts included: the bot reviews drafts, and an early review is the cheap one.
+# `ready_for_review` and `reopened` ask again only if the bot has no review of the current commit, so
+# a draft the bot already read at this commit is not reviewed twice. A dismissed review does not count.
+#
+# REQUESTED REVIEWER, NOT CODE OWNER. Do not list the bot in CODEOWNERS. As a code owner, its
+# approval can satisfy the code-owner rule alone, and an author can merge without a person (ENG-212).
+#
+# FORKS ARE SKIPPED. The job needs `pull-requests: write`, which GitHub withholds from a fork's
+# token. pull_request_target would grant it; this kit does not use it.
+#
+# 422. GitHub answers 422 when the bot is not a collaborator on this repo, which is the usual cause.
+# Give the bot account read access, then re-run the job. GitHub's own message is printed beside it.
+#
+# RUNNER. `runs-on` is set at install time to the org's self-hosted runner group. Never a
+# GitHub-hosted runner: those burn paid minutes.
+#
+# ACTION PINS. Every action is pinned to a full commit SHA with its release in a trailing comment,
+# `owner/action@<40-hex SHA> # vX.Y.Z`, the convention runway-hub and paved-road-hub write and the
+# marketplace's own workflows follow (rule 4 in its .github/workflows/CLAUDE.md). The SHA cannot move
+# under us, the comment says which release it is, and Dependabot bumps the two together. Never a
+# bare tag, a branch or @latest.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+concurrency:
+  group: request-bot-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  request-review:
+    name: Request bot review
+    # `pull-requests: write` is the job's, not the workflow's: the one step below asks the API to add
+    # a reviewer to this pull request.
+    permissions:
+      contents: read
+      pull-requests: write
+    if: github.event.pull_request.head.repo.id == github.repository_id
+    runs-on: { group: org/webpros-cpanel-arc-runners }
+    timeout-minutes: 5
+    env:
+      BOT_LOGIN: WPSolverBot_webpros
+    steps:
+      - name: Request a review from the bot
+        # No checkout and no setup-node: github-script runs on the runner's bundled Node and only
+        # talks to the API. Everything it reads comes from the event payload or env, never from
+        # `${{ }}` inside the script body.
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const bot = process.env.BOT_LOGIN;
+            const pr = context.payload.pull_request;
+            const action = context.payload.action;
+            // GitHub logins are case-insensitive; the installed value may not match the API's case.
+            const isBot = (user) => (user?.login ?? '').toLowerCase() === bot.toLowerCase();
+
+            // GitHub rejects a review request addressed to the pull request's own author.
+            if (isBot(pr.user)) {
+              core.info(`#${pr.number} was opened by ${bot}: an author cannot review their own PR.`);
+              return;
+            }
+
+            // A PR can be opened with reviewers already attached (`gh pr create --reviewer`).
+            if ((pr.requested_reviewers ?? []).some(isBot)) {
+              core.info(`#${pr.number} already has ${bot} as a requested reviewer, nothing to do.`);
+              return;
+            }
+
+            // GitHub clears the request once the bot reviews. On ready_for_review or reopened, ask
+            // again only if the bot has no standing review of this exact commit. A dismissed review
+            // was set aside by a person, so it does not count.
+            if (action !== 'opened') {
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                ...context.repo,
+                pull_number: pr.number,
+                per_page: 100,
+              });
+              const reviewed = reviews.some(
+                (review) => isBot(review.user) && review.commit_id === pr.head.sha && review.state !== 'DISMISSED',
+              );
+              if (reviewed) {
+                core.info(`${bot} already reviewed #${pr.number} at ${pr.head.sha.slice(0, 7)}, nothing to do.`);
+                return;
+              }
+            }
+
+            // GitHub sometimes answers a valid request with a 5xx. Retry those, with a pause between
+            // attempts only: a 4xx will not change on a second try.
+            const attempts = 3;
+            const pauseMs = 10_000;
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+              try {
+                await github.rest.pulls.requestReviewers({
+                  ...context.repo,
+                  pull_number: pr.number,
+                  reviewers: [bot],
+                });
+                core.info(`Requested a review from ${bot} on #${pr.number}${pr.draft ? ' (draft)' : ''}.`);
+                return;
+              } catch (error) {
+                const retryable = !error.status || error.status >= 500;
+                if (retryable && attempt < attempts) {
+                  core.warning(
+                    `Attempt ${attempt}/${attempts} failed (HTTP ${error.status ?? 'none'}), ` +
+                      `retrying in ${pauseMs / 1000}s.`,
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, pauseMs));
+                  continue;
+                }
+                const status = error.status ? ` (HTTP ${error.status})` : '';
+                const hint =
+                  error.status === 422 ? ` A 422 usually means ${bot} is not a collaborator: give it read access.` : '';
+                core.setFailed(
+                  `Could not request a review from ${bot} on #${pr.number}${status}: ${error.message}.${hint}`,
+                );
+                return;
+              }
+            }
