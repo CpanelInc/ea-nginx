@@ -1,0 +1,47 @@
+#!/usr/local/cpanel/3rdparty/bin/perl
+# cpanel - config-scripts/global/webapp-includes
+#                                                           All rights Reserved.
+# This code is subject to the cPanel license. Unauthorized copying is prohibited
+
+package scripts::ea_nginx_webapp_includes;
+
+use strict;
+use warnings;
+
+use File::Glob ();
+
+# The cPanel webapp plugin only writes these includes in standalone mode.
+# In reverse-proxy mode a leftover one outranks `location /` and bypasses Apache,
+# so remove any the plugin wrote. Files without its marker line are left alone.
+my $MARKER = qr/\A# Managed by the cPanel webapp plugin for \S+\. Do not edit\.\n/;
+
+sub run {
+    my ($root) = @_;
+    $root //= '';
+
+    return 0 if -e "$root/etc/nginx/ea-nginx/enable.standalone";
+
+    for my $file ( File::Glob::bsd_glob("$root/etc/nginx/conf.d/users/*/*/webapp.conf") ) {
+        next if -l $file || !-f _;
+
+        open( my $fh, '<', $file ) or next;
+        my $first = <$fh>;
+        close $fh;
+        next if !defined $first || $first !~ $MARKER;
+
+        if ( unlink $file ) {
+            print "Removed stale webapp include “$file”\n";
+            ( my $dir = $file ) =~ s{/[^/]+\z}{};
+            rmdir $dir;    # only succeeds when empty
+        }
+        else {
+            warn "Could not remove “$file”: $!\n";
+        }
+    }
+
+    return 0;
+}
+
+exit( run() ) if !caller;
+
+1;
