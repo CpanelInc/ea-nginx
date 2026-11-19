@@ -7,5 +7,5 @@ on:
       - production
 jobs:
   build:
-    uses: webpros-cpanel/ea-tools/.github/workflows/reusable-external-publish.yml@ghes
+    uses: webpros-cpanel/ea-tools/.github/workflows/reusable-external-publish.yml@main
     secrets: inherit
