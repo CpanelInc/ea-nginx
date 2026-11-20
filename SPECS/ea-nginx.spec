@@ -109,7 +109,7 @@ Summary: High performance web server (caching reverse-proxy by default)
 Name: ea-nginx
 Version: %{main_version}
 # Doing release_prefix this way for Release allows for OBS-proof versioning, See EA-4544 for more details
-%define release_prefix 1
+%define release_prefix 2
 Release: %{release_prefix}%{?dist}.cpanel
 Vendor: cPanel, L.L.C
 URL: http://nginx.org/
@@ -419,6 +419,7 @@ install %{SOURCE28} %{buildroot}/usr/local/cpanel/whostmgr/addonfeatures/ea-ngin
 %dir %{_sysconfdir}/nginx/ea-nginx
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/meta/apache
 %attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/config-scripts/global/config-scripts-global-cloudflare
+%attr(755, root, root) %{_sysconfdir}/nginx/ea-nginx/config-scripts/global/config-scripts-global-webapp-includes
 %config %{_sysconfdir}/nginx/ea-nginx/meta/apache_port.initial
 %config %{_sysconfdir}/nginx/ea-nginx/meta/apache_ssl_port.initial
 %config %{_sysconfdir}/nginx/ea-nginx/settings.json
@@ -734,6 +735,9 @@ if [ $1 -ge 1 ]; then
 fi
 
 %changelog
+* Wed Nov 18 2026 Chris Castillo <chris.castillo@webpros.com> - 1.31.9-2
+- EA4-354: Remove stale webapp per-domain nginx includes when ea-nginx is not in standalone mode
+
 * Wed Nov 18 2026 Cory McIntire <cory.mcintire@webpros.com> - 1.31.9-1
 - EA-13664: Update ea-nginx from v1.31.8 to v1.31.9 (CVE-2026-113425, CVE-2026-118899, CVE-2026-120967, CVE-2026-120993, CVE-2026-123007, CVE-2026-123633, CVE-2026-123634, CVE-2026-123640, CVE-2026-125283)
 
